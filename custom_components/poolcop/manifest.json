@@ -1,0 +1,9 @@
+{
+  "domain": "poolcop",
+  "name": "PoolCop",
+  "codeowners": ["@sstriker"],
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/poolcop",
+  "iot_class": "cloud_polling",
+  "requirements": ["poolcop==0.0.1"]
+}
