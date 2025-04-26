@@ -13,8 +13,95 @@
                 "data": {
                     "api_key": "API Key"
                 },
-                "description": "Do you want to start setup?"
+                "description": "Enter your PoolCopilot API key to connect to your PoolCop system."
+            },
+            "flow_rates": {
+                "title": "Pump Flow Configuration",
+                "description": "Your pool has {pump_speeds} speed levels and a volume of {vol} m³. Configure flow rates (m³/h) for each pump speed level that your system supports.",
+                "data": {
+                    "flow_rate_1": "Flow at Speed 1 (m³/h)",
+                    "flow_rate_2": "Flow at Speed 2 (m³/h)",
+                    "flow_rate_3": "Flow at Speed 3 (m³/h)"
+                }
             }
+        }
+    },
+    "services": {
+        "set_pump_speed": {
+            "name": "Set pump speed",
+            "description": "Sets the pool pump speed to a specific level.",
+            "fields": {
+                "speed": {
+                    "name": "Speed",
+                    "description": "Pump speed level (1, 2, or 3)."
+                }
+            }
+        },
+        "toggle_pump": {
+            "name": "Toggle pump",
+            "description": "Toggles the pool pump on or off."
+        },
+        "toggle_aux": {
+            "name": "Toggle auxiliary",
+            "description": "Toggles an auxiliary output on or off.",
+            "fields": {
+                "aux_id": {
+                    "name": "Auxiliary ID",
+                    "description": "The auxiliary output to toggle (1-6)."
+                }
+            }
+        },
+        "set_valve_position": {
+            "name": "Set valve position",
+            "description": "Sets the valve to a specific position.",
+            "fields": {
+                "position": {
+                    "name": "Position",
+                    "description": "Valve position (1-6)."
+                }
+            }
+        },
+        "clear_alarm": {
+            "name": "Clear alarm",
+            "description": "Clears active alarms."
+        },
+        "set_force_filtration": {
+            "name": "Set forced filtration",
+            "description": "Sets the pool to forced filtration mode for a specific duration.",
+            "fields": {
+                "hours": {
+                    "name": "Hours",
+                    "description": "Duration in hours (24, 48, or 72)."
+                }
+            }
+        },
+        "configure_pump_flow": {
+            "name": "Configure pump flow",
+            "description": "Configures flow rates (m³/h) for different pump speeds to calculate actual flow.",
+            "fields": {
+                "speed_1": {
+                    "name": "Speed 1 Flow",
+                    "description": "Flow rate (m³/h) when pump is at speed level 1."
+                },
+                "speed_2": {
+                    "name": "Speed 2 Flow",
+                    "description": "Flow rate (m³/h) when pump is at speed level 2."
+                },
+                "speed_3": {
+                    "name": "Speed 3 Flow",
+                    "description": "Flow rate (m³/h) when pump is at speed level 3."
+                }
+            }
+        }
+    },
+    "entity": {
+        "binary_sensor": {
+            "aux1": "{aux_name}",
+            "aux2": "{aux_name}",
+            "aux3": "{aux_name}",
+            "aux4": "{aux_name}",
+            "aux5": "{aux_name}",
+            "aux6": "{aux_name}"
         }
     }
 }

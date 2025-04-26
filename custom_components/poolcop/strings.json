@@ -2,19 +2,27 @@
   "config": {
     "step": {
       "user": {
-        "description": "[%key:common::config_flow::description::confirm_setup%]",
+        "description": "Enter your PoolCop API key from the PoolCopilot account",
         "data": {
-          "api_key": "[%key:common::config_flow::data::api_key%]"
+          "api_key": "API Key"
+        }
+      },
+      "flow_rates": {
+        "description": "Your pool pump has {pump_speeds} speeds. Configure the flow rates for each speed.\n\nPool volume: {vol} m³\n\n{has_detected_flows:? The system detected a flow rate of **{flowrate} m³/h** from your PoolCop and has calculated default values based on this.:: Default values are shown, please adjust as needed based on your pump specifications.}",
+        "data": {
+          "flow_rate_1": "Flow rate at speed 1 (m³/h)",
+          "flow_rate_2": "Flow rate at speed 2 (m³/h)",
+          "flow_rate_3": "Flow rate at speed 3 (m³/h)"
         }
       }
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "Device is already configured"
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid API key",
+      "unknown": "Unexpected error"
     }
   }
 }
