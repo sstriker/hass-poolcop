@@ -37,26 +37,26 @@ SERVICE_TOGGLE_AUX = "toggle_aux"
 SERVICE_SET_VALVE_POSITION = "set_valve_position"
 SERVICE_CLEAR_ALARM = "clear_alarm"
 
-# Valve position mappings
 VALVE_POSITIONS = {
-    "filter": 1,
-    "waste": 2,
-    "closed": 3,
-    "backwash": 4,
-    "bypass": 5,
-    "rinse": 6,
+    "filter": 0,
+    "waste": 1,
+    "closed": 2,
+    "backwash": 3,
+    "bypass": 4,
+    "rinse": 5,
 }
 
 VALVE_POSITION_NAMES = {
-    1: "Filter",
-    2: "Waste", 
-    3: "Closed",
-    4: "Backwash",
-    5: "Bypass",
-    6: "Rinse"
+    0: "Filter",
+    1: "Waste",
+    2: "Closed",
+    3: "Backwash",
+    4: "Bypass",
+    5: "Rinse",
+    6: "Unknown",
+    7: "None"
 }
 
-# Add mappings for enumerated values
 WATERLEVEL_STATES = {
     0: "Not Installed",
     1: "Low",
@@ -69,6 +69,21 @@ WATER_VALVE_POSITIONS = {
     0: "Standby",
     1: "Refill",
     2: "Measure",
+}
+
+# Add a mapping for 'Watervalve' (valve used for water level control)
+WATERVALVE_STATES = {
+    0: "Standby",
+    1: "Open",
+    2: "Closed",
+    3: "Measure"
+}
+
+FORCED_FILTRATION_MODES = {
+    0: "None",
+    1: "24 Hours",
+    2: "48 Hours",
+    3: "72 Hours",
 }
 
 POOL_TYPES = {
@@ -110,6 +125,19 @@ FILTER_TIMER_MODES = {
 PH_TYPES = {
     0: "Acid (pH-)",
     1: "Base (pH+)",
+}
+
+OPERATION_MODES = {
+    0: "Stop",       # PoolCop stopped
+    1: "Freeze",     # PoolCop freeze protection
+    2: "Forced",     # PoolCop in forced mode
+    3: "Auto",       # Auto mode
+    4: "Timer",      # Timers mode
+    5: "Manual",     # Manual mode
+    6: "Paused",     # PoolCop paused
+    7: "External",   # External mode
+    8: "Unknown",    #
+    9: "Unknown"     #
 }
 
 # Timer-related constants

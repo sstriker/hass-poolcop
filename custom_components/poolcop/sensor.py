@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import zoneinfo
+from typing import Any
 
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
@@ -22,7 +24,18 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, FILTER_MODES, FILTER_TIMER_MODES
+from .const import (
+    DOMAIN,
+    FILTER_MODES,
+    FILTER_TIMER_MODES,
+    FORCED_FILTRATION_MODES,
+    LOGGER,
+    OPERATION_MODES,
+    VALVE_POSITION_NAMES,
+    WATER_VALVE_POSITIONS,
+    WATERVALVE_STATES,
+    WATERLEVEL_STATES,
+)
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -70,13 +83,13 @@ def _active_alarm_value_fn(
     attribute: str,
 ) -> Callable[[PoolCopData], str | int | float | datetime | None]:
     """Return value function for active alarm data."""
-    
+
     def value_fn(data: PoolCopData) -> str | int | float | datetime | None:
         if not data.active_alarms:
             return None
         # Return the attribute from the most recent active alarm
         return data.active_alarms[0].get(attribute)
-        
+
     return value_fn
 
 
@@ -84,7 +97,7 @@ def _active_alarm_timestamp_fn(
     attribute: str,
 ) -> Callable[[PoolCopData], datetime | None]:
     """Return timestamp function for active alarm data."""
-    
+
     def value_fn(data: PoolCopData) -> datetime | None:
         if not data.active_alarms:
             return None
@@ -92,30 +105,8 @@ def _active_alarm_timestamp_fn(
         if not timestamp:
             return None
         return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
-        
+
     return value_fn
-
-
-def _pump_flow_fn(data: PoolCopData) -> float | None:
-    """Calculate pump flow rate based on current pump speed."""
-    # Get the pump state and speed
-    is_pump_on = bool(data.status_value("status.pump"))
-    if not is_pump_on:
-        return 0.0
-        
-    # Get the current pump speed level
-    speed_level = data.status_value("status.pumpspeed")
-    if speed_level is None:
-        return None
-        
-    # Get the coordinator reference to access flow calculation method
-    # This is a bit of a hack, but it allows us to access the coordinator's method
-    coordinator = data._asdict().get("_coordinator")
-    if not coordinator:
-        return None
-        
-    # Calculate the flow rate based on the current speed level
-    return coordinator.calculate_flow_rate(float(speed_level))
 
 
 def _cycle_time_remaining_fn(data: PoolCopData) -> float | None:
@@ -139,46 +130,33 @@ def _cycle_elapsed_time_fn(data: PoolCopData) -> float | None:
         return data.cycle_status["elapsed_time"]
     return None
 
-
-# Define value functions for pool settings
-def _value_fn_pool_settings(path: str) -> Callable[[PoolCopData], Any]:
-    """Return a value function for settings data at path."""
-    def value_fn(data: PoolCopData) -> Any:
-        try:
-            return data.status_value(path, prefix="PoolCop.settings")
-        except (KeyError, AttributeError):
-            return None
-    return value_fn
-
-
 def _state_mapping_fn(path: str, mapping: dict) -> Callable[[PoolCopData], str | None]:
     """Return a value function that maps a numeric value to a string."""
     def value_fn(data: PoolCopData) -> str | None:
         value = data.status_value(path)
-        if value is None:
-            return None
-        return mapping.get(value, f"Unknown ({value})")
+        return mapping.get(value, None)
     return value_fn
 
-def _time_str_to_time_today(time_str: str) -> datetime | None:
-    """Convert a time string (HH:MM:SS) to a datetime object for today."""
+def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
+    """Convert a time string (HH:MM:SS) to a datetime object for today using timezone."""
     if not time_str or time_str == "00:00:00":
         return None
-        
+
     try:
         hour, minute, second = map(int, time_str.split(':'))
-        now = datetime.now()
+        now = datetime.now(zoneinfo.ZoneInfo(timezone))
         result = datetime(
             year=now.year, month=now.month, day=now.day,
-            hour=hour, minute=minute, second=second
+            hour=hour, minute=minute, second=second,
+            tzinfo=zoneinfo.ZoneInfo(timezone)
         )
-        
+
         # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
         if result < now and hour < 12:
             result = result + timedelta(days=1)
-            
+
         return result
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError):
         return None
 
 def _timer_fn(timer_name: str, field: str) -> Callable[[PoolCopData], Any]:
@@ -200,9 +178,13 @@ def _timer_time_fn(timer_name: str, field: str) -> Callable[[PoolCopData], datet
             timer = data.status_value(f"timers.{timer_name}")
             if timer and timer.get("enabled") == 1:
                 time_str = timer.get(field)
-                return _time_str_to_time_today(time_str)
+
+                # Get timezone from Pool data or fallback to UTC
+                timezone = data.status_value("timezone", prefix="Pool") or "UTC"
+                return _time_str_to_time_today(time_str, timezone)
             return None
-        except (KeyError, AttributeError):
+        except (KeyError, AttributeError, zoneinfo.ZoneInfoNotFoundError) as err:
+            LOGGER.debug("Error creating timer time with timezone: %s", err)
             return None
     return value_fn
 
@@ -268,16 +250,16 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Water level",
         icon="mdi:waves",
         device_class=SensorDeviceClass.ENUM,
-        options=["Not Installed", "Low", "Normal", "High", "Error"],
-        value_fn=_value_fn("waterlevel"),
+        options=list(WATERLEVEL_STATES.values()),
+        value_fn=_state_mapping_fn("waterlevel", WATERLEVEL_STATES),
     ),
     PoolCopSensorEntityDescription(
         key="valve_position",
         name="Valve position",
         icon="mdi:valve",
         device_class=SensorDeviceClass.ENUM,
-        options=["Filter", "Waste", "Closed", "Backwash", "Bypass", "Rinse", "Unknown", "None"],
-        value_fn=_value_fn("status.valveposition"),
+        options=list(VALVE_POSITION_NAMES.values()),
+        value_fn=_state_mapping_fn("status.valveposition", VALVE_POSITION_NAMES),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed",
@@ -290,9 +272,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="poolcop",
         name="Operation Mode",
         icon="mdi:state-machine",
-        value_fn=_value_fn("status.poolcop"),
         device_class=SensorDeviceClass.ENUM,
-        options=["Idle", "Cycle 1", "Backwash", "Cycle 2", "Waste", "Rinse", "Pause", "External Filter"],
+        options=list(OPERATION_MODES.values()),
+        value_fn=_state_mapping_fn("status.poolcop", OPERATION_MODES),
     ),
     PoolCopSensorEntityDescription(
         key="last_backwash",
@@ -317,8 +299,8 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Forced filtration mode",
         icon="mdi:clock-fast",
         device_class=SensorDeviceClass.ENUM,
-        options=["None", "24 Hours", "48 Hours", "72 Hours"],
-        value_fn=_value_fn("status.forced.mode"),
+        options=list(FORCED_FILTRATION_MODES.values()),
+        value_fn=_state_mapping_fn("status.forced.mode", FORCED_FILTRATION_MODES),
     ),
     PoolCopSensorEntityDescription(
         key="forced_filtration_remaining",
@@ -329,20 +311,12 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("status.forced.remaining_hours"),
     ),
     PoolCopSensorEntityDescription(
-        key="water_valve_position",
-        name="Water valve position",
-        icon="mdi:pipe-valve",
+        key="refill_status",
+        name="Refill Status",
+        icon="mdi:water-pump",
         device_class=SensorDeviceClass.ENUM,
-        options=["Standby", "Refill", "Measure"],
-        value_fn=_value_fn("status.watervalve"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="running_status",
-        name="System Running Status",
-        icon="mdi:sync-circle",
-        device_class=SensorDeviceClass.ENUM,
-        options=["Stopped", "Freeze Protection", "Forced", "Auto", "Timer", "Manual", "Paused", "External"],
-        value_fn=_value_fn("status.running_status"),
+        options=list(WATER_VALVE_POSITIONS.values()),
+        value_fn=_state_mapping_fn("status.watervalve", WATER_VALVE_POSITIONS),
     ),
     PoolCopSensorEntityDescription(
         key="ph_setpoint",
@@ -445,7 +419,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="m³",
         icon="mdi:pool",
-        value_fn=_value_fn_pool_settings("pool.volume"),
+        value_fn=_value_fn("settings.pool.volume"),
     ),
     PoolCopSensorEntityDescription(
         key="pool_turnover",
@@ -453,7 +427,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="×/day",
         icon="mdi:refresh",
-        value_fn=_value_fn_pool_settings("pool.turnover"),
+        value_fn=_value_fn("settings.pool.turnover"),
     ),
     PoolCopSensorEntityDescription(
         key="pool_cover_reduction",
@@ -461,9 +435,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="%",
         icon="mdi:percent",
-        value_fn=_value_fn_pool_settings("pool.cover_reduction"),
+        value_fn=_value_fn("settings.pool.cover_reduction"),
     ),
-    
+
     # Filter settings
     PoolCopSensorEntityDescription(
         key="filter_backwash_duration",
@@ -471,7 +445,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-outline",
-        value_fn=_value_fn_pool_settings("filter.backwash_duration"),
+        value_fn=_value_fn("settings.filter.backwash_duration"),
     ),
     PoolCopSensorEntityDescription(
         key="filter_rinse_duration",
@@ -479,14 +453,14 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-outline",
-        value_fn=_value_fn_pool_settings("filter.rinse_duration"),
+        value_fn=_value_fn("settings.filter.rinse_duration"),
     ),
     PoolCopSensorEntityDescription(
         key="filter_max_days",
         name="Maximum Days Between Backwash",
         native_unit_of_measurement=UnitOfTime.DAYS,
         icon="mdi:calendar-range",
-        value_fn=_value_fn_pool_settings("filter.max_days"),
+        value_fn=_value_fn("settings.filter.max_days"),
     ),
     PoolCopSensorEntityDescription(
         key="filter_timer_mode",
@@ -494,18 +468,15 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-cog",
         device_class=SensorDeviceClass.ENUM,
         options=list(FILTER_TIMER_MODES.values()),
-        value_fn=lambda data: FILTER_TIMER_MODES.get(
-            data.status_value("filter.timer", prefix="PoolCop.settings"), 
-            f"Unknown ({data.status_value('filter.timer', prefix='PoolCop.settings')})"
-        ),
+        value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
     ),
-    
+
     # Pump settings
     PoolCopSensorEntityDescription(
         key="pump_nb_speeds",
         name="Pump Speed Levels",
         icon="mdi:speedometer",
-        value_fn=_value_fn_pool_settings("pump.nb_speed"),
+        value_fn=_value_fn("settings.pump.nb_speed"),
     ),
     PoolCopSensorEntityDescription(
         key="pump_pressure_low",
@@ -513,7 +484,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.PA,
-        value_fn=_value_fn_pool_settings("pump.pressure_low"),
+        value_fn=_value_fn("settings.pump.pressure_low"),
     ),
     PoolCopSensorEntityDescription(
         key="pump_pressure_alarm",
@@ -521,9 +492,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.PA,
-        value_fn=_value_fn_pool_settings("pump.pressure_alarm"),
+        value_fn=_value_fn("settings.pump.pressure_alarm"),
     ),
-    
+
     # pH settings
     PoolCopSensorEntityDescription(
         key="ph_set_point",
@@ -531,9 +502,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="pH",
         icon="mdi:ph",
-        value_fn=_value_fn_pool_settings("ph.set_point"),
+        value_fn=_value_fn("settings.ph.set_point"),
     ),
-    
+
     # ORP settings
     PoolCopSensorEntityDescription(
         key="orp_set_point",
@@ -541,7 +512,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:molecule",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mV",
-        value_fn=_value_fn_pool_settings("orp.set_point"),
+        value_fn=_value_fn("settings.orp.set_point"),
     ),
     PoolCopSensorEntityDescription(
         key="orp_hyper_set_point",
@@ -549,14 +520,14 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:molecule",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mV",
-        value_fn=_value_fn_pool_settings("orp.hyper_set_point"),
+        value_fn=_value_fn("settings.orp.hyper_set_point"),
     ),
     PoolCopSensorEntityDescription(
         key="orp_temperature_shutdown",
         name="ORP Temperature Shutdown",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        value_fn=_value_fn_pool_settings("orp.temperature_shutdown"),
+        value_fn=_value_fn("settings.orp.temperature_shutdown"),
     ),
 )
 
@@ -585,7 +556,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_timer_time_fn("cycle1", "stop"),
     ),
-    
+
     # Cycle 2 timer
     PoolCopSensorEntityDescription(
         key="cycle2_enabled",
@@ -609,7 +580,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_timer_time_fn("cycle2", "stop"),
     ),
-    
+
     # Add sensors for switchable auxiliary outputs
     PoolCopSensorEntityDescription(
         key="aux4_enabled",
@@ -634,28 +605,28 @@ async def async_setup_entry(
 ) -> None:
     """Set up PoolCop sensors based on a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    
+
     # Add standard sensors
     entities = [
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in SENSORS
     ]
-    
+
     # Add the flow rate sensor
     entities.append(FlowRateSensor(coordinator=coordinator))
-    
+
     # Add settings sensors
     entities.extend(
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in SETTINGS_SENSORS
     )
-    
+
     # Add timer sensors
     entities.extend(
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in TIMER_SENSORS
     )
-    
+
     async_add_entities(entities)
 
 
@@ -712,11 +683,22 @@ class FlowRateSensor(PoolCopSensorEntity):
         is_pump_on = bool(self.coordinator.data.status_value("status.pump"))
         if not is_pump_on:
             return 0.0
-            
+
         # Get the current pump speed level (discrete value 0-3)
         speed_level = self.coordinator.data.status_value("status.pumpspeed")
         if speed_level is None:
             return None
-            
-        # Calculate the flow rate based on the current speed level
-        return self.coordinator.calculate_flow_rate(speed_level)
+
+        try:
+            speed_level = int(speed_level)
+        except (ValueError, TypeError):
+            LOGGER.warning("Invalid pump speed level: %s, flow rate unavailable", speed_level)
+            return None
+
+        if speed_level in self.coordinator.flow_rates:
+            flow_rate = self.coordinator.flow_rates[speed_level]
+            LOGGER.debug("Using flow rate for speed %s: %s m³/h", speed_level, flow_rate)
+            return flow_rate
+
+        LOGGER.warning("Unknown speed level: %s, flow rate unavailable", speed_level)
+        return None

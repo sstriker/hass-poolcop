@@ -42,6 +42,9 @@ def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
 
     return is_on_fn
 
+def _watervalve_is_on(data: PoolCopData) -> bool:
+    """Return true if the water valve is open."""
+    return data.status_value("status.watervalve") == 1 # Refill
 
 FILTER_CYCLE_ICONS = ("mdi:sync", "mdi:sync-off")
 PUMP_ICONS = ("mdi:pump", "mdi:pump-off")
@@ -60,7 +63,7 @@ BINARY_SENSORS = (
         key="watervalve",
         name="Watervalve",
         device_class=BinarySensorDeviceClass.OPENING,
-        is_on_fn=_is_on_fn("status.watervalve"),
+        is_on_fn=_watervalve_is_on,
         on_off_icons=VALVE_ICONS,
     ),
     PoolCopBinarySensorEntityDescription(
