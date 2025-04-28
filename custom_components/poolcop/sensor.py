@@ -400,14 +400,6 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_cycle_end_time_fn,
     ),
-    PoolCopSensorEntityDescription(
-        key="filter_mode",
-        name="Filter Mode",
-        icon="mdi:air-filter",
-        device_class=SensorDeviceClass.ENUM,
-        options=list(FILTER_MODES.values()),
-        value_fn=_state_mapping_fn("status.filter_mode", FILTER_MODES),
-    ),
 )
 
 # Additional sensors for pool settings
@@ -469,6 +461,14 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(FILTER_TIMER_MODES.values()),
         value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
+    ),
+    PoolCopSensorEntityDescription(
+        key="filter_mode",
+        name="Filter Mode",
+        icon="mdi:air-filter",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(FILTER_MODES.values()),
+        value_fn=_state_mapping_fn("settings.filter.mode", FILTER_MODES),
     ),
 
     # Pump settings

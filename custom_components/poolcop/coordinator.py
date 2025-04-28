@@ -31,7 +31,6 @@ from .const import (
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
-    FORCED_FILTRATION_MODES,
 )
 
 # Default cycle durations (in seconds)
@@ -57,16 +56,21 @@ class PoolCopData(NamedTuple):
     cycle_status: dict[str, Any] | None = None  # For tracking cycle information
     next_timer_event: dict[str, Any] | None = None  # For tracking upcoming timer events
 
-    def status_value(self, path: str, prefix=None) -> Any:
+    def status_value(self, path: str, prefix: str = "PoolCop") -> Any:
         """Get value from a path (e.g. 'temperature.water') from the Poolcop status."""
-        if prefix is None:
-            prefix = "PoolCop"
-        path = ".".join([prefix, path])
+        full_path = f"{prefix}.{path}"
 
         try:
-            v = reduce(operator.getitem, path.split("."), self.status)  # type: ignore[arg-type]
-            return v
-        except (KeyError, TypeError):
+            result = self.status
+            for part in filter(None, full_path.split('.')):
+                if not isinstance(result, dict):
+                    return None
+                result = result.get(part)
+                if result is None:
+                    return None
+            return result
+        except (KeyError, TypeError) as err:
+            LOGGER.debug("Error accessing path %s with prefix %s: %s", path, prefix, err)
             return None
 
     def has_active_alarms(self) -> bool:
