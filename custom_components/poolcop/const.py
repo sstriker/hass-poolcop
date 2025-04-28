@@ -1,4 +1,5 @@
 """Constants for the PoolCop integration."""
+
 from __future__ import annotations
 
 from datetime import timedelta
@@ -54,7 +55,7 @@ VALVE_POSITION_NAMES = {
     4: "Bypass",
     5: "Rinse",
     6: "Unknown",
-    7: "None"
+    7: "None",
 }
 
 WATERLEVEL_STATES = {
@@ -72,12 +73,7 @@ WATER_VALVE_POSITIONS = {
 }
 
 # Add a mapping for 'Watervalve' (valve used for water level control)
-WATERVALVE_STATES = {
-    0: "Standby",
-    1: "Open",
-    2: "Closed",
-    3: "Measure"
-}
+WATERVALVE_STATES = {0: "Standby", 1: "Open", 2: "Closed", 3: "Measure"}
 
 FORCED_FILTRATION_MODES = {
     0: "None",
@@ -111,15 +107,15 @@ FILTER_MODES = {
 }
 
 FILTER_TIMER_MODES = {
-    0: "STOP - Disabled",         # Completely disables filtration
-    1: "TIMER - Manual Schedule", # User-defined ON/OFF times for two cycles
-    2: "ECO+ - Intelligent",      # Adjusts runtime based on water temperature
-    3: "VOLUME - Pool Volume",    # Based on pool volume, pump flow, desired turnovers
-    4: "CONTINUOUS - 23h/day",    # Runs 23 hours/day in two cycles
-    5: "FORCE 24H",               # Overrides normal logic to run for 24h
-    6: "FORCE 48H",               # Overrides normal logic to run for 48h
-    7: "FORCE 72H",               # Overrides normal logic to run for 72h
-    8: "24/24 - Always On",       # True continuous mode, pump runs 24/7
+    0: "STOP - Disabled",  # Completely disables filtration
+    1: "TIMER - Manual Schedule",  # User-defined ON/OFF times for two cycles
+    2: "ECO+ - Intelligent",  # Adjusts runtime based on water temperature
+    3: "VOLUME - Pool Volume",  # Based on pool volume, pump flow, desired turnovers
+    4: "CONTINUOUS - 23h/day",  # Runs 23 hours/day in two cycles
+    5: "FORCE 24H",  # Overrides normal logic to run for 24h
+    6: "FORCE 48H",  # Overrides normal logic to run for 48h
+    7: "FORCE 72H",  # Overrides normal logic to run for 72h
+    8: "24/24 - Always On",  # True continuous mode, pump runs 24/7
 }
 
 PH_TYPES = {
@@ -128,19 +124,19 @@ PH_TYPES = {
 }
 
 OPERATION_MODES = {
-    0: "Stop",       # PoolCop stopped
-    1: "Freeze",     # PoolCop freeze protection
-    2: "Forced",     # PoolCop in forced mode
-    3: "Auto",       # Auto mode
-    4: "Timer",      # Timers mode
-    5: "Manual",     # Manual mode
-    6: "Paused",     # PoolCop paused
-    7: "External",   # External mode
-    8: "Unknown",    #
-    9: "Unknown"     #
+    0: "Stop",  # PoolCop stopped
+    1: "Freeze",  # PoolCop freeze protection
+    2: "Forced",  # PoolCop in forced mode
+    3: "Auto",  # Auto mode
+    4: "Timer",  # Timers mode
+    5: "Manual",  # Manual mode
+    6: "Paused",  # PoolCop paused
+    7: "External",  # External mode
+    8: "Unknown",
+    9: "Unknown",
 }
 
 # Timer-related constants
 DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes
-APPROACHING_TIMER_UPDATE_INTERVAL = 60    # 1 minute
-TIMER_APPROACHING_THRESHOLD = 10 * 60     # 10 minutes
+APPROACHING_TIMER_UPDATE_INTERVAL = 60  # 1 minute
+TIMER_APPROACHING_THRESHOLD = 10 * 60  # 10 minutes

@@ -1,17 +1,12 @@
 """The Coordinator for PoolCop."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from functools import reduce
-import operator
 import time
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple
 
-from poolcop import (
-    PoolCopilot,
-    PoolCopilotConnectionError,
-    PoolCopilotRateLimitError,
-)
+from poolcop import PoolCopilot, PoolCopilotConnectionError, PoolCopilotRateLimitError
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -20,29 +15,29 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    DOMAIN,
-    LOGGER,
-    NORMAL_UPDATE_INTERVAL,
-    TRANSITION_UPDATE_INTERVAL,
-    CYCLE_END_PREDICTION_WINDOW,
     ALARM_FETCH_INTERVAL,
-    STORAGE_KEY,
-    STORAGE_VERSION,
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
+    CYCLE_END_PREDICTION_WINDOW,
+    DOMAIN,
+    LOGGER,
+    NORMAL_UPDATE_INTERVAL,
+    STORAGE_KEY,
+    STORAGE_VERSION,
+    TRANSITION_UPDATE_INTERVAL,
 )
 
 # Default cycle durations (in seconds)
 DEFAULT_CYCLE_DURATIONS = {
-    0: 0,      # Idle - no duration
-    1: 7200,   # Cycle 1 - start with 2 hours as default
-    2: 600,    # Backwash - start with 10 minutes as default
-    3: 3600,   # Cycle 2 - start with 1 hour as default
-    4: 900,    # Waste - start with 15 minutes as default
-    5: 300,    # Rinse - start with 5 minutes as default
-    6: 0,      # Pause - no predictable duration
-    7: 0,      # External Filter - no predictable duration
+    0: 0,  # Idle - no duration
+    1: 7200,  # Cycle 1 - start with 2 hours as default
+    2: 600,  # Backwash - start with 10 minutes as default
+    3: 3600,  # Cycle 2 - start with 1 hour as default
+    4: 900,  # Waste - start with 15 minutes as default
+    5: 300,  # Rinse - start with 5 minutes as default
+    6: 0,  # Pause - no predictable duration
+    7: 0,  # External Filter - no predictable duration
 }
 
 
@@ -62,16 +57,19 @@ class PoolCopData(NamedTuple):
 
         try:
             result = self.status
-            for part in filter(None, full_path.split('.')):
+            for part in filter(None, full_path.split(".")):
                 if not isinstance(result, dict):
                     return None
                 result = result.get(part)
                 if result is None:
                     return None
-            return result
         except (KeyError, TypeError) as err:
-            LOGGER.debug("Error accessing path %s with prefix %s: %s", path, prefix, err)
+            LOGGER.debug(
+                "Error accessing path %s with prefix %s: %s", path, prefix, err
+            )
             return None
+        else:
+            return result
 
     def has_active_alarms(self) -> bool:
         """Check if there are any active alarms."""
@@ -102,7 +100,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         )
 
         # Initialize pump flow rates from defaults
-        self.flow_rates = dict()
+        self.flow_rates = {}
 
         # Update flow rates from config entry if available
         if CONF_FLOW_RATE_1 in config_entry.data:
@@ -136,11 +134,12 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         new_interval = NORMAL_UPDATE_INTERVAL
 
         # If we have a current cycle and know its typical duration
-        if (cycle_mode is not None and
-            self._current_cycle_start is not None and
-            cycle_mode in self._cycle_durations and
-            self._cycle_durations[cycle_mode] > 0):
-
+        if (
+            cycle_mode is not None
+            and self._current_cycle_start is not None
+            and cycle_mode in self._cycle_durations
+            and self._cycle_durations[cycle_mode] > 0
+        ):
             # Calculate expected end time
             expected_duration = self._cycle_durations[cycle_mode]
             cycle_elapsed = now - self._current_cycle_start
@@ -151,7 +150,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 new_interval = TRANSITION_UPDATE_INTERVAL
                 LOGGER.debug(
                     "Cycle %s approaching end (%.1f minutes remaining). Using faster update interval.",
-                    cycle_mode, time_remaining / 60
+                    cycle_mode,
+                    time_remaining / 60,
                 )
 
         # Update the coordinator's update interval if it changed
@@ -186,22 +186,31 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                         if self._last_operation_mode in [1, 2, 3, 4, 5]:
                             # Update the average duration using exponential moving average
                             # Weight: 30% new, 70% old
-                            old_duration = self._cycle_durations[self._last_operation_mode]
+                            old_duration = self._cycle_durations[
+                                self._last_operation_mode
+                            ]
                             if old_duration > 0:
-                                new_duration = (0.3 * cycle_duration) + (0.7 * old_duration)
-                                self._cycle_durations[self._last_operation_mode] = new_duration
+                                new_duration = (0.3 * cycle_duration) + (
+                                    0.7 * old_duration
+                                )
+                                self._cycle_durations[self._last_operation_mode] = (
+                                    new_duration
+                                )
                                 LOGGER.debug(
                                     "Updated duration for mode %s: %.1f minutes",
-                                    self._last_operation_mode, new_duration / 60
+                                    self._last_operation_mode,
+                                    new_duration / 60,
                                 )
 
                         # Record transition for analysis
-                        self._cycle_transitions.append({
-                            "from_mode": self._last_operation_mode,
-                            "to_mode": current_mode,
-                            "duration": cycle_duration,
-                            "timestamp": now,
-                        })
+                        self._cycle_transitions.append(
+                            {
+                                "from_mode": self._last_operation_mode,
+                                "to_mode": current_mode,
+                                "duration": cycle_duration,
+                                "timestamp": now,
+                            }
+                        )
 
                         # Keep only last 20 transitions
                         if len(self._cycle_transitions) > 20:
@@ -211,7 +220,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self._current_cycle_start = now
                 LOGGER.debug(
                     "Cycle transition detected: %s -> %s",
-                    self._last_operation_mode, current_mode
+                    self._last_operation_mode,
+                    current_mode,
                 )
 
             # Update last mode
@@ -223,7 +233,10 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 cycle_status["elapsed_time"] = elapsed_time
 
                 # Only predict for cycles with known durations
-                if current_mode in [1, 2, 3, 4, 5] and self._cycle_durations[current_mode] > 0:
+                if (
+                    current_mode in [1, 2, 3, 4, 5]
+                    and self._cycle_durations[current_mode] > 0
+                ):
                     expected_duration = self._cycle_durations[current_mode]
                     remaining_time = max(0, expected_duration - elapsed_time)
                     cycle_status["remaining_time"] = remaining_time
@@ -261,33 +274,44 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if start_time_str and start_time_str != "00:00:00":
                     start_time = self._time_str_to_datetime(start_time_str)
                     if start_time:
-                        seconds_until = (start_time.timestamp() - now_timestamp)
+                        seconds_until = start_time.timestamp() - now_timestamp
                         # Only consider events in the near future (next 30 minutes)
                         if 0 < seconds_until < 1800:
-                            upcoming_events.append({
-                                "type": f"{cycle_name}_start",
-                                "time": start_time,
-                                "seconds_until": seconds_until
-                            })
+                            upcoming_events.append(
+                                {
+                                    "type": f"{cycle_name}_start",
+                                    "time": start_time,
+                                    "seconds_until": seconds_until,
+                                }
+                            )
 
                 # Process stop time
                 stop_time_str = cycle.get("stop")
                 if stop_time_str and stop_time_str != "00:00:00":
                     stop_time = self._time_str_to_datetime(stop_time_str)
                     if stop_time:
-                        seconds_until = (stop_time.timestamp() - now_timestamp)
+                        seconds_until = stop_time.timestamp() - now_timestamp
                         # Only consider events in the near future (next 30 minutes)
                         if 0 < seconds_until < 1800:
-                            upcoming_events.append({
-                                "type": f"{cycle_name}_stop",
-                                "time": stop_time,
-                                "seconds_until": seconds_until
-                            })
+                            upcoming_events.append(
+                                {
+                                    "type": f"{cycle_name}_stop",
+                                    "time": stop_time,
+                                    "seconds_until": seconds_until,
+                                }
+                            )
 
             # Process auxiliary timers that are enabled and switchable
             for aux_id in range(1, 7):
                 # First check if this aux is switchable by checking the aux data
-                aux_data = next((a for a in self.data.status_value("aux", []) if a.get("id") == aux_id), None)
+                aux_data = next(
+                    (
+                        a
+                        for a in self.data.status_value("aux", [])
+                        if a.get("id") == aux_id
+                    ),
+                    None,
+                )
                 if not aux_data or not aux_data.get("switchable"):
                     continue
 
@@ -301,28 +325,32 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if start_time_str and start_time_str != "00:00:00":
                     start_time = self._time_str_to_datetime(start_time_str)
                     if start_time:
-                        seconds_until = (start_time.timestamp() - now_timestamp)
+                        seconds_until = start_time.timestamp() - now_timestamp
                         # Only consider events in the near future (next 30 minutes)
                         if 0 < seconds_until < 1800:
-                            upcoming_events.append({
-                                "type": f"aux{aux_id}_start",
-                                "time": start_time,
-                                "seconds_until": seconds_until
-                            })
+                            upcoming_events.append(
+                                {
+                                    "type": f"aux{aux_id}_start",
+                                    "time": start_time,
+                                    "seconds_until": seconds_until,
+                                }
+                            )
 
                 # Process stop time
                 stop_time_str = aux_timer.get("stop")
                 if stop_time_str and stop_time_str != "00:00:00":
                     stop_time = self._time_str_to_datetime(stop_time_str)
                     if stop_time:
-                        seconds_until = (stop_time.timestamp() - now_timestamp)
+                        seconds_until = stop_time.timestamp() - now_timestamp
                         # Only consider events in the near future (next 30 minutes)
                         if 0 < seconds_until < 1800:
-                            upcoming_events.append({
-                                "type": f"aux{aux_id}_stop",
-                                "time": stop_time,
-                                "seconds_until": seconds_until
-                            })
+                            upcoming_events.append(
+                                {
+                                    "type": f"aux{aux_id}_stop",
+                                    "time": stop_time,
+                                    "seconds_until": seconds_until,
+                                }
+                            )
 
             # No upcoming events found
             if not upcoming_events:
@@ -335,14 +363,13 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             LOGGER.debug(
                 "Found upcoming timer event: %s in %.1f minutes",
                 next_event["type"],
-                next_event["seconds_until"] / 60
+                next_event["seconds_until"] / 60,
             )
-
-            return next_event
-
         except (KeyError, TypeError, ValueError) as err:
             LOGGER.debug("Error checking timer events: %s", err)
             return None
+        else:
+            return next_event
 
     def _time_str_to_datetime(self, time_str: str) -> datetime | None:
         """Convert a time string (HH:MM:SS) to a datetime object for today/tomorrow."""
@@ -354,29 +381,46 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             timezone = None
             if self.data and self.data.status:
                 pool_data = self.data.status_value("", prefix="Pool")
-                if pool_data and isinstance(pool_data, dict) and "timezone" in pool_data:
+                if (
+                    pool_data
+                    and isinstance(pool_data, dict)
+                    and "timezone" in pool_data
+                ):
                     try:
                         import zoneinfo
+
                         timezone = zoneinfo.ZoneInfo(pool_data["timezone"])
                     except (ImportError, zoneinfo.ZoneInfoNotFoundError):
                         LOGGER.debug("Could not use timezone %s", pool_data["timezone"])
 
-            hour, minute, second = map(int, time_str.split(':'))
+            # If we couldn't get the timezone from pool data, use local timezone
+            if timezone is None:
+                from datetime import timezone as dt_timezone
+                from time import localtime
+
+                utc_offset = -localtime().tm_gmtoff
+                timezone = dt_timezone(timedelta(seconds=utc_offset))
+
+            hour, minute, second = map(int, time_str.split(":"))
             now = datetime.now(tz=timezone)
             result = datetime(
-                year=now.year, month=now.month, day=now.day,
-                hour=hour, minute=minute, second=second,
-                tzinfo=timezone
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=hour,
+                minute=minute,
+                second=second,
+                tzinfo=timezone,
             )
 
             # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
             if result < now and hour < 12:
                 result = result + timedelta(days=1)
-
-            return result
         except (ValueError, TypeError) as err:
             LOGGER.debug("Error parsing time string %s: %s", time_str, err)
             return None
+        else:
+            return result
 
     async def _async_update_data(self) -> PoolCopData:
         """Fetch data from PoolCop."""
@@ -392,16 +436,16 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             # 1. We haven't fetched alarms in the last 4 hours AND there are alarms, OR
             # 2. The alarm count has changed since our last check
             should_fetch_alarms = (
-                (current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL and alarm_count > 0) or
-                (alarm_count != self._previous_alarm_count)
-            )
+                current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
+                and alarm_count > 0
+            ) or (alarm_count != self._previous_alarm_count)
 
             if should_fetch_alarms:
                 LOGGER.debug(
                     "Fetching alarm data: interval=%s, previous_count=%s, current_count=%s",
                     current_time - self._last_alarm_fetch,
                     self._previous_alarm_count,
-                    alarm_count
+                    alarm_count,
                 )
                 # Fetch current alarms (only offsetting by 0 to get most recent)
                 alarm_data = await self.poolcopilot.alarm_history(0)
@@ -410,7 +454,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if alarm_data and "alarms" in alarm_data:
                     # Get alarms that don't have a cleared timestamp
                     self._active_alarms = [
-                        alarm for alarm in alarm_data.get("alarms", [])
+                        alarm
+                        for alarm in alarm_data.get("alarms", [])
                         if not alarm.get("cleared")
                     ]
 
@@ -447,13 +492,17 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             interval = NORMAL_UPDATE_INTERVAL
 
             # First check cycle-based timing
-            if (data.cycle_status and
-                data.cycle_status.get("remaining_time") is not None and
-                0 < data.cycle_status.get("remaining_time", 0) < CYCLE_END_PREDICTION_WINDOW):
+            if (
+                data.cycle_status
+                and data.cycle_status.get("remaining_time") is not None
+                and 0
+                < data.cycle_status.get("remaining_time", 0)
+                < CYCLE_END_PREDICTION_WINDOW
+            ):
                 interval = TRANSITION_UPDATE_INTERVAL
                 LOGGER.debug(
                     "Cycle approaching end (%.1f minutes remaining). Using faster update interval.",
-                    data.cycle_status["remaining_time"] / 60
+                    data.cycle_status["remaining_time"] / 60,
                 )
 
             # Then check timer-based timing (takes precedence if closer)
@@ -465,7 +514,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     LOGGER.debug(
                         "Timer event %s approaching (%.1f minutes remaining). Using faster update interval.",
                         next_timer_event["type"],
-                        seconds_until / 60
+                        seconds_until / 60,
                     )
                 elif interval == NORMAL_UPDATE_INTERVAL:
                     # Don't wait longer than 5 minutes if there's an upcoming event
@@ -475,7 +524,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                         "Upcoming timer event %s (%.1f minutes). Setting interval to %d seconds.",
                         next_timer_event["type"],
                         seconds_until / 60,
-                        interval
+                        interval,
                     )
 
             # Update the coordinator's update interval if needed
@@ -484,12 +533,12 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 LOGGER.debug("Adjusted update interval to %d seconds", interval)
 
             # Save learned data periodically - every hour
-            if not hasattr(self, "_last_save_time") or current_time - getattr(self, "_last_save_time", 0) > 3600:
+            if (
+                not hasattr(self, "_last_save_time")
+                or current_time - getattr(self, "_last_save_time", 0) > 3600
+            ):
                 self.hass.async_create_task(self.async_save_learned_data())
                 self._last_save_time = current_time
-
-            return data
-
         except PoolCopilotRateLimitError as err:
             # Add specific handling for rate limit errors with exponential backoff
             retry_after = getattr(err, "retry_after", None)
@@ -505,17 +554,20 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
             LOGGER.warning(
                 "PoolCopilot API rate limit reached. Backing off for %d seconds",
-                backoff_time
+                backoff_time,
             )
 
             # Update the coordinator's update interval temporarily
             self.update_interval = timedelta(seconds=backoff_time)
 
             # Propagate a more specific error
-            raise UpdateFailed("PoolCopilot API rate limit reached, backing off") from err
-
+            raise UpdateFailed(
+                "PoolCopilot API rate limit reached, backing off"
+            ) from err
         except PoolCopilotConnectionError as err:
             raise UpdateFailed("Error communicating with PoolCopilot API") from err
+        else:
+            return data
 
     async def async_get_alarm_history(self, offset: int = 0) -> dict[str, Any]:
         """Get alarm history from PoolCop."""

@@ -1,4 +1,5 @@
 """PoolCop base entity."""
+
 from __future__ import annotations
 
 from typing import cast
@@ -35,51 +36,51 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         """Check if this entity's component is installed/enabled in PoolCop."""
         # Default to enabled
         key = self.entity_description.key
-        
+
         # Check for specific components that might not be installed
         if key == "ph_control" or key.startswith("ph_") or key == "pH":
             return bool(self.coordinator.data.status_value("conf.pH"))
-            
+
         if key == "orp_control" or key.startswith("orp_"):
             return bool(self.coordinator.data.status_value("conf.orp"))
-            
-        if key == "ioniser" or key == "ioniser_control" or key.startswith("ioniser_"):
+
+        if key in {"ioniser", "ioniser_control"} or key.startswith("ioniser_"):
             return bool(self.coordinator.data.status_value("conf.ioniser"))
-            
+
         if key == "autochlor_control" or key.startswith("autochlor_"):
             return bool(self.coordinator.data.status_value("conf.autochlor"))
-            
+
         if key.startswith("waterlevel_") or key == "water_level":
             return bool(self.coordinator.data.status_value("conf.waterlevel"))
-            
+
         # Check for temperature sensors
         if key == "temperature_air":
             return bool(self.coordinator.data.status_value("conf.airtemp"))
-            
+
         if key == "temperature_water":
             return bool(self.coordinator.data.status_value("conf.watertemp"))
-            
-        if key == "temperature_solar" or key == "solar_temperature":
+
+        if key in {"temperature_solar", "solar_temperature"}:
             return bool(self.coordinator.data.status_value("conf.solartemp"))
-            
+
         # Pressure sensor
         if key == "pressure":
             return bool(self.coordinator.data.status_value("conf.pressure"))
-            
+
         # Lighting control
         if key.startswith("light_") or key == "lighting_control":
             return bool(self.coordinator.data.status_value("conf.lighting"))
-            
+
         # Auxiliary controls
         if key.startswith("aux_") or key == "auxiliary_control":
             aux_num = key.split("_")[1] if "_" in key else None
             if aux_num and aux_num.isdigit():
                 return bool(self.coordinator.data.status_value(f"conf.aux{aux_num}"))
-            
+
         # Solar heating
         if key.startswith("solar_") or key == "solar_control":
             return bool(self.coordinator.data.status_value("conf.solar"))
-        
+
         # Enable all other entities by default
         return True
 

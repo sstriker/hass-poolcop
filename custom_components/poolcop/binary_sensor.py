@@ -1,4 +1,5 @@
 """Support for PoolCop binary sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -42,9 +43,11 @@ def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
 
     return is_on_fn
 
+
 def _watervalve_is_on(data: PoolCopData) -> bool:
     """Return true if the water valve is open."""
-    return data.status_value("status.watervalve") == 1 # Refill
+    return data.status_value("status.watervalve") == 1  # Refill
+
 
 FILTER_CYCLE_ICONS = ("mdi:sync", "mdi:sync-off")
 PUMP_ICONS = ("mdi:pump", "mdi:pump-off")
@@ -137,7 +140,6 @@ BINARY_SENSORS = (
         is_on_fn=_is_on_fn("status.aux6"),
         on_off_icons=FILTER_CYCLE_ICONS,
     ),
-    
     # These binary sensors represent equipment installation status (connectivity)
     PoolCopBinarySensorEntityDescription(
         key="orp_installed",
@@ -181,7 +183,6 @@ BINARY_SENSORS = (
         is_on_fn=_is_on_fn("conf.air"),
         on_off_icons=INSTALLED_ICONS,
     ),
-    
     # Special binary sensors
     PoolCopBinarySensorEntityDescription(
         key="active_alarm",
@@ -218,15 +219,21 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
         """Initialize a PoolCop binary sensor."""
         super().__init__(coordinator=coordinator, description=description)
         self.entity_id = f"{BINARY_SENSOR_DOMAIN}.{self._attr_unique_id}"
-        
+
         # Apply custom names for aux outputs if available
-        if description.key.startswith("aux") and coordinator.data.status_value("conf.aux_names"):
+        if description.key.startswith("aux") and coordinator.data.status_value(
+            "conf.aux_names"
+        ):
             aux_number = description.key.replace("aux", "")
             if aux_number.isdigit():
-                aux_name = coordinator.data.status_value(f"conf.aux_names.aux{aux_number}")
+                aux_name = coordinator.data.status_value(
+                    f"conf.aux_names.aux{aux_number}"
+                )
                 if aux_name:
                     # Use translation system instead of directly setting the name
-                    self._attr_translation_key = f"entity.binary_sensor.{description.key}"
+                    self._attr_translation_key = (
+                        f"entity.binary_sensor.{description.key}"
+                    )
                     self._attr_translation_placeholders = {"aux_name": aux_name}
 
     @property

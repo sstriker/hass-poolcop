@@ -1,4 +1,5 @@
 """Config flow for PoolCop integration."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -13,25 +14,19 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY, CONF_UNIQUE_ID
-
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import (
-    DOMAIN,
-    LOGGER,
-    CONF_FLOW_RATE_1,
-    CONF_FLOW_RATE_2,
-    CONF_FLOW_RATE_3,
-)
+from .const import CONF_FLOW_RATE_1, CONF_FLOW_RATE_2, CONF_FLOW_RATE_3, DOMAIN, LOGGER
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_API_KEY): str,
     }
 )
+
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for poolcop."""
@@ -79,9 +74,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if single_flowrate and isinstance(single_flowrate, (str, int, float)):
                 try:
                     self._pump_flowrate = float(single_flowrate)
-                    LOGGER.debug("Detected flow rate from API: %s m³/h", self._pump_flowrate)
+                    LOGGER.debug(
+                        "Detected flow rate from API: %s m³/h", self._pump_flowrate
+                    )
                 except (ValueError, TypeError):
-                    LOGGER.warning("Failed to convert flowrate value to float: %s", single_flowrate)
+                    LOGGER.warning(
+                        "Failed to convert flowrate value to float: %s", single_flowrate
+                    )
 
             # Continue to the flow rate configuration step
             return await self.async_step_flow_rates()
@@ -89,8 +88,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
         except InvalidAuth:
             errors["base"] = "invalid_auth"
-        except Exception:  # pylint: disable=broad-except
-            LOGGER.exception("Unexpected exception")
+        except (PoolCopilotError, ValueError, KeyError, AttributeError) as err:
+            LOGGER.exception("Error during configuration: %s", err)
             errors["base"] = "unknown"
 
         return self.async_show_form(
@@ -109,15 +108,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             flow_rate = self._pump_flowrate
 
             # Add flow rate fields based on detected speeds (always include speed 1)
-            schema_dict[vol.Required(CONF_FLOW_RATE_1, default=flow_rate)] = vol.Coerce(float)
+            schema_dict[vol.Required(CONF_FLOW_RATE_1, default=flow_rate)] = vol.Coerce(
+                float
+            )
 
             # Add speed 2 if pump has at least 2 speeds
             if self._pump_nb_speeds >= 2:
-                schema_dict[vol.Required(CONF_FLOW_RATE_2, default=flow_rate)] = vol.Coerce(float)
+                schema_dict[vol.Required(CONF_FLOW_RATE_2, default=flow_rate)] = (
+                    vol.Coerce(float)
+                )
 
             # Add speed 3 if pump has 3 speeds
             if self._pump_nb_speeds >= 3:
-                schema_dict[vol.Required(CONF_FLOW_RATE_3, default=flow_rate)] = vol.Coerce(float)
+                schema_dict[vol.Required(CONF_FLOW_RATE_3, default=flow_rate)] = (
+                    vol.Coerce(float)
+                )
 
             # Create schema with just the relevant flow rate fields
             data_schema = vol.Schema(schema_dict)
@@ -125,8 +130,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             # Display pump info in the form description
             description_placeholders = {
                 "pump_speeds": self._pump_nb_speeds,
-                "vol": self._pool_info.get("settings", {}).get("pool", {}).get("volume", "Unknown"),
-                "flowrate": self._pump_flowrate
+                "vol": self._pool_info.get("settings", {})
+                .get("pool", {})
+                .get("volume", "Unknown"),
+                "flowrate": self._pump_flowrate,
             }
 
             return self.async_show_form(
@@ -185,7 +192,9 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     return {
         "title": "PoolCop",
         CONF_UNIQUE_ID: poolcopilot.poolcop_id,
-        "pool_info": status.get("PoolCop", {}),  # Store full pool info for configuration
+        "pool_info": status.get(
+            "PoolCop", {}
+        ),  # Store full pool info for configuration
     }
 
 

@@ -1,11 +1,12 @@
 """Support for PoolCop sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-import zoneinfo
 from typing import Any
+import zoneinfo
 
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
@@ -33,7 +34,6 @@ from .const import (
     OPERATION_MODES,
     VALVE_POSITION_NAMES,
     WATER_VALVE_POSITIONS,
-    WATERVALVE_STATES,
     WATERLEVEL_STATES,
 )
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
@@ -130,12 +130,16 @@ def _cycle_elapsed_time_fn(data: PoolCopData) -> float | None:
         return data.cycle_status["elapsed_time"]
     return None
 
+
 def _state_mapping_fn(path: str, mapping: dict) -> Callable[[PoolCopData], str | None]:
     """Return a value function that maps a numeric value to a string."""
+
     def value_fn(data: PoolCopData) -> str | None:
         value = data.status_value(path)
-        return mapping.get(value, None)
+        return mapping.get(value)
+
     return value_fn
+
 
 def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
     """Convert a time string (HH:MM:SS) to a datetime object for today using timezone."""
@@ -143,36 +147,59 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         return None
 
     try:
-        hour, minute, second = map(int, time_str.split(':'))
-        now = datetime.now(zoneinfo.ZoneInfo(timezone))
+        hour, minute, second = map(int, time_str.split(":"))
+
+        # Try using the provided timezone
+        try:
+            tz_info = zoneinfo.ZoneInfo(timezone)
+        except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+            # Fall back to system timezone if provided timezone is invalid
+            from datetime import timezone as dt_timezone
+            from time import localtime
+
+            utc_offset = -localtime().tm_gmtoff
+            tz_info = dt_timezone(timedelta(seconds=utc_offset))
+
+        now = datetime.now(tz=tz_info)
         result = datetime(
-            year=now.year, month=now.month, day=now.day,
-            hour=hour, minute=minute, second=second,
-            tzinfo=zoneinfo.ZoneInfo(timezone)
+            year=now.year,
+            month=now.month,
+            day=now.day,
+            hour=hour,
+            minute=minute,
+            second=second,
+            tzinfo=tz_info,
         )
 
         # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
         if result < now and hour < 12:
             result = result + timedelta(days=1)
-
-        return result
     except (ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError):
         return None
+    else:
+        return result
+
 
 def _timer_fn(timer_name: str, field: str) -> Callable[[PoolCopData], Any]:
     """Return a value function for a timer field."""
+
     def value_fn(data: PoolCopData) -> Any:
         try:
             timer = data.status_value(f"timers.{timer_name}")
             if timer:
                 return timer.get(field)
-            return None
         except (KeyError, AttributeError):
-            return None
+            pass
+        return None
+
     return value_fn
 
-def _timer_time_fn(timer_name: str, field: str) -> Callable[[PoolCopData], datetime | None]:
+
+def _timer_time_fn(
+    timer_name: str, field: str
+) -> Callable[[PoolCopData], datetime | None]:
     """Return a value function for a timer time field as datetime."""
+
     def value_fn(data: PoolCopData) -> datetime | None:
         try:
             timer = data.status_value(f"timers.{timer_name}")
@@ -182,10 +209,10 @@ def _timer_time_fn(timer_name: str, field: str) -> Callable[[PoolCopData], datet
                 # Get timezone from Pool data or fallback to UTC
                 timezone = data.status_value("timezone", prefix="Pool") or "UTC"
                 return _time_str_to_time_today(time_str, timezone)
-            return None
         except (KeyError, AttributeError, zoneinfo.ZoneInfoNotFoundError) as err:
             LOGGER.debug("Error creating timer time with timezone: %s", err)
-            return None
+        return None
+
     return value_fn
 
 
@@ -383,7 +410,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=lambda data: round(_cycle_elapsed_time_fn(data) / 60) if _cycle_elapsed_time_fn(data) is not None else None,
+        value_fn=lambda data: round(_cycle_elapsed_time_fn(data) / 60)
+        if _cycle_elapsed_time_fn(data) is not None
+        else None,
     ),
     PoolCopSensorEntityDescription(
         key="cycle_remaining_time",
@@ -391,7 +420,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-sand",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=lambda data: round(_cycle_time_remaining_fn(data) / 60) if _cycle_time_remaining_fn(data) is not None else None,
+        value_fn=lambda data: round(_cycle_time_remaining_fn(data) / 60)
+        if _cycle_time_remaining_fn(data) is not None
+        else None,
     ),
     PoolCopSensorEntityDescription(
         key="cycle_predicted_end",
@@ -429,7 +460,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:percent",
         value_fn=_value_fn("settings.pool.cover_reduction"),
     ),
-
     # Filter settings
     PoolCopSensorEntityDescription(
         key="filter_backwash_duration",
@@ -470,7 +500,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(FILTER_MODES.values()),
         value_fn=_state_mapping_fn("settings.filter.mode", FILTER_MODES),
     ),
-
     # Pump settings
     PoolCopSensorEntityDescription(
         key="pump_nb_speeds",
@@ -494,7 +523,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfPressure.PA,
         value_fn=_value_fn("settings.pump.pressure_alarm"),
     ),
-
     # pH settings
     PoolCopSensorEntityDescription(
         key="ph_set_point",
@@ -504,7 +532,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:ph",
         value_fn=_value_fn("settings.ph.set_point"),
     ),
-
     # ORP settings
     PoolCopSensorEntityDescription(
         key="orp_set_point",
@@ -540,7 +567,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
-        value_fn=lambda data: "Enabled" if _timer_fn("cycle1", "enabled")(data) == 1 else "Disabled",
+        value_fn=lambda data: "Enabled"
+        if _timer_fn("cycle1", "enabled")(data) == 1
+        else "Disabled",
     ),
     PoolCopSensorEntityDescription(
         key="cycle1_start_time",
@@ -556,7 +585,6 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_timer_time_fn("cycle1", "stop"),
     ),
-
     # Cycle 2 timer
     PoolCopSensorEntityDescription(
         key="cycle2_enabled",
@@ -564,7 +592,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
-        value_fn=lambda data: "Enabled" if _timer_fn("cycle2", "enabled")(data) == 1 else "Disabled",
+        value_fn=lambda data: "Enabled"
+        if _timer_fn("cycle2", "enabled")(data) == 1
+        else "Disabled",
     ),
     PoolCopSensorEntityDescription(
         key="cycle2_start_time",
@@ -580,7 +610,6 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_timer_time_fn("cycle2", "stop"),
     ),
-
     # Add sensors for switchable auxiliary outputs
     PoolCopSensorEntityDescription(
         key="aux4_enabled",
@@ -588,7 +617,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
-        value_fn=lambda data: "Enabled" if _timer_fn("aux4", "enabled")(data) == 1 else "Disabled",
+        value_fn=lambda data: "Enabled"
+        if _timer_fn("aux4", "enabled")(data) == 1
+        else "Disabled",
     ),
     PoolCopSensorEntityDescription(
         key="aux4_start_time",
@@ -692,12 +723,16 @@ class FlowRateSensor(PoolCopSensorEntity):
         try:
             speed_level = int(speed_level)
         except (ValueError, TypeError):
-            LOGGER.warning("Invalid pump speed level: %s, flow rate unavailable", speed_level)
+            LOGGER.warning(
+                "Invalid pump speed level: %s, flow rate unavailable", speed_level
+            )
             return None
 
         if speed_level in self.coordinator.flow_rates:
             flow_rate = self.coordinator.flow_rates[speed_level]
-            LOGGER.debug("Using flow rate for speed %s: %s m³/h", speed_level, flow_rate)
+            LOGGER.debug(
+                "Using flow rate for speed %s: %s m³/h", speed_level, flow_rate
+            )
             return flow_rate
 
         LOGGER.warning("Unknown speed level: %s, flow rate unavailable", speed_level)
