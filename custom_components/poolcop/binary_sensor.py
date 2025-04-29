@@ -13,6 +13,7 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -147,6 +148,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.orp"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="pH_installed",
@@ -154,6 +156,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.pH"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_installed",
@@ -161,6 +164,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.waterlevel"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="ioniser_installed",
@@ -168,6 +172,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.ioniser"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="autochlor_installed",
@@ -175,6 +180,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.autochlor"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="air_installed",
@@ -182,6 +188,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.air"),
         on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     # Special binary sensors
     PoolCopBinarySensorEntityDescription(

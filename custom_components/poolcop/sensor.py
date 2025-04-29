@@ -23,6 +23,7 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -442,6 +443,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="m³",
         icon="mdi:pool",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pool.volume"),
     ),
     PoolCopSensorEntityDescription(
@@ -450,6 +452,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="×/day",
         icon="mdi:refresh",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pool.turnover"),
     ),
     PoolCopSensorEntityDescription(
@@ -458,6 +461,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="%",
         icon="mdi:percent",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pool.cover_reduction"),
     ),
     # Filter settings
@@ -467,6 +471,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.filter.backwash_duration"),
     ),
     PoolCopSensorEntityDescription(
@@ -475,6 +480,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.filter.rinse_duration"),
     ),
     PoolCopSensorEntityDescription(
@@ -482,6 +488,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Maximum Days Between Backwash",
         native_unit_of_measurement=UnitOfTime.DAYS,
         icon="mdi:calendar-range",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.filter.max_days"),
     ),
     PoolCopSensorEntityDescription(
@@ -490,6 +497,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-cog",
         device_class=SensorDeviceClass.ENUM,
         options=list(FILTER_TIMER_MODES.values()),
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
     ),
     PoolCopSensorEntityDescription(
@@ -498,6 +506,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:air-filter",
         device_class=SensorDeviceClass.ENUM,
         options=list(FILTER_MODES.values()),
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.filter.mode", FILTER_MODES),
     ),
     # Pump settings
@@ -505,6 +514,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="pump_nb_speeds",
         name="Pump Speed Levels",
         icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pump.nb_speed"),
     ),
     PoolCopSensorEntityDescription(
@@ -513,6 +523,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.PA,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pump.pressure_low"),
     ),
     PoolCopSensorEntityDescription(
@@ -521,6 +532,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.PA,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pump.pressure_alarm"),
     ),
     # pH settings
@@ -530,6 +542,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="pH",
         icon="mdi:ph",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.ph.set_point"),
     ),
     # ORP settings
@@ -539,6 +552,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:molecule",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mV",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.orp.set_point"),
     ),
     PoolCopSensorEntityDescription(
@@ -547,6 +561,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:molecule",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mV",
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.orp.hyper_set_point"),
     ),
     PoolCopSensorEntityDescription(
@@ -554,6 +569,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="ORP Temperature Shutdown",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.orp.temperature_shutdown"),
     ),
 )
