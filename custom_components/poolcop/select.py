@@ -41,7 +41,6 @@ async def _async_set_pump_speed(
     try:
         speed = int(option)
         await coordinator.poolcopilot.set_pump_speed(speed)
-        coordinator.async_schedule_refresh()
     except ValueError:
         LOGGER.error("Invalid pump speed value: %s", option)
 
@@ -89,7 +88,6 @@ async def _async_set_valve_position(
     position_value = VALVE_POSITIONS.get(option.lower())
     if position_value is not None:
         await coordinator.poolcopilot.set_valve_position(position_value)
-        coordinator.async_schedule_refresh()
 
 
 def _get_current_valve_position(
