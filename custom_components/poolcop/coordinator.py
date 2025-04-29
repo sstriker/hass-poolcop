@@ -50,6 +50,7 @@ class PoolCopData(NamedTuple):
     active_alarms: list[dict[str, Any]] | None = None
     cycle_status: dict[str, Any] | None = None  # For tracking cycle information
     next_timer_event: dict[str, Any] | None = None  # For tracking upcoming timer events
+    last_command_result: dict[str, Any] | None = None  # Result from the most recent command
 
     def status_value(self, path: str, prefix: str = "PoolCop") -> Any:
         """Get value from a path (e.g. 'temperature.water') from the Poolcop status."""
@@ -611,3 +612,169 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         # Load stored data before first refresh
         await self.async_load_learned_data()
         await super().async_config_entry_first_refresh()
+
+    async def set_pump_speed(self, speed: int) -> None:
+        """Set the pump speed using the PoolCopilot API.
+        
+        This method is used by both select entities and services.
+        After setting the pump speed, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            result = await self.poolcopilot.set_pump_speed(speed)
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Set pump speed to %s, result: %s", speed, result)
+            return result
+        except Exception as err:
+            LOGGER.error("Error setting pump speed: %s", err)
+            raise
+
+    async def toggle_pump(self, new_state: bool = None) -> None:
+        """Toggle the pump state using the PoolCopilot API.
+        
+        If new_state is provided, it sets the pump to that state directly.
+        Otherwise, it toggles the current state.
+        
+        This method is used by service calls.
+        After toggling the pump, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            # If no specific state requested, get current state and toggle it
+            if new_state is None:
+                current_state = bool(self.data.status_value("status.pump"))
+                new_state = not current_state
+            
+            # Convert boolean state to string command the API expects
+            command = "on" if new_state else "off"
+            
+            result = await self.poolcopilot.set_pump(command)
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Toggled pump to %s, result: %s", command, result)
+            return result
+        except Exception as err:
+            LOGGER.error("Error toggling pump: %s", err)
+            raise
+
+    async def set_valve_position(self, position: int) -> None:
+        """Set the valve position using the PoolCopilot API.
+        
+        This method is used by select entities.
+        After setting the valve position, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            result = await self.poolcopilot.set_valve_position(position)
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Set valve position to %s, result: %s", position, result)
+            return result
+        except Exception as err:
+            LOGGER.error("Error setting valve position: %s", err)
+            raise
+
+    async def clear_alarm(self) -> None:
+        """Clear active alarms using the PoolCopilot API.
+        
+        This method is used by service calls.
+        After clearing alarms, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            result = await self.poolcopilot.clear_alarm()
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Cleared alarms, result: %s", result)
+            
+            # Reset active alarms and force a refresh of alarm data on next update
+            self._active_alarms = []
+            self._last_alarm_fetch = 0
+            
+            return result
+        except Exception as err:
+            LOGGER.error("Error clearing alarm: %s", err)
+            raise
+
+    async def toggle_auxiliary(self, aux_id: int) -> None:
+        """Toggle an auxiliary output using the PoolCopilot API.
+        
+        This method is used by service calls.
+        After toggling the auxiliary, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            result = await self.poolcopilot.toggle_auxiliary(aux_id)
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Toggled auxiliary %s, result: %s", aux_id, result)
+            return result
+        except Exception as err:
+            LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
+            raise
+
+    async def set_force_filtration(self, mode: int) -> None:
+        """Set forced filtration mode using the PoolCopilot API.
+        
+        Mode options:
+        - 0: Disable forced filtration
+        - 1: Force for 24 hours
+        - 2: Force for 48 hours
+        - 3: Force for 72 hours
+        
+        This method is used by service calls.
+        After setting the forced filtration mode, it updates the last_command_result in PoolCopData.
+        """
+        try:
+            result = await self.poolcopilot.set_force_filtration(mode)
+            # Create a new data object with the updated command result
+            self.data = PoolCopData(
+                status=self.data.status,
+                alarms=self.data.alarms,
+                commands=self.data.commands,
+                active_alarms=self.data.active_alarms,
+                cycle_status=self.data.cycle_status,
+                next_timer_event=self.data.next_timer_event,
+                last_command_result=result
+            )
+            LOGGER.debug("Set force filtration mode to %s, result: %s", mode, result)
+            return result
+        except Exception as err:
+            LOGGER.error("Error setting force filtration mode: %s", err)
+            raise
