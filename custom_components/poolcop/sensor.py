@@ -37,6 +37,9 @@ from .const import (
     VALVE_POSITION_NAMES,
     WATER_VALVE_POSITIONS,
     WATERLEVEL_STATES,
+    POOL_TYPES,
+    PUMP_TYPES,
+    PH_TYPES,
 )
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
@@ -213,6 +216,25 @@ def _timer_time_fn(
                 return _time_str_to_time_today(time_str, timezone)
         except (KeyError, AttributeError, zoneinfo.ZoneInfoNotFoundError) as err:
             LOGGER.debug("Error creating timer time with timezone: %s", err)
+        return None
+
+    return value_fn
+
+
+def _weekday_mapping_fn(path: str) -> Callable[[PoolCopData], str | None]:
+    """Return a value function that maps a numeric day value to a weekday name."""
+    WEEKDAYS = ["Disabled", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    def value_fn(data: PoolCopData) -> str | None:
+        value = data.status_value(path)
+        if value is None:
+            return None
+        try:
+            day_index = int(value)
+            if 0 <= day_index < len(WEEKDAYS):
+                return WEEKDAYS[day_index]
+        except (ValueError, TypeError):
+            pass
         return None
 
     return value_fn
@@ -466,25 +488,13 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("settings.pool.cover_reduction"),
     ),
     PoolCopSensorEntityDescription(
-        key="pool_freeze_protection",
-        name="Freeze Protection",
-        icon="mdi:snowflake-alert",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.pool.freeze_protection"),
-    ),
-    PoolCopSensorEntityDescription(
         key="pool_type",
         name="Pool Type",
         icon="mdi:pool",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(POOL_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.pool.type"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="pool_service",
-        name="Pool Service Mode",
-        icon="mdi:tools",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.pool.service"),
+        value_fn=_state_mapping_fn("settings.pool.type", POOL_TYPES),
     ),
     # Filter settings
     PoolCopSensorEntityDescription(
@@ -521,13 +531,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:calendar-range",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.filter.max_days"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="filter_waste_valve",
-        name="Waste Valve Configuration",
-        icon="mdi:valve",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.filter.waste_valve"),
     ),
     PoolCopSensorEntityDescription(
         key="filter_timer_mode",
@@ -574,17 +577,13 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("settings.pump.pressure_alarm"),
     ),
     PoolCopSensorEntityDescription(
-        key="pump_protect",
-        name="Pump Protection",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.pump.protect"),
-    ),
-    PoolCopSensorEntityDescription(
         key="pump_type",
         name="Pump Type",
         icon="mdi:pump",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(PUMP_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.pump.type"),
+        value_fn=_state_mapping_fn("settings.pump.type", PUMP_TYPES),
     ),
     PoolCopSensorEntityDescription(
         key="pump_flowrate",
@@ -637,8 +636,10 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="ph_type",
         name="pH Dosing Type",
         icon="mdi:ph",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(PH_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.ph.type"),
+        value_fn=_state_mapping_fn("settings.ph.type", PH_TYPES),
     ),
     PoolCopSensorEntityDescription(
         key="ph_dosing_time",
@@ -676,13 +677,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("settings.orp.disinfectant"),
     ),
     PoolCopSensorEntityDescription(
-        key="orp_control",
-        name="ORP Control Enabled",
-        icon="mdi:toggle-switch",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.orp.control"),
-    ),
-    PoolCopSensorEntityDescription(
         key="orp_next_injection",
         name="ORP Next Injection",
         device_class=SensorDeviceClass.DURATION,
@@ -704,8 +698,10 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="orp_hyper_day",
         name="ORP Hyper Chlorination Day",
         icon="mdi:calendar-week",
+        device_class=SensorDeviceClass.ENUM,
+        options=["Disabled", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.orp.hyper_day"),
+        value_fn=_weekday_mapping_fn("settings.orp.hyper_day"),
     ),
     PoolCopSensorEntityDescription(
         key="orp_temperature_shutdown",
@@ -717,25 +713,11 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
     ),
     # Waterlevel settings
     PoolCopSensorEntityDescription(
-        key="waterlevel_auto_add",
-        name="Waterlevel Auto Add",
-        icon="mdi:water-plus",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.waterlevel.auto_add"),
-    ),
-    PoolCopSensorEntityDescription(
         key="waterlevel_cable_status",
         name="Waterlevel Cable Status",
         icon="mdi:cable-data",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.waterlevel.cable_status"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="waterlevel_continuous",
-        name="Waterlevel Continuous",
-        icon="mdi:water-sync",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.waterlevel.continuous"),
     ),
     PoolCopSensorEntityDescription(
         key="waterlevel_max_duration",
@@ -747,36 +729,15 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("settings.waterlevel.max_duration"),
     ),
     PoolCopSensorEntityDescription(
-        key="waterlevel_auto_reduce",
-        name="Waterlevel Auto Reduce",
-        icon="mdi:water-minus",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.waterlevel.auto_reduce"),
-    ),
-    PoolCopSensorEntityDescription(
         key="waterlevel_draining_duration",
         name="Waterlevel Draining Duration",
         device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.waterlevel.draining_duration"),
     ),
     # Autochlor settings
-    PoolCopSensorEntityDescription(
-        key="autochlor_auto",
-        name="Autochlor Auto",
-        icon="mdi:auto-fix",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.autochlor.auto"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="autochlor_acid",
-        name="Autochlor Acid",
-        icon="mdi:flask",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.autochlor.acid"),
-    ),
     PoolCopSensorEntityDescription(
         key="autochlor_duration",
         name="Autochlor Duration",
@@ -796,13 +757,6 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=_value_fn("settings.autochlor.next_injection"),
     ),
     # Ioniser settings
-    PoolCopSensorEntityDescription(
-        key="ioniser_mode",
-        name="Ioniser Mode",
-        icon="mdi:lightning-bolt",
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.ioniser.mode"),
-    ),
     PoolCopSensorEntityDescription(
         key="ioniser_duration",
         name="Ioniser Duration",
