@@ -21,6 +21,7 @@ from homeassistant.const import (
     UnitOfPressure,
     UnitOfTemperature,
     UnitOfTime,
+    UnitOfVolumeFlowRate,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -704,7 +705,7 @@ class FlowRateSensor(PoolCopSensorEntity):
     """Flow rate sensor that calculates flow based on pump speed."""
 
     _attr_has_entity_name = True
-    _attr_native_unit_of_measurement = "m³/h"
+    _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR
     _attr_device_class = SensorDeviceClass.VOLUME_FLOW_RATE
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:water-pump"

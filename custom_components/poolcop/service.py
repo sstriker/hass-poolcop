@@ -7,6 +7,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.helpers.service import async_extract_config_entry_ids
 
 from .const import (
     DOMAIN,
@@ -42,6 +43,30 @@ SET_VALVE_POSITION_SCHEMA = vol.Schema(
 )
 
 
+async def _async_get_targeted_coordinators(
+    hass: HomeAssistant, service_call: ServiceCall
+) -> list[PoolCopDataUpdateCoordinator]:
+    """Get coordinators targeted by the service call."""
+    entry_ids = await async_extract_config_entry_ids(hass, service_call)
+
+    if not entry_ids:
+        _LOGGER.error(
+            "No config entries were specified and no poolcop entities were targeted"
+        )
+        return []
+
+    coordinators = []
+    for entry_id in entry_ids:
+        if entry_id not in hass.data[DOMAIN]:
+            continue
+
+        coordinator = hass.data[DOMAIN][entry_id]
+        if isinstance(coordinator, PoolCopDataUpdateCoordinator):
+            coordinators.append(coordinator)
+
+    return coordinators
+
+
 async def async_setup_services(hass: HomeAssistant) -> None:
     """Set up PoolCop services."""
     if hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED):
@@ -51,11 +76,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Set the pump speed."""
         speed = service_call.data["speed"]
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
+        coordinators = await _async_get_targeted_coordinators(hass, service_call)
+        if not coordinators:
+            return
 
         for coordinator in coordinators:
             try:
@@ -68,11 +91,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def async_toggle_pump(service_call: ServiceCall) -> None:
         """Toggle the pump state."""
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
+        coordinators = await _async_get_targeted_coordinators(hass, service_call)
+        if not coordinators:
+            return
 
         for coordinator in coordinators:
             try:
@@ -85,11 +106,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Toggle an auxiliary output."""
         aux_id = service_call.data["aux_id"]
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
+        coordinators = await _async_get_targeted_coordinators(hass, service_call)
+        if not coordinators:
+            return
 
         for coordinator in coordinators:
             try:
@@ -107,11 +126,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             _LOGGER.error("Invalid valve position name: %s", position_name)
             return
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
+        coordinators = await _async_get_targeted_coordinators(hass, service_call)
+        if not coordinators:
+            return
 
         for coordinator in coordinators:
             try:
@@ -127,11 +144,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def async_clear_alarm(service_call: ServiceCall) -> None:
         """Clear active alarms."""
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
+        coordinators = await _async_get_targeted_coordinators(hass, service_call)
+        if not coordinators:
+            return
 
         for coordinator in coordinators:
             try:
@@ -148,10 +163,17 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=SET_PUMP_SPEED_SCHEMA,
     )
 
-    hass.services.async_register(DOMAIN, SERVICE_TOGGLE_PUMP, async_toggle_pump)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_TOGGLE_PUMP,
+        async_toggle_pump,
+    )
 
     hass.services.async_register(
-        DOMAIN, SERVICE_TOGGLE_AUX, async_toggle_aux, schema=TOGGLE_AUX_SCHEMA
+        DOMAIN,
+        SERVICE_TOGGLE_AUX,
+        async_toggle_aux,
+        schema=TOGGLE_AUX_SCHEMA,
     )
 
     hass.services.async_register(
@@ -161,7 +183,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=SET_VALVE_POSITION_SCHEMA,
     )
 
-    hass.services.async_register(DOMAIN, SERVICE_CLEAR_ALARM, async_clear_alarm)
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CLEAR_ALARM,
+        async_clear_alarm,
+    )
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
