@@ -34,12 +34,12 @@ from .const import (
     FORCED_FILTRATION_MODES,
     LOGGER,
     OPERATION_MODES,
+    PH_TYPES,
+    POOL_TYPES,
+    PUMP_TYPES,
     VALVE_POSITION_NAMES,
     WATER_VALVE_POSITIONS,
     WATERLEVEL_STATES,
-    POOL_TYPES,
-    PUMP_TYPES,
-    PH_TYPES,
 )
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
