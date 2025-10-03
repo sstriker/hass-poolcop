@@ -1,4 +1,5 @@
 """The poolcop integration."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -8,9 +9,11 @@ from homeassistant.exceptions import ConfigEntryNotReady
 
 from .const import DOMAIN, LOGGER
 from .coordinator import PoolCopDataUpdateCoordinator
+from .service import async_setup_services
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
+    Platform.SELECT,
     Platform.SENSOR,
 ]
 
@@ -18,16 +21,15 @@ PLATFORMS: list[Platform] = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up PoolCop as config entry."""
     api_key: str = entry.data[CONF_API_KEY]
-    # name: str = entry.data[CONF_NAME]
     assert entry.unique_id is not None
     poolcop_id: str = entry.unique_id
-    # forecast: bool = entry.options.get(CONF_FORECAST, False)
 
     LOGGER.debug("PoolCop ID: %s", poolcop_id)
 
     coordinator = PoolCopDataUpdateCoordinator(
         hass,
         api_key,
+        entry,
     )
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -35,11 +37,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await coordinator.poolcopilot.close()
         raise
 
-    # entry.async_on_unload(entry.add_update_listener(update_listener))
-
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    # Set up services
+    await async_setup_services(hass)
+
     return True
 
 
@@ -49,3 +53,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
 
     return unload_ok
+
+
+async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload config entry."""
+    await async_unload_entry(hass, entry)
+    await async_setup_entry(hass, entry)
