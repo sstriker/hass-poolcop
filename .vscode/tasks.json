@@ -25,6 +25,18 @@
       "type": "shell",
       "command": "ruff format .",
       "group": "build"
+    },
+    {
+      "label": "hassfest",
+      "type": "shell",
+      "command": "python3 -m hassfest .",
+      "group": "build"
+    },
+    {
+      "label": "run-home-assistant",
+      "type": "shell",
+      "command": "hass -c /config",
+      "group": "build"
     }
   ]
 }
