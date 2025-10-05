@@ -1,0 +1,33 @@
+{
+  "name": "Home Assistant - PoolCop Integration",
+  "image": "ghcr.io/ludeeus/devcontainer/hass:stable",
+  "features": {},
+  "workspaceFolder": "/workspaces/hass-poolcop",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/hass-poolcop,type=bind,consistency=cached",
+  "mounts": [
+    "type=bind,source=${localEnv:HOME}/clones/python-poolcop,target=/workspaces/python-poolcop,consistency=cached"
+  ],
+  "containerEnv": {
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "postCreateCommand": "pip install -U pip && pip install -U pytest pytest-asyncio pytest-cov pytest-homeassistant-custom-component aiohttp && if [ -d /workspaces/python-poolcop ]; then pip install -e /workspaces/python-poolcop; fi",
+  "postStartCommand": "mkdir -p /config/custom_components && rm -f /config/custom_components/poolcop && ln -s /workspaces/hass-poolcop/custom_components/poolcop /config/custom_components/poolcop",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
+        "python.analysis.typeCheckingMode": "basic",
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "github.vscode-pull-request-github",
+        "ryanluker.vscode-coverage-gutters"
+      ]
+    }
+  }
+}
