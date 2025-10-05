@@ -1,0 +1,36 @@
+[tool.black]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+combine_as_imports = true
+line_length = 88
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+select = [
+  "E", # pycodestyle errors
+  "F", # pyflakes
+  "I", # isort
+  "B", # flake8-bugbear
+  "UP", # pyupgrade
+  "SIM", # flake8-simplify
+]
+ignore = [
+  "E501", # line length handled by black
+]
+exclude = [
+  ".venv",
+  ".git",
+  "__pycache__",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
