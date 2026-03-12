@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SET_PUMP_SPEED_SCHEMA = vol.Schema(
     {
-        vol.Required("speed"): vol.All(vol.Coerce(int), vol.Range(min=0, max=100)),
+        vol.Required("speed"): vol.All(vol.Coerce(int), vol.In([0, 1, 2, 3])),
     }
 )
 
@@ -35,7 +35,7 @@ SET_VALVE_POSITION_SCHEMA = vol.Schema(
 
 TOGGLE_AUX_SCHEMA = vol.Schema(
     {
-        vol.Required("aux_id"): vol.All(vol.Coerce(int), vol.Range(min=1, max=6)),
+        vol.Required("aux_id"): vol.All(vol.Coerce(int), vol.Range(min=1, max=15)),
     }
 )
 

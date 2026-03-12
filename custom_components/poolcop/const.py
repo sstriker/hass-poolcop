@@ -124,19 +124,51 @@ PH_TYPES = {
 }
 
 OPERATION_MODES = {
-    0: "Stop",  # PoolCop stopped
-    1: "Freeze",  # PoolCop freeze protection
-    2: "Forced",  # PoolCop in forced mode
-    3: "Auto",  # Auto mode
-    4: "Timer",  # Timers mode
-    5: "Manual",  # Manual mode
-    6: "Paused",  # PoolCop paused
-    7: "External",  # External mode
-    8: "Unknown",
-    9: "Unknown",
+    0: "Stop",       # PoolCop stopped
+    1: "Freeze",     # PoolCop freeze protection
+    2: "Forced",     # PoolCop in forced mode
+    3: "Auto",       # Auto mode
+    4: "Timer",      # Timers mode
+    5: "Manual",     # Manual mode
+    6: "Paused",     # PoolCop paused
+    7: "External",   # External mode
+    8: "Eco+",       # Eco+ intelligent mode
+    9: "Continuous", # 24/24h continuous mode
 }
 
 # Timer-related constants
 DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes
 APPROACHING_TIMER_UPDATE_INTERVAL = 60  # 1 minute
 TIMER_APPROACHING_THRESHOLD = 10 * 60  # 10 minutes
+
+# Aux label display names (maps PoolCopilot API label IDs to human-readable names)
+AUX_LABEL_NAMES: Final[dict[int, str]] = {
+    0: "Pool Light",
+    1: "Pool Cleaner",
+    2: "Pool Heating",
+    3: "Disinfection",
+    4: "Electrolysis",
+    5: "Remnant",
+    6: "Transfer Pump",
+    7: "UV",
+    8: "Spa",
+    9: "Fountain",
+    10: "Borehole",
+    11: "Pool House",
+    12: "Garden 1",
+    13: "Garden 2",
+    14: "Garden 3",
+    15: "Available",
+    16: "Waste Valve",
+    17: "Speed Control",
+    18: "ORP Control",
+    19: "Remnant",
+    20: "Pool Cover",
+    21: "Jet Stream",
+    22: "External Warnings",
+    23: "Cleaning Valve",
+    24: "Rinsing Valve",
+    25: "Dosing APF",
+    26: "Dosing ACO",
+    27: "Suction Valve",
+}

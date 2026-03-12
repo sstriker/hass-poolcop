@@ -1,19 +1,46 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Device is already configured"
+            "already_configured": "Device is already configured",
+            "reauth_successful": "Re-authentication successful"
         },
         "error": {
             "cannot_connect": "Failed to connect",
-            "invalid_auth": "Invalid authentication",
+            "invalid_auth": "Invalid API key",
             "unknown": "Unexpected error"
         },
         "step": {
+            "flow_rates": {
+                "data": {
+                    "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
+                    "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
+                    "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+                },
+                "description": "Your pool pump has {pump_speeds} speeds. Configure the flow rates for each speed.\n\nPool volume: {vol} m\u00b3\nDetected flow rate: {flowrate} m\u00b3/h"
+            },
+            "reauth_confirm": {
+                "data": {
+                    "api_key": "API Key"
+                },
+                "description": "Your PoolCopilot API key is no longer valid. Please enter a new API key."
+            },
             "user": {
                 "data": {
                     "api_key": "API Key"
                 },
-                "description": "Do you want to start setup?"
+                "description": "Enter your PoolCop API key from the PoolCopilot account"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
+                    "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
+                    "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+                },
+                "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume."
             }
         }
     }
