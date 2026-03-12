@@ -1,11 +1,10 @@
 """Test PoolCop config flow."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.poolcop.const import (
     CONF_FLOW_RATE_1,
@@ -79,9 +78,12 @@ async def test_user_flow_invalid_auth(hass: HomeAssistant):
         DOMAIN, context={"source": "user"}
     )
 
+    mock_poolcop = MagicMock()
+    mock_poolcop.status = AsyncMock(side_effect=PoolCopilotInvalidKeyError("bad key"))
+
     with patch(
         "custom_components.poolcop.config_flow.PoolCopilot",
-        side_effect=PoolCopilotInvalidKeyError("bad key"),
+        return_value=mock_poolcop,
     ):
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
@@ -129,12 +131,15 @@ async def test_reauth_flow(hass: HomeAssistant, mock_config_entry, mock_poolcop)
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "reauth_confirm"
 
-    with patch(
-        "custom_components.poolcop.config_flow.PoolCopilot",
-        return_value=mock_poolcop_validate,
-    ), patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
+    with (
+        patch(
+            "custom_components.poolcop.config_flow.PoolCopilot",
+            return_value=mock_poolcop_validate,
+        ),
+        patch(
+            "custom_components.poolcop.coordinator.PoolCopilot",
+            return_value=mock_poolcop,
+        ),
     ):
         mock_poolcop.status.return_value = {
             "PoolCop": {

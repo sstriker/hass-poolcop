@@ -3,9 +3,8 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-
 from homeassistant.const import CONF_API_KEY
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.poolcop.const import (
     CONF_FLOW_RATE_1,
@@ -15,6 +14,12 @@ from custom_components.poolcop.const import (
 )
 
 pytest_plugins = "pytest_homeassistant_custom_component"
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations in Home Assistant."""
+    yield
 
 
 MOCK_API_KEY = "test-api-key-12345"

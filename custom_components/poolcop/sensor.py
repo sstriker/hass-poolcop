@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import zoneinfo
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
-import zoneinfo
 
 from homeassistant.components.sensor import (
     DOMAIN as SENSOR_DOMAIN,
+)
+from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -230,7 +232,16 @@ def _timer_time_fn(
 
 def _weekday_mapping_fn(path: str) -> Callable[[PoolCopData], str | None]:
     """Return a value function that maps a numeric day value to a weekday name."""
-    WEEKDAYS = ["Disabled", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    WEEKDAYS = [
+        "Disabled",
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
 
     def value_fn(data: PoolCopData) -> str | None:
         value = data.status_value(path)
@@ -401,9 +412,11 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=lambda data: round(_cycle_elapsed_time_fn(data) / 60)
-        if _cycle_elapsed_time_fn(data) is not None
-        else None,
+        value_fn=lambda data: (
+            round(_cycle_elapsed_time_fn(data) / 60)
+            if _cycle_elapsed_time_fn(data) is not None
+            else None
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="cycle_remaining_time",
@@ -411,9 +424,11 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-sand",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=lambda data: round(_cycle_time_remaining_fn(data) / 60)
-        if _cycle_time_remaining_fn(data) is not None
-        else None,
+        value_fn=lambda data: (
+            round(_cycle_time_remaining_fn(data) / 60)
+            if _cycle_time_remaining_fn(data) is not None
+            else None
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="cycle_predicted_end",
@@ -440,7 +455,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="pool_turnover",
         name="Pool Turnover Rate",
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="×/day",
+        native_unit_of_measurement="x/day",
         icon="mdi:refresh",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pool.turnover"),
@@ -666,7 +681,16 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="ORP Hyper Chlorination Day",
         icon="mdi:calendar-week",
         device_class=SensorDeviceClass.ENUM,
-        options=["Disabled", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+        options=[
+            "Disabled",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ],
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_weekday_mapping_fn("settings.orp.hyper_day"),
     ),
@@ -764,9 +788,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: "Enabled"
-        if _timer_fn("cycle1", "enabled")(data) == 1
-        else "Disabled",
+        value_fn=lambda data: (
+            "Enabled" if _timer_fn("cycle1", "enabled")(data) == 1 else "Disabled"
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="cycle1_start_time",
@@ -792,9 +816,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: "Enabled"
-        if _timer_fn("cycle2", "enabled")(data) == 1
-        else "Disabled",
+        value_fn=lambda data: (
+            "Enabled" if _timer_fn("cycle2", "enabled")(data) == 1 else "Disabled"
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="cycle2_start_time",
@@ -820,9 +844,9 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: "Enabled"
-        if _timer_fn("aux4", "enabled")(data) == 1
-        else "Disabled",
+        value_fn=lambda data: (
+            "Enabled" if _timer_fn("aux4", "enabled")(data) == 1 else "Disabled"
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="aux4_start_time",

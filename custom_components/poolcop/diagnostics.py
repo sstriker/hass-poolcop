@@ -37,9 +37,7 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][
-        config_entry.entry_id
-    ]
+    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     diagnostics_data: dict[str, Any] = {
         "config_entry": {

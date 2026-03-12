@@ -17,10 +17,14 @@ ignore = [
   "E501", # line length handled by formatter
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]
 
 [tool.pytest.ini_options]
 addopts = "-q --cov=custom_components/poolcop --cov-report=term-missing"
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"

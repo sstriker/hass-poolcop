@@ -4,20 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from poolcop import (
-    PoolCopilot,
-    PoolCopilotConnectionError,
-    PoolCopilotError,
-    PoolCopilotInvalidKeyError,
-)
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.const import CONF_API_KEY, CONF_UNIQUE_ID
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
+from poolcop import (
+    PoolCopilot,
+    PoolCopilotConnectionError,
+    PoolCopilotError,
+    PoolCopilotInvalidKeyError,
+)
 
 from .const import CONF_FLOW_RATE_1, CONF_FLOW_RATE_2, CONF_FLOW_RATE_3, DOMAIN, LOGGER
 
@@ -152,9 +152,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             options=options,
         )
 
-    async def async_step_reauth(
-        self, entry_data: dict[str, Any]
-    ) -> FlowResult:
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> FlowResult:
         """Handle reauth when the API key becomes invalid."""
         return await self.async_step_reauth_confirm()
 
@@ -233,17 +231,13 @@ class PoolCopOptionsFlow(config_entries.OptionsFlow):
             fr2 = current_options.get(
                 CONF_FLOW_RATE_2, current_data.get(CONF_FLOW_RATE_2, 0)
             )
-            schema_dict[vol.Required(CONF_FLOW_RATE_2, default=fr2)] = vol.Coerce(
-                float
-            )
+            schema_dict[vol.Required(CONF_FLOW_RATE_2, default=fr2)] = vol.Coerce(float)
 
         if pump_nb_speeds >= 3:
             fr3 = current_options.get(
                 CONF_FLOW_RATE_3, current_data.get(CONF_FLOW_RATE_3, 0)
             )
-            schema_dict[vol.Required(CONF_FLOW_RATE_3, default=fr3)] = vol.Coerce(
-                float
-            )
+            schema_dict[vol.Required(CONF_FLOW_RATE_3, default=fr3)] = vol.Coerce(float)
 
         return self.async_show_form(
             step_id="init",

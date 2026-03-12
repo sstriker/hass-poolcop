@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "poolcop"
@@ -124,16 +124,16 @@ PH_TYPES = {
 }
 
 OPERATION_MODES = {
-    0: "Stop",       # PoolCop stopped
-    1: "Freeze",     # PoolCop freeze protection
-    2: "Forced",     # PoolCop in forced mode
-    3: "Auto",       # Auto mode
-    4: "Timer",      # Timers mode
-    5: "Manual",     # Manual mode
-    6: "Paused",     # PoolCop paused
-    7: "External",   # External mode
-    8: "Eco+",       # Eco+ intelligent mode
-    9: "Continuous", # 24/24h continuous mode
+    0: "Stop",  # PoolCop stopped
+    1: "Freeze",  # PoolCop freeze protection
+    2: "Forced",  # PoolCop in forced mode
+    3: "Auto",  # Auto mode
+    4: "Timer",  # Timers mode
+    5: "Manual",  # Manual mode
+    6: "Paused",  # PoolCop paused
+    7: "External",  # External mode
+    8: "Eco+",  # Eco+ intelligent mode
+    9: "Continuous",  # 24/24h continuous mode
 }
 
 # Timer-related constants

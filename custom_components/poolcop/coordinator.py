@@ -2,16 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import time
+from datetime import datetime, timedelta
 from typing import Any, NamedTuple
-
-from poolcop import (
-    PoolCopilot,
-    PoolCopilotConnectionError,
-    PoolCopilotInvalidKeyError,
-    PoolCopilotRateLimitError,
-)
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -21,6 +14,13 @@ from homeassistant.helpers.update_coordinator import (
     ConfigEntryAuthFailed,
     DataUpdateCoordinator,
     UpdateFailed,
+)
+
+from poolcop import (
+    PoolCopilot,
+    PoolCopilotConnectionError,
+    PoolCopilotInvalidKeyError,
+    PoolCopilotRateLimitError,
 )
 
 from .const import (
@@ -188,45 +188,43 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             now = time.time()
 
             # Check if operation mode changed
-            if self._last_operation_mode != current_mode:
-                if self._last_operation_mode is not None:
-                    # Record cycle transition data
-                    if self._current_cycle_start is not None:
-                        cycle_duration = now - self._current_cycle_start
+            if (
+                self._last_operation_mode != current_mode
+                and self._last_operation_mode is not None
+            ):
+                # Record cycle transition data
+                if self._current_cycle_start is not None:
+                    cycle_duration = now - self._current_cycle_start
 
-                        # Only update duration for non-idle/pause/external modes
-                        if self._last_operation_mode in [1, 2, 3, 4, 5]:
-                            # Update the average duration using exponential moving average
-                            # Weight: 30% new, 70% old
-                            old_duration = self._cycle_durations[
-                                self._last_operation_mode
-                            ]
-                            if old_duration > 0:
-                                new_duration = (0.3 * cycle_duration) + (
-                                    0.7 * old_duration
-                                )
-                                self._cycle_durations[self._last_operation_mode] = (
-                                    new_duration
-                                )
-                                LOGGER.debug(
-                                    "Updated duration for mode %s: %.1f minutes",
-                                    self._last_operation_mode,
-                                    new_duration / 60,
-                                )
+                    # Only update duration for non-idle/pause/external modes
+                    if self._last_operation_mode in [1, 2, 3, 4, 5]:
+                        # Update the average duration using exponential moving average
+                        # Weight: 30% new, 70% old
+                        old_duration = self._cycle_durations[self._last_operation_mode]
+                        if old_duration > 0:
+                            new_duration = (0.3 * cycle_duration) + (0.7 * old_duration)
+                            self._cycle_durations[self._last_operation_mode] = (
+                                new_duration
+                            )
+                            LOGGER.debug(
+                                "Updated duration for mode %s: %.1f minutes",
+                                self._last_operation_mode,
+                                new_duration / 60,
+                            )
 
-                        # Record transition for analysis
-                        self._cycle_transitions.append(
-                            {
-                                "from_mode": self._last_operation_mode,
-                                "to_mode": current_mode,
-                                "duration": cycle_duration,
-                                "timestamp": now,
-                            }
-                        )
+                    # Record transition for analysis
+                    self._cycle_transitions.append(
+                        {
+                            "from_mode": self._last_operation_mode,
+                            "to_mode": current_mode,
+                            "duration": cycle_duration,
+                            "timestamp": now,
+                        }
+                    )
 
-                        # Keep only last 20 transitions
-                        if len(self._cycle_transitions) > 20:
-                            self._cycle_transitions.pop(0)
+                    # Keep only last 20 transitions
+                    if len(self._cycle_transitions) > 20:
+                        self._cycle_transitions.pop(0)
 
                 # New cycle started
                 self._current_cycle_start = now
@@ -552,9 +550,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self.hass.async_create_task(self.async_save_learned_data())
                 self._last_save_time = current_time
         except PoolCopilotInvalidKeyError as err:
-            raise ConfigEntryAuthFailed(
-                "API key is invalid or expired"
-            ) from err
+            raise ConfigEntryAuthFailed("API key is invalid or expired") from err
         except PoolCopilotRateLimitError as err:
             # Add specific handling for rate limit errors with exponential backoff
             retry_after = getattr(err, "retry_after", None)
