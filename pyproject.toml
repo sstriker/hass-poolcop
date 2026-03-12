@@ -1,36 +1,26 @@
-[tool.black]
-line-length = 88
-target-version = ["py310", "py311", "py312"]
-skip-string-normalization = true
-
-[tool.isort]
-profile = "black"
-combine_as_imports = true
-line_length = 88
-
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 88
+
+[tool.ruff.lint]
 select = [
-  "E", # pycodestyle errors
-  "F", # pyflakes
-  "I", # isort
-  "B", # flake8-bugbear
-  "UP", # pyupgrade
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # isort
+  "B",   # flake8-bugbear
+  "UP",  # pyupgrade
   "SIM", # flake8-simplify
+  "S",   # flake8-bandit (security)
+  "RUF", # ruff-specific rules
 ]
 ignore = [
-  "E501", # line length handled by black
-]
-exclude = [
-  ".venv",
-  ".git",
-  "__pycache__",
+  "E501", # line length handled by formatter
 ]
 
 [tool.ruff.lint.isort]
 known-first-party = ["custom_components"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --cov=custom_components/poolcop --cov-report=term-missing"
 testpaths = ["tests"]
+asyncio_mode = "auto"

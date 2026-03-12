@@ -1,3 +1,9 @@
+# Sensitive files
+token.dump.txt
+*.har
+*.credentials
+*.secret
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

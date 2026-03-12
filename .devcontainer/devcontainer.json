@@ -1,6 +1,6 @@
 {
   "name": "Home Assistant - PoolCop Integration",
-  "image": "ghcr.io/ludeeus/devcontainer/hass:stable",
+  "image": "ghcr.io/home-assistant/home-assistant:dev",
   "features": {},
   "workspaceFolder": "/workspaces/hass-poolcop",
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/hass-poolcop,type=bind,consistency=cached",
@@ -10,7 +10,7 @@
   "containerEnv": {
     "PYTHONDONTWRITEBYTECODE": "1"
   },
-  "postCreateCommand": "pip install -U pip && pip install -U pytest pytest-asyncio pytest-cov pytest-homeassistant-custom-component aiohttp pre-commit ruff black hassfest && if [ -d /workspaces/python-poolcop ]; then pip install -e /workspaces/python-poolcop; fi && pre-commit install --install-hooks",
+  "postCreateCommand": "pip install -U pip && pip install -U pytest pytest-asyncio pytest-cov pytest-homeassistant-custom-component aiohttp pre-commit ruff black && if [ -d /workspaces/python-poolcop ]; then pip install -e /workspaces/python-poolcop; fi && pre-commit install --install-hooks",
   "forwardPorts": [8123],
   "postStartCommand": "mkdir -p /config/custom_components && rm -f /config/custom_components/poolcop && ln -s /workspaces/hass-poolcop/custom_components/poolcop /config/custom_components/poolcop",
   "customizations": {
