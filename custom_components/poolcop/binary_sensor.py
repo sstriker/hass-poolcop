@@ -98,49 +98,6 @@ BINARY_SENSORS = (
         is_on_fn=_is_on_fn("status.ioniser"),
         on_off_icons=PUMP_ICONS,
     ),
-    # Auxiliary outputs
-    PoolCopBinarySensorEntityDescription(
-        key="aux1",
-        name="aux 1",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux1"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux2",
-        name="aux 2",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux2"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux3",
-        name="aux 3",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux3"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux4",
-        name="aux 4",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux4"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux5",
-        name="aux 5",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux5"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux6",
-        name="aux 6",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux6"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
     # These binary sensors represent equipment installation status (connectivity)
     PoolCopBinarySensorEntityDescription(
         key="orp_installed",
@@ -293,12 +250,22 @@ BINARY_SENSORS = (
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up PoolCop sensors based on a config entry."""
+    """Set up PoolCop binary sensors based on a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
+
+    entities: list[BinarySensorEntity] = [
         PoolCopBinarySensorEntity(coordinator=coordinator, description=description)
         for description in BINARY_SENSORS
-    )
+        if PoolCopEntity.is_component_installed(coordinator, description.key)
+    ]
+
+    # Dynamic aux binary sensors for non-switchable aux ports
+    aux_list = coordinator.data.status_value("aux") or []
+    for aux in aux_list:
+        if not aux.get("switchable"):
+            entities.append(PoolCopAuxBinarySensor(coordinator, aux))
+
+    async_add_entities(entities)
 
 
 class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
@@ -316,22 +283,6 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
         super().__init__(coordinator=coordinator, description=description)
         self.entity_id = f"{BINARY_SENSOR_DOMAIN}.{self._attr_unique_id}"
 
-        # Apply custom names for aux outputs if available
-        if description.key.startswith("aux") and coordinator.data.status_value(
-            "conf.aux_names"
-        ):
-            aux_number = description.key.replace("aux", "")
-            if aux_number.isdigit():
-                aux_name = coordinator.data.status_value(
-                    f"conf.aux_names.aux{aux_number}"
-                )
-                if aux_name:
-                    # Use translation system instead of directly setting the name
-                    self._attr_translation_key = (
-                        f"entity.binary_sensor.{description.key}"
-                    )
-                    self._attr_translation_placeholders = {"aux_name": aux_name}
-
     @property
     def is_on(self) -> bool:
         """Return true if the binary sensor is on."""
@@ -342,3 +293,59 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
         """Return the icon to use in the frontend, if any."""
         icons = self.entity_description.on_off_icons
         return icons[0] if self.is_on else icons[1]
+
+
+class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
+    """Binary sensor for a non-switchable PoolCop auxiliary input."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.RUNNING
+
+    def __init__(
+        self,
+        coordinator: PoolCopDataUpdateCoordinator,
+        aux_data: dict,
+    ) -> None:
+        """Initialize the aux binary sensor."""
+        from homeassistant.helpers.entity import EntityDescription
+
+        self._aux_id: int = aux_data["id"]
+        label = aux_data.get("label", f"Aux {self._aux_id}")
+
+        super().__init__(
+            coordinator=coordinator,
+            description=EntityDescription(
+                key=f"aux_{self._aux_id}",
+                name=label,
+            ),
+        )
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if the aux input is active."""
+        aux_list = self.coordinator.data.status_value("aux") or []
+        for aux in aux_list:
+            if aux.get("id") == self._aux_id:
+                return bool(aux.get("status"))
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return extra state attributes."""
+        aux_list = self.coordinator.data.status_value("aux") or []
+        for aux in aux_list:
+            if aux.get("id") == self._aux_id:
+                attrs = {}
+                if "slave" in aux:
+                    attrs["slave"] = aux["slave"]
+                if "days" in aux:
+                    attrs["days"] = aux["days"]
+                if "label" in aux:
+                    attrs["label"] = aux["label"]
+                return attrs
+        return {}
+
+    @property
+    def icon(self) -> str | None:
+        """Return the icon."""
+        return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"
