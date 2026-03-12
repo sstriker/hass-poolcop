@@ -73,13 +73,20 @@ def _value_fn(
 def _datetime_value_fn(
     path: str,
 ) -> Callable[[PoolCopData], datetime | None]:
-    """Return a value function for timestamp at path."""
+    """Return a value function for timestamp at path.
+
+    Guards against epoch timestamps (before year 2000) which occur when
+    the PoolCop hardware resets — returns None instead of a bogus date.
+    """
 
     def value_fn(data: PoolCopData) -> datetime | None:
         value = data.status_value(path)
         if value is None:
             return None
-        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S%z")
+        if parsed.year < 2000:
+            return None
+        return parsed
 
     return value_fn
 
@@ -368,46 +375,6 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(WATER_VALVE_POSITIONS.values()),
         value_fn=_state_mapping_fn("status.watervalve", WATER_VALVE_POSITIONS),
-    ),
-    PoolCopSensorEntityDescription(
-        key="ph_setpoint",
-        name="pH Setpoint",
-        icon="mdi:ph",
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="pH",
-        value_fn=_value_fn("conf.ph_setpoint"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="orp_setpoint",
-        name="ORP Setpoint",
-        icon="mdi:molecule",
-        state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="mV",
-        value_fn=_value_fn("conf.orp_setpoint"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="filtration_time_today",
-        name="Filtration Time Today",
-        icon="mdi:timer-outline",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=_value_fn("status.filtration_time.today"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="filtration_time_yesterday",
-        name="Filtration Time Yesterday",
-        icon="mdi:timer-outline",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.MINUTES,
-        value_fn=_value_fn("status.filtration_time.yesterday"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="filtration_time_total",
-        name="Filtration Time Total",
-        icon="mdi:timer-outline",
-        device_class=SensorDeviceClass.DURATION,
-        native_unit_of_measurement=UnitOfTime.HOURS,
-        value_fn=_value_fn("status.filtration_time.total"),
     ),
     PoolCopSensorEntityDescription(
         key="active_alarm_code",
@@ -796,6 +763,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: "Enabled"
         if _timer_fn("cycle1", "enabled")(data) == 1
         else "Disabled",
@@ -805,6 +773,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Cycle 1 Start Time",
         icon="mdi:clock-start",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("cycle1", "start"),
     ),
     PoolCopSensorEntityDescription(
@@ -812,6 +781,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Cycle 1 Stop Time",
         icon="mdi:clock-end",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("cycle1", "stop"),
     ),
     # Cycle 2 timer
@@ -821,6 +791,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: "Enabled"
         if _timer_fn("cycle2", "enabled")(data) == 1
         else "Disabled",
@@ -830,6 +801,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Cycle 2 Start Time",
         icon="mdi:clock-start",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("cycle2", "start"),
     ),
     PoolCopSensorEntityDescription(
@@ -837,6 +809,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Cycle 2 Stop Time",
         icon="mdi:clock-end",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("cycle2", "stop"),
     ),
     # Add sensors for switchable auxiliary outputs
@@ -846,6 +819,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:toggle-switch",
         device_class=SensorDeviceClass.ENUM,
         options=["Disabled", "Enabled"],
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: "Enabled"
         if _timer_fn("aux4", "enabled")(data) == 1
         else "Disabled",
@@ -855,6 +829,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Aux 4 Start Time",
         icon="mdi:clock-start",
         device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("aux4", "start"),
     ),
 )
@@ -866,19 +841,21 @@ async def async_setup_entry(
     """Set up PoolCop sensors based on a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Add standard sensors
+    # Add standard sensors (skip uninstalled components)
     entities = [
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in SENSORS
+        if PoolCopEntity.is_component_installed(coordinator, description.key)
     ]
 
     # Add the flow rate sensor
     entities.append(FlowRateSensor(coordinator=coordinator))
 
-    # Add settings sensors
+    # Add settings sensors (skip uninstalled components)
     entities.extend(
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in SETTINGS_SENSORS
+        if PoolCopEntity.is_component_installed(coordinator, description.key)
     )
 
     # Add timer sensors
