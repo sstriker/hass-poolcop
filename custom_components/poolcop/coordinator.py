@@ -376,7 +376,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 aux_data = next(
                     (
                         a
-                        for a in self.data.status_value("aux", [])
+                        for a in self.data.status_value("aux") or []
                         if a.get("id") == aux_id
                     ),
                     None,

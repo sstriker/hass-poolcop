@@ -127,3 +127,59 @@ async def test_service_clear_alarm(
         blocking=True,
     )
     mock_poolcop.clear_alarm.assert_called_once()
+
+
+async def test_service_error_handling(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """ConnectionError logged, not raised."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Make set_pump_speed raise ConnectionError
+    mock_poolcop.set_pump_speed.side_effect = ConnectionError("offline")
+
+    # Should not raise — service catches and logs
+    await hass.services.async_call(
+        DOMAIN,
+        SERVICE_SET_PUMP_SPEED,
+        {"speed": 2},
+        blocking=True,
+    )
+
+
+async def test_service_registration_idempotent(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Double register → no crash."""
+    from custom_components.poolcop.service import async_setup_services
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Call setup_services again — should not crash
+    await async_setup_services(hass)
+    assert hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED)
+
+
+async def test_service_unload_not_registered(hass: HomeAssistant):
+    """Unload when not registered → no crash."""
+    from custom_components.poolcop.service import async_unload_services
+
+    # Services not registered yet — should not crash
+    await async_unload_services(hass)
+    assert not hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED)
