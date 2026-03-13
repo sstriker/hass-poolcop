@@ -17,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     AUX_FIXED_FUNCTION_LABELS,
+    AUX_LABEL_ICONS,
     AUX_RELAY_LABELS,
     AUX_VALVE_LABELS,
     DOMAIN,
@@ -309,7 +310,8 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
         self._aux_id: int = aux_data["id"]
         api_label = aux_data.get("label", "")
         label = aux_display_name(api_label, self._aux_id)
-        lid = aux_label_id(api_label)
+        self._label_id = aux_label_id(api_label)
+        lid = self._label_id
 
         # Fixed-function aux ports have first-class entity counterparts
         # — show as "Label (Aux N)" and mark diagnostic
@@ -362,4 +364,7 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
         """Return the icon."""
         if self._attr_device_class == BinarySensorDeviceClass.OPENING:
             return "mdi:valve-open" if self.is_on else "mdi:valve-closed"
+        icons = AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        if icons:
+            return icons[0] if self.is_on else icons[1]
         return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"

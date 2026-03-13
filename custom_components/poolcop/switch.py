@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, aux_display_name
+from .const import AUX_LABEL_ICONS, DOMAIN, aux_display_name, aux_label_id
 from .coordinator import PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -78,7 +78,9 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):
         from homeassistant.helpers.entity import EntityDescription
 
         self._aux_id: int = aux_data["id"]
-        label = aux_display_name(aux_data.get("label", ""), self._aux_id)
+        api_label = aux_data.get("label", "")
+        label = aux_display_name(api_label, self._aux_id)
+        self._label_id = aux_label_id(api_label)
 
         super().__init__(
             coordinator=coordinator,
@@ -112,6 +114,14 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):
                     attrs["label"] = aux["label"]
                 return attrs
         return {}
+
+    @property
+    def icon(self) -> str | None:
+        """Return the icon."""
+        icons = AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        if icons:
+            return icons[0] if self.is_on else icons[1]
+        return None
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the aux output on."""

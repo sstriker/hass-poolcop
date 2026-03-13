@@ -185,6 +185,26 @@ AUX_VALVE_LABELS: Final[set[int]] = {16, 23, 24, 27}
 # Relay-type aux label IDs with first-class counterparts — POWER device class (On/Off)
 AUX_RELAY_LABELS: Final[set[int]] = {17, 18}
 
+# Aux label icon mapping — (on_icon, off_icon) per label ID
+AUX_LABEL_ICONS: Final[dict[int, tuple[str, str]]] = {
+    0: ("mdi:lightbulb-on", "mdi:lightbulb-off"),  # Pool Light
+    1: ("mdi:robot-vacuum", "mdi:robot-vacuum-off"),  # Pool Cleaner
+    2: ("mdi:heating-coil", "mdi:heating-coil"),  # Pool Heating
+    3: ("mdi:bottle-tonic-skull", "mdi:bottle-tonic-skull-outline"),  # Disinfection
+    4: ("mdi:flash", "mdi:flash-off"),  # Electrolysis
+    6: ("mdi:pump", "mdi:pump-off"),  # Transfer Pump
+    7: ("mdi:weather-sunny", "mdi:weather-sunny-off"),  # UV
+    8: ("mdi:hot-tub", "mdi:hot-tub"),  # Spa
+    9: ("mdi:fountain", "mdi:fountain"),  # Fountain
+    10: ("mdi:water-well", "mdi:water-well-outline"),  # Borehole
+    11: ("mdi:home", "mdi:home-outline"),  # Pool House
+    20: ("mdi:window-shutter", "mdi:window-shutter-open"),  # Pool Cover
+    21: ("mdi:waves-arrow-right", "mdi:waves-arrow-right"),  # Jet Stream
+    22: ("mdi:alert", "mdi:alert-outline"),  # External Warnings
+    25: ("mdi:beaker", "mdi:beaker-outline"),  # Dosing APF
+    26: ("mdi:beaker", "mdi:beaker-outline"),  # Dosing ACO
+}
+
 
 def aux_label_id(api_label: str) -> int | None:
     """Extract the numeric label ID from an API label string like 'label_aux_17'."""
