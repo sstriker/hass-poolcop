@@ -32,6 +32,44 @@
       "unknown": "Unexpected error"
     }
   },
+  "entity": {
+    "sensor": {
+      "poolcop": {
+        "name": "Operation Mode",
+        "state": {
+          "stop": "Stop",
+          "freeze": "Freeze",
+          "forced": "Forced",
+          "auto": "Auto",
+          "timer": "Timer",
+          "manual": "Manual",
+          "paused": "Paused",
+          "external": "External",
+          "eco_": "Eco+",
+          "continuous": "Continuous"
+        },
+        "state_attributes": {
+          "description": {
+            "name": "Description"
+          }
+        }
+      },
+      "filter_timer_mode": {
+        "name": "Filter Timer Mode",
+        "state": {
+          "stop_disabled": "STOP - Disabled",
+          "timer_manual_schedule": "TIMER - Manual Schedule",
+          "eco_intelligent": "ECO+ - Intelligent",
+          "volume_pool_volume": "VOLUME - Pool Volume",
+          "continuous_23h_day": "CONTINUOUS - 23h/day",
+          "force_24h": "FORCE 24H",
+          "force_48h": "FORCE 48H",
+          "force_72h": "FORCE 72H",
+          "_24_24_always_on": "24/24 - Always On"
+        }
+      }
+    }
+  },
   "options": {
     "step": {
       "init": {

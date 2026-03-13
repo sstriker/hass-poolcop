@@ -32,8 +32,10 @@ from .const import (
     DOMAIN,
     FILTER_MODES,
     FILTER_TIMER_MODES,
+    FILTER_TIMER_MODE_DESCRIPTIONS,
     FORCED_FILTRATION_MODES,
     LOGGER,
+    OPERATION_MODE_DESCRIPTIONS,
     OPERATION_MODES,
     PH_TYPES,
     POOL_TYPES,
@@ -60,6 +62,8 @@ class PoolCopSensorEntityDescription(
     SensorEntityDescription, PoolCopSensorEntityDescriptionMixin
 ):
     """Describes PoolCop sensor entity."""
+
+    extra_attrs_fn: Callable[[PoolCopData], dict[str, Any]] | None = None
 
 
 def _value_fn(
@@ -357,6 +361,11 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(OPERATION_MODES.values()),
         value_fn=_state_mapping_fn("status.poolcop", OPERATION_MODES),
+        extra_attrs_fn=lambda data: {
+            "description": OPERATION_MODE_DESCRIPTIONS.get(
+                data.status_value("status.poolcop"), ""
+            )
+        },
     ),
     PoolCopSensorEntityDescription(
         key="last_backwash",
@@ -535,6 +544,11 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(FILTER_TIMER_MODES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
+        extra_attrs_fn=lambda data: {
+            "description": FILTER_TIMER_MODE_DESCRIPTIONS.get(
+                data.status_value("settings.filter.timer"), ""
+            )
+        },
     ),
     PoolCopSensorEntityDescription(
         key="filter_mode",
@@ -947,6 +961,13 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
     def native_value(self) -> str | int | float | datetime | None:
         """Return the state of the sensor."""
         return self.entity_description.value_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
+        if self.entity_description.extra_attrs_fn:
+            return self.entity_description.extra_attrs_fn(self.coordinator.data)
+        return None
 
 
 class FlowRateSensor(PoolCopSensorEntity):
