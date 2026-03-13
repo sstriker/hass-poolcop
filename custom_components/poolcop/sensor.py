@@ -859,6 +859,8 @@ async def async_setup_entry(
     entities.append(FlowRateSensor(coordinator=coordinator))
     entities.append(DailyFiltrationVolumeSensor(coordinator=coordinator))
     entities.append(DailyTurnoverSensor(coordinator=coordinator))
+    entities.append(PlannedRemainingVolumeSensor(coordinator=coordinator))
+    entities.append(PlannedRemainingTurnoverSensor(coordinator=coordinator))
 
     # Add settings sensors (skip uninstalled components)
     entities.extend(
@@ -1025,3 +1027,49 @@ class DailyTurnoverSensor(PoolCopSensorEntity):
     def native_value(self) -> float | None:
         """Return the number of pool turnovers today."""
         return self.coordinator.daily_turnovers
+
+
+class PlannedRemainingVolumeSensor(PoolCopSensorEntity):
+    """Planned remaining filtration volume for the current day."""
+
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+    _attr_device_class = SensorDeviceClass.VOLUME
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:water-outline"
+
+    def __init__(self, *, coordinator: PoolCopDataUpdateCoordinator) -> None:
+        """Initialize the planned remaining volume sensor."""
+        description = PoolCopSensorEntityDescription(
+            key="planned_remaining_volume",
+            name="Planned Remaining Filter Volume",
+            value_fn=lambda data: None,
+        )
+        super().__init__(coordinator=coordinator, description=description)
+
+    @property
+    def native_value(self) -> float:
+        """Return the planned remaining filtration volume in m³."""
+        return self.coordinator.planned_remaining_volume
+
+
+class PlannedRemainingTurnoverSensor(PoolCopSensorEntity):
+    """Planned remaining turnovers for the current day."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:sync-circle"
+
+    def __init__(self, *, coordinator: PoolCopDataUpdateCoordinator) -> None:
+        """Initialize the planned remaining turnover sensor."""
+        description = PoolCopSensorEntityDescription(
+            key="planned_remaining_turnovers",
+            name="Planned Remaining Turnovers",
+            value_fn=lambda data: None,
+        )
+        super().__init__(coordinator=coordinator, description=description)
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the planned remaining turnovers."""
+        return self.coordinator.planned_remaining_turnovers

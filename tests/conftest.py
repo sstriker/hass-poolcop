@@ -156,6 +156,8 @@ def mock_poolcop_data():
                 "pump": {
                     "nb_speed": 3,
                     "flowrate": 15.0,
+                    "speed_cycle1": 2,
+                    "speed_cycle2": 1,
                 },
                 "pool": {
                     "volume": 50,

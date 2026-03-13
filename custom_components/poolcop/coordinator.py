@@ -199,6 +199,180 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         self._last_flow_update = now
 
+    def _get_remaining_cycle_seconds(self, cycle_name: str) -> float:
+        """Return remaining filtration seconds for a cycle timer today.
+
+        Returns 0 if the cycle is disabled, has no valid times, or has already finished.
+        Unlike _time_str_to_datetime, this always interprets times as today (no tomorrow shift).
+        """
+        if not self.data or not self.data.status:
+            return 0.0
+
+        timer = self.data.status_value(f"timers.{cycle_name}")
+        if not timer or timer.get("enabled") != 1:
+            return 0.0
+
+        start_str = timer.get("start")
+        stop_str = timer.get("stop")
+        if (
+            not start_str
+            or not stop_str
+            or start_str == "00:00:00"
+            or stop_str == "00:00:00"
+        ):
+            return 0.0
+
+        try:
+            # Get timezone
+            tz = None
+            pool_data = self.data.status_value("", prefix="Pool")
+            if pool_data and isinstance(pool_data, dict) and "timezone" in pool_data:
+                try:
+                    import zoneinfo
+
+                    tz = zoneinfo.ZoneInfo(pool_data["timezone"])
+                except (ImportError, zoneinfo.ZoneInfoNotFoundError):
+                    pass
+
+            now = datetime.now(tz=tz)
+
+            sh, sm, ss = map(int, start_str.split(":"))
+            eh, em, es = map(int, stop_str.split(":"))
+
+            start_dt = now.replace(hour=sh, minute=sm, second=ss, microsecond=0)
+            stop_dt = now.replace(hour=eh, minute=em, second=es, microsecond=0)
+        except (ValueError, TypeError):
+            return 0.0
+
+        # Ensure stop is after start (same-day cycle)
+        if stop_dt <= start_dt:
+            return 0.0
+
+        if now >= stop_dt:
+            return 0.0
+        if now <= start_dt:
+            return (stop_dt - start_dt).total_seconds()
+        return (stop_dt - now).total_seconds()
+
+    def _get_flow_rate_for_speed(self, speed: int | None) -> float:
+        """Return flow rate for a given pump speed, with fallback."""
+        if speed is not None:
+            rate = self.flow_rates.get(speed, 0.0)
+            if rate > 0:
+                return rate
+        # Fallback to current pump speed
+        current_speed = self.data.status_value("status.pumpspeed") if self.data else None
+        if current_speed is not None:
+            try:
+                return self.flow_rates.get(int(current_speed), 0.0)
+            except (ValueError, TypeError):
+                pass
+        # Last fallback: speed 1
+        return self.flow_rates.get(1, 0.0)
+
+    @property
+    def planned_remaining_volume(self) -> float:
+        """Return the planned remaining filtration volume in m³ for today.
+
+        Dispatches on the actual operating mode (status.poolcop), not
+        the configured filter timer setting, so forced filtration activated
+        via command is handled correctly.
+        """
+        if not self.data or not self.data.status:
+            return 0.0
+
+        op_mode = self.data.status_value("status.poolcop")
+        if op_mode is None:
+            return 0.0
+
+        # Modes with no predictable planned filtration
+        # 0=Stop, 1=Freeze, 5=Manual, 6=Paused, 7=External
+        if op_mode in (0, 1, 5, 6, 7):
+            return 0.0
+
+        # Mode 2: Forced - use status.forced.remaining_hours × flow rate
+        if op_mode == 2:
+            remaining_hours = self.data.status_value("status.forced.remaining_hours")
+            if remaining_hours is not None and remaining_hours > 0:
+                current_speed = self.data.status_value("status.pumpspeed")
+                if current_speed is not None:
+                    try:
+                        current_speed = int(current_speed)
+                    except (ValueError, TypeError):
+                        current_speed = None
+                flow = self._get_flow_rate_for_speed(current_speed)
+                return round(flow * remaining_hours, 3)
+            return 0.0
+
+        # Modes 3 (Auto), 4 (Timer), 8 (Eco+) - use cycle timers
+        if op_mode in (3, 4, 8):
+            total = 0.0
+            for cycle_name, speed_key in (
+                ("cycle1", "speed_cycle1"),
+                ("cycle2", "speed_cycle2"),
+            ):
+                remaining_secs = self._get_remaining_cycle_seconds(cycle_name)
+                if remaining_secs > 0:
+                    speed = self.data.status_value(f"settings.pump.{speed_key}")
+                    if speed is not None:
+                        try:
+                            speed = int(speed)
+                        except (ValueError, TypeError):
+                            speed = None
+                    flow = self._get_flow_rate_for_speed(speed)
+                    total += flow * (remaining_secs / 3600.0)
+            return round(total, 3)
+
+        # Mode 9: Continuous - remaining hours today × flow rate
+        if op_mode == 9:
+            return self._remaining_hours_volume()
+
+        return 0.0
+
+    def _remaining_hours_volume(self) -> float:
+        """Calculate volume from remaining hours today × current flow rate."""
+        try:
+            # Get timezone
+            tz = None
+            if self.data and self.data.status:
+                pool_data = self.data.status_value("", prefix="Pool")
+                if pool_data and isinstance(pool_data, dict) and "timezone" in pool_data:
+                    try:
+                        import zoneinfo
+
+                        tz = zoneinfo.ZoneInfo(pool_data["timezone"])
+                    except (ImportError, zoneinfo.ZoneInfoNotFoundError):
+                        pass
+
+            now = datetime.now(tz=tz) if tz else datetime.now()
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(
+                days=1
+            )
+            remaining_hours = (midnight - now).total_seconds() / 3600.0
+            # Cap at 23 hours
+            remaining_hours = min(remaining_hours, 23.0)
+        except Exception:
+            return 0.0
+
+        current_speed = self.data.status_value("status.pumpspeed") if self.data else None
+        if current_speed is not None:
+            try:
+                current_speed = int(current_speed)
+            except (ValueError, TypeError):
+                current_speed = None
+        flow = self._get_flow_rate_for_speed(current_speed)
+        return round(flow * remaining_hours, 3)
+
+    @property
+    def planned_remaining_turnovers(self) -> float | None:
+        """Return planned remaining turnovers (volume / pool_volume)."""
+        if not self.data or not self.data.status:
+            return None
+        pool_volume = self.data.status_value("settings.pool.volume")
+        if not pool_volume or pool_volume <= 0:
+            return None
+        return round(self.planned_remaining_volume / pool_volume, 2)
+
     @property
     def daily_volume(self) -> float:
         """Return the accumulated daily filtration volume in m³."""

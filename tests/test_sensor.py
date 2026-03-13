@@ -149,3 +149,30 @@ async def test_aux_timer_sensors_created(
     sensor_keys = {s.entity_id for s in states}
     # Should have transfer_pump_enabled and transfer_pump_start_time sensors
     assert any("transfer_pump_enabled" in s for s in sensor_keys)
+
+
+async def test_planned_remaining_sensors_exist(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Planned remaining volume and turnovers sensors are created."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    states = hass.states.async_all("sensor")
+    sensor_keys = {s.entity_id for s in states}
+    assert any("planned_remaining_filter_volume" in s for s in sensor_keys)
+    assert any("planned_remaining_turnovers" in s for s in sensor_keys)
+
+
+async def test_planned_remaining_volume_value(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Planned remaining volume sensor reflects coordinator property."""
+    coordinator = await _setup_integration(
+        hass, mock_config_entry, mock_poolcop, mock_poolcop_data
+    )
+
+    state = hass.states.get("sensor.test_pool_planned_remaining_filter_volume")
+    assert state is not None
+    # Value should match what coordinator returns (numeric string)
+    expected = str(coordinator.planned_remaining_volume)
+    assert state.state == expected
