@@ -9,9 +9,6 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
-    DOMAIN as SENSOR_DOMAIN,
-)
-from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -42,6 +39,7 @@ from .const import (
     VALVE_POSITION_NAMES,
     WATER_VALVE_POSITIONS,
     WATERLEVEL_STATES,
+    aux_display_name,
 )
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
@@ -836,26 +834,6 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_timer_time_fn("cycle2", "stop"),
     ),
-    # Add sensors for switchable auxiliary outputs
-    PoolCopSensorEntityDescription(
-        key="aux4_enabled",
-        name="Aux 4 Enabled",
-        icon="mdi:toggle-switch",
-        device_class=SensorDeviceClass.ENUM,
-        options=["Disabled", "Enabled"],
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            "Enabled" if _timer_fn("aux4", "enabled")(data) == 1 else "Disabled"
-        ),
-    ),
-    PoolCopSensorEntityDescription(
-        key="aux4_start_time",
-        name="Aux 4 Start Time",
-        icon="mdi:clock-start",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_timer_time_fn("aux4", "start"),
-    ),
 )
 
 
@@ -882,11 +860,50 @@ async def async_setup_entry(
         if PoolCopEntity.is_component_installed(coordinator, description.key)
     )
 
-    # Add timer sensors
+    # Add timer sensors (cycle1, cycle2)
     entities.extend(
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in TIMER_SENSORS
     )
+
+    # Add dynamic aux timer sensors from API aux array
+    aux_list = coordinator.data.status_value("aux") or []
+    timers = coordinator.data.status_value("timers") or {}
+    for aux in aux_list:
+        aux_id = aux["id"]
+        timer_key = f"aux{aux_id}"
+        if timer_key not in timers:
+            continue
+        label = aux_display_name(aux.get("label", ""), aux_id)
+        entities.append(
+            PoolCopSensorEntity(
+                coordinator=coordinator,
+                description=PoolCopSensorEntityDescription(
+                    key=f"{timer_key}_enabled",
+                    name=f"{label} Enabled",
+                    icon="mdi:toggle-switch",
+                    device_class=SensorDeviceClass.ENUM,
+                    options=["Disabled", "Enabled"],
+                    entity_category=EntityCategory.DIAGNOSTIC,
+                    value_fn=lambda data, k=timer_key: (
+                        "Enabled" if _timer_fn(k, "enabled")(data) == 1 else "Disabled"
+                    ),
+                ),
+            )
+        )
+        entities.append(
+            PoolCopSensorEntity(
+                coordinator=coordinator,
+                description=PoolCopSensorEntityDescription(
+                    key=f"{timer_key}_start_time",
+                    name=f"{label} Start Time",
+                    icon="mdi:clock-start",
+                    device_class=SensorDeviceClass.TIMESTAMP,
+                    entity_category=EntityCategory.DIAGNOSTIC,
+                    value_fn=_timer_time_fn(timer_key, "start"),
+                ),
+            )
+        )
 
     async_add_entities(entities)
 
@@ -906,7 +923,6 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
     ) -> None:
         """Initialize PoolCop sensor."""
         super().__init__(coordinator=coordinator, description=description)
-        self.entity_id = f"{SENSOR_DOMAIN}.{self._attr_unique_id}"
 
     @property
     def native_value(self) -> str | int | float | datetime | None:

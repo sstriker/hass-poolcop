@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, aux_display_name
 from .coordinator import PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -22,10 +22,10 @@ async def async_setup_entry(
 
     entities: list[SwitchEntity] = [PoolCopPumpSwitch(coordinator)]
 
-    # Dynamic aux switches from aux[] array where switchable is true
+    # Dynamic aux switches from aux[] array where switchable and not slaved
     aux_list = coordinator.data.status_value("aux") or []
     for aux in aux_list:
-        if aux.get("switchable"):
+        if aux.get("switchable") and not aux.get("slave"):
             entities.append(PoolCopAuxSwitch(coordinator, aux))
 
     async_add_entities(entities)
@@ -78,7 +78,7 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):
         from homeassistant.helpers.entity import EntityDescription
 
         self._aux_id: int = aux_data["id"]
-        label = aux_data.get("label", f"Aux {self._aux_id}")
+        label = aux_display_name(aux_data.get("label", ""), self._aux_id)
 
         super().__init__(
             coordinator=coordinator,

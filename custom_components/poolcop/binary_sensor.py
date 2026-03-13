@@ -6,9 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.binary_sensor import (
-    DOMAIN as BINARY_SENSOR_DOMAIN,
-)
-from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
@@ -18,7 +15,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import AUX_FIXED_FUNCTION_LABELS, DOMAIN, aux_display_name, aux_label_id
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -261,10 +258,10 @@ async def async_setup_entry(
         if PoolCopEntity.is_component_installed(coordinator, description.key)
     ]
 
-    # Dynamic aux binary sensors for non-switchable aux ports
+    # Dynamic aux binary sensors for non-switchable or slaved aux ports
     aux_list = coordinator.data.status_value("aux") or []
     for aux in aux_list:
-        if not aux.get("switchable"):
+        if not aux.get("switchable") or aux.get("slave"):
             entities.append(PoolCopAuxBinarySensor(coordinator, aux))
 
     async_add_entities(entities)
@@ -283,7 +280,6 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
     ) -> None:
         """Initialize a PoolCop binary sensor."""
         super().__init__(coordinator=coordinator, description=description)
-        self.entity_id = f"{BINARY_SENSOR_DOMAIN}.{self._attr_unique_id}"
 
     @property
     def is_on(self) -> bool:
@@ -312,7 +308,9 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
         from homeassistant.helpers.entity import EntityDescription
 
         self._aux_id: int = aux_data["id"]
-        label = aux_data.get("label", f"Aux {self._aux_id}")
+        api_label = aux_data.get("label", "")
+        label = aux_display_name(api_label, self._aux_id)
+        lid = aux_label_id(api_label)
 
         super().__init__(
             coordinator=coordinator,
@@ -321,6 +319,11 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
                 name=label,
             ),
         )
+
+        # Fixed-function aux ports (Speed Control, Waste Valve, ORP Control)
+        # have first-class entity counterparts — mark as diagnostic
+        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
     @property
     def is_on(self) -> bool | None:

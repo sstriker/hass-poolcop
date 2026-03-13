@@ -30,6 +30,7 @@ COORDINATOR_FIELDS_TO_REDACT = {
     "dns",
     "email",
     "uuid",
+    "apiname",
 }
 
 

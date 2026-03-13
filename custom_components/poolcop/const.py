@@ -141,7 +141,9 @@ DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes
 APPROACHING_TIMER_UPDATE_INTERVAL = 60  # 1 minute
 TIMER_APPROACHING_THRESHOLD = 10 * 60  # 10 minutes
 
-# Aux label display names (maps PoolCopilot API label IDs to human-readable names)
+# Aux label display names (maps numeric label IDs to human-readable names)
+# Without the X-PoolCopilot-Lang header, the API returns "label_aux_N" keys
+# where N is the numeric label ID.
 AUX_LABEL_NAMES: Final[dict[int, str]] = {
     0: "Pool Light",
     1: "Pool Cleaner",
@@ -172,3 +174,29 @@ AUX_LABEL_NAMES: Final[dict[int, str]] = {
     26: "Dosing ACO",
     27: "Suction Valve",
 }
+
+
+# Fixed-function label IDs (16+) that have first-class entity counterparts
+AUX_FIXED_FUNCTION_LABELS: Final[set[int]] = {16, 17, 18}
+
+
+def aux_label_id(api_label: str) -> int | None:
+    """Extract the numeric label ID from an API label string like 'label_aux_17'."""
+    if api_label and api_label.startswith("label_aux_"):
+        try:
+            return int(api_label.removeprefix("label_aux_"))
+        except ValueError:
+            pass
+    return None
+
+
+def aux_display_name(api_label: str, aux_id: int) -> str:
+    """Resolve an API aux label to a clean display name.
+
+    The API returns "label_aux_N" where N is the numeric label ID.
+    Maps to a human-readable name via AUX_LABEL_NAMES.
+    """
+    label_id = aux_label_id(api_label)
+    if label_id is not None:
+        return AUX_LABEL_NAMES.get(label_id, f"Aux {aux_id}")
+    return api_label or f"Aux {aux_id}"
