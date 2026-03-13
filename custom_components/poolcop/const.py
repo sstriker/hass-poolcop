@@ -107,15 +107,28 @@ FILTER_MODES = {
 }
 
 FILTER_TIMER_MODES = {
-    0: "STOP - Disabled",  # Completely disables filtration
-    1: "TIMER - Manual Schedule",  # User-defined ON/OFF times for two cycles
-    2: "ECO+ - Intelligent",  # Adjusts runtime based on water temperature
-    3: "VOLUME - Pool Volume",  # Based on pool volume, pump flow, desired turnovers
-    4: "CONTINUOUS - 23h/day",  # Runs 23 hours/day in two cycles
-    5: "FORCE 24H",  # Overrides normal logic to run for 24h
-    6: "FORCE 48H",  # Overrides normal logic to run for 48h
-    7: "FORCE 72H",  # Overrides normal logic to run for 72h
-    8: "24/24 - Always On",  # True continuous mode, pump runs 24/7
+    0: "STOP - Disabled",
+    1: "TIMER - Manual Schedule",
+    2: "ECO+ - Intelligent",
+    3: "VOLUME - Pool Volume",
+    4: "CONTINUOUS - 23h/day",
+    5: "FORCE 24H",
+    6: "FORCE 48H",
+    7: "FORCE 72H",
+    8: "24/24 - Always On",
+}
+
+# Descriptions for filter timer modes (from PoolCop Evolution manual §4.4.4.6)
+FILTER_TIMER_MODE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Completely disables filtration. Both cycles set to 00:00-00:00.",
+    1: "User-defined ON/OFF times for Cycle 1 and Cycle 2.",
+    2: "Cycle 1 user-set, Cycle 2 duration adjusted based on water temperature.",
+    3: "Cycle 1 user-set, Cycle 2 duration calculated from pool volume and turnovers.",
+    4: "Runs 23h/day in two 11h30 cycles. Only start time configurable.",
+    5: "Overrides normal cycles. Pump runs for 24h then reverts to previous settings.",
+    6: "Overrides normal cycles. Pump runs for 48h then reverts to previous settings.",
+    7: "Overrides normal cycles. Pump runs for 72h then reverts to previous settings.",
+    8: "True continuous mode. Pump runs 24/7. No cycles.",
 }
 
 PH_TYPES = {
@@ -124,17 +137,34 @@ PH_TYPES = {
 }
 
 OPERATION_MODES = {
-    0: "Stop",  # PoolCop stopped
-    1: "Freeze",  # PoolCop freeze protection
-    2: "Forced",  # PoolCop in forced mode
-    3: "Auto",  # Auto mode
-    4: "Timer",  # Timers mode
-    5: "Manual",  # Manual mode
-    6: "Paused",  # PoolCop paused
-    7: "External",  # External mode
-    8: "Eco+",  # Eco+ intelligent mode
-    9: "Continuous",  # 24/24h continuous mode
+    0: "Stop",
+    1: "Freeze",
+    2: "Forced",
+    3: "Auto",
+    4: "Timer",
+    5: "Manual",
+    6: "Paused",
+    7: "External",
+    8: "Eco+",
+    9: "Continuous",
 }
+
+# Descriptions for operating modes (from PoolCop Evolution manual §4.4.4.4)
+OPERATION_MODE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Filtration stopped. No cycles defined.",
+    1: "Freeze protection active. Pump runs to prevent freezing.",
+    2: "Forced filtration. Overrides normal cycles for 24/48/72h.",
+    3: "Automatic mode. PoolCop adjusts Cycle 2 duration based on water temperature.",
+    4: "Timer mode. Filtration runs on user-programmed Cycle 1 and Cycle 2 schedules.",
+    5: "Manual mode. Pump started by user, runs outside programmed timer periods.",
+    6: "Paused. All automatic actions suspended.",
+    7: "External mode. Pump controlled by external system.",
+    8: "Eco+ intelligent mode. Runtime adjusted based on water temperature.",
+    9: "Continuous mode. Runs 23h/day in two 11h30 cycles.",
+}
+
+# Operating modes where filtration cycles are active and cycle sensors are relevant
+CYCLE_ACTIVE_MODES: Final[set[int]] = {2, 3, 4, 8, 9}
 
 # Timer-related constants
 DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes

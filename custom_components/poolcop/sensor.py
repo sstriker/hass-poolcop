@@ -28,6 +28,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     AUX_FIXED_FUNCTION_LABELS,
+    CYCLE_ACTIVE_MODES,
     DOMAIN,
     FILTER_MODES,
     FILTER_TIMER_MODES,
@@ -123,8 +124,16 @@ def _active_alarm_timestamp_fn(
     return value_fn
 
 
+def _is_cycle_mode(data: PoolCopData) -> bool:
+    """Return True if the current operating mode uses filtration cycles."""
+    mode = data.status_value("status.poolcop")
+    return mode in CYCLE_ACTIVE_MODES if mode is not None else False
+
+
 def _cycle_time_remaining_fn(data: PoolCopData) -> float | None:
     """Get remaining time in seconds for the current cycle."""
+    if not _is_cycle_mode(data):
+        return None
     if data.cycle_status and data.cycle_status.get("remaining_time") is not None:
         return data.cycle_status["remaining_time"]
     return None
@@ -132,6 +141,8 @@ def _cycle_time_remaining_fn(data: PoolCopData) -> float | None:
 
 def _cycle_end_time_fn(data: PoolCopData) -> datetime | None:
     """Get predicted end time for the current cycle."""
+    if not _is_cycle_mode(data):
+        return None
     if data.cycle_status and data.cycle_status.get("predicted_end") is not None:
         timestamp = data.cycle_status["predicted_end"]
         return datetime.fromtimestamp(timestamp)
@@ -140,6 +151,8 @@ def _cycle_end_time_fn(data: PoolCopData) -> datetime | None:
 
 def _cycle_elapsed_time_fn(data: PoolCopData) -> float | None:
     """Get elapsed time in seconds for the current cycle."""
+    if not _is_cycle_mode(data):
+        return None
     if data.cycle_status and data.cycle_status.get("elapsed_time") is not None:
         return data.cycle_status["elapsed_time"]
     return None
