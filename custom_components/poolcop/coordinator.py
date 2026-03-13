@@ -140,44 +140,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         self._current_cycle_start = None
         self._cycle_durations = DEFAULT_CYCLE_DURATIONS.copy()
         self._cycle_transitions = []  # Track recent cycle transitions for analysis
-        self._next_update_time = time.time()  # When to perform next update
-
-    def _adjust_update_interval(self) -> None:
-        """Adjust the update interval based on cycle state."""
-        now = time.time()
-        cycle_mode = self.data.status_value("status.poolcop")
-
-        # Default to normal interval
-        new_interval = NORMAL_UPDATE_INTERVAL
-
-        # If we have a current cycle and know its typical duration
-        if (
-            cycle_mode is not None
-            and self._current_cycle_start is not None
-            and cycle_mode in self._cycle_durations
-            and self._cycle_durations[cycle_mode] > 0
-        ):
-            # Calculate expected end time
-            expected_duration = self._cycle_durations[cycle_mode]
-            cycle_elapsed = now - self._current_cycle_start
-            time_remaining = expected_duration - cycle_elapsed
-
-            # If we're approaching the end of a cycle, increase update frequency
-            if 0 < time_remaining < CYCLE_END_PREDICTION_WINDOW:
-                new_interval = TRANSITION_UPDATE_INTERVAL
-                LOGGER.debug(
-                    "Cycle %s approaching end (%.1f minutes remaining). Using faster update interval.",
-                    cycle_mode,
-                    time_remaining / 60,
-                )
-
-        # Update the coordinator's update interval if it changed
-        if self.update_interval.total_seconds() != new_interval:
-            self.update_interval = timedelta(seconds=new_interval)
-            LOGGER.debug("Adjusted update interval to %s seconds", new_interval)
-
-        # Schedule next update
-        self._next_update_time = now + new_interval
 
     def get_current_flow_rate(self) -> float:
         """Return the current effective flow rate in m³/h.

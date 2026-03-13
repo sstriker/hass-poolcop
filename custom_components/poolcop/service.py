@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import logging
-
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import (
     DOMAIN,
+    LOGGER,
     SERVICE_CLEAR_ALARM,
     SERVICE_SET_PUMP_SPEED,
     SERVICE_SET_VALVE_POSITION,
@@ -17,8 +16,6 @@ from .const import (
     VALVE_POSITIONS,
 )
 from .coordinator import PoolCopDataUpdateCoordinator
-
-_LOGGER = logging.getLogger(__name__)
 
 SET_PUMP_SPEED_SCHEMA = vol.Schema(
     {
@@ -59,7 +56,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 await coordinator.set_pump_speed(speed)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
-                _LOGGER.error("Error setting pump speed: %s", err)
+                LOGGER.error("Error setting pump speed: %s", err)
 
     async def async_toggle_pump(service_call: ServiceCall) -> None:
         """Toggle the pump state."""
@@ -77,7 +74,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 await coordinator.toggle_pump(not pump_state)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError, KeyError, TypeError) as err:
-                _LOGGER.error("Error toggling pump: %s", err)
+                LOGGER.error("Error toggling pump: %s", err)
 
     async def async_toggle_aux(service_call: ServiceCall) -> None:
         """Toggle an auxiliary output."""
@@ -94,7 +91,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 await coordinator.toggle_auxiliary(aux_id)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
-                _LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
+                LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
 
     async def async_set_valve_position(service_call: ServiceCall) -> None:
         """Set the valve position."""
@@ -102,7 +99,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         position_value = VALVE_POSITIONS.get(position_name.lower())
 
         if position_value is None:
-            _LOGGER.error("Invalid valve position: %s", position_name)
+            LOGGER.error("Invalid valve position: %s", position_name)
             return
 
         coordinators = [
@@ -116,7 +113,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 await coordinator.set_valve_position(position_value)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
-                _LOGGER.error("Error setting valve position: %s", err)
+                LOGGER.error("Error setting valve position: %s", err)
 
     async def async_clear_alarm(service_call: ServiceCall) -> None:
         """Clear active alarms."""
@@ -131,7 +128,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 await coordinator.clear_alarm()
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
-                _LOGGER.error("Error clearing alarm: %s", err)
+                LOGGER.error("Error clearing alarm: %s", err)
 
     hass.services.async_register(
         DOMAIN,
