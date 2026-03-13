@@ -300,3 +300,266 @@ async def test_turnovers_no_pool_volume(coordinator):
     status = _make_status(op_mode=4, pool_volume=0)
     coordinator.data = PoolCopData(status=status)
     assert coordinator.planned_remaining_turnovers is None
+
+
+# --- Edge case / branch coverage tests ---
+
+
+async def test_no_data_returns_zero(coordinator):
+    """No coordinator data -> 0.0 for volume, None for turnovers."""
+    coordinator.data = None
+    assert coordinator.planned_remaining_volume == 0.0
+    assert coordinator.planned_remaining_turnovers is None
+
+
+async def test_none_op_mode_returns_zero(coordinator):
+    """op_mode missing from status -> 0.0."""
+    status = _make_status()
+    del status["PoolCop"]["status"]["poolcop"]
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.planned_remaining_volume == 0.0
+
+
+async def test_unknown_op_mode_returns_zero(coordinator):
+    """Unrecognised op_mode (e.g. 99) -> 0.0."""
+    status = _make_status(op_mode=99)
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.planned_remaining_volume == 0.0
+
+
+async def test_cycle_with_zero_times(coordinator):
+    """Cycle enabled but times 00:00:00 -> 0 remaining."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="00:00:00", cycle1_stop="00:00:00",
+    )
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.planned_remaining_volume == 0.0
+
+
+async def test_cycle_stop_before_start(coordinator):
+    """Cycle where stop < start (overnight) -> 0 remaining."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="22:00:00", cycle1_stop="06:00:00",
+    )
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(23, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    assert vol == 0.0
+
+
+async def test_cycle_invalid_time_string(coordinator):
+    """Cycle with unparseable time string -> 0 remaining."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="bad", cycle1_stop="also_bad",
+    )
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.planned_remaining_volume == 0.0
+
+
+async def test_get_remaining_cycle_no_data(coordinator):
+    """_get_remaining_cycle_seconds with no data -> 0."""
+    coordinator.data = None
+    assert coordinator._get_remaining_cycle_seconds("cycle1") == 0.0
+
+
+async def test_flow_rate_fallback_to_pumpspeed(coordinator):
+    """When speed_cycle has no matching flow rate, fall back to pumpspeed."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        speed_cycle1=99,  # No flow rate configured for speed 99
+        pump_speed=2,     # Fallback to pumpspeed=2 -> 15 m³/h
+    )
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # Falls back to pumpspeed 2 -> 15 m³/h * 4h = 60
+    assert vol == 60.0
+
+
+async def test_flow_rate_fallback_unknown_speeds(coordinator):
+    """When both speed_cycle and pumpspeed are unconfigured -> 0."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        speed_cycle1=99,  # Unknown - no flow rate for 99
+        pump_speed=99,    # Also unknown
+    )
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # pumpspeed fallback returns 0.0 (no rate for speed 99)
+    assert vol == 0.0
+
+
+async def test_flow_rate_fallback_to_speed1(coordinator):
+    """When pumpspeed is missing from status, fall back to speed 1."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        speed_cycle1=99,  # Unknown
+    )
+    del status["PoolCop"]["status"]["pumpspeed"]  # No pumpspeed at all
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # Falls back to speed 1 -> 10 m³/h * 4h = 40
+    assert vol == 40.0
+
+
+async def test_forced_mode_invalid_speed(coordinator):
+    """Forced mode with non-integer pumpspeed -> fallback still works."""
+    status = _make_status(op_mode=2, forced_remaining=5)
+    status["PoolCop"]["status"]["pumpspeed"] = "bad"
+    coordinator.data = PoolCopData(status=status)
+
+    vol = coordinator.planned_remaining_volume
+    # Falls back: "bad" -> ValueError -> speed=None -> pumpspeed fallback
+    # pumpspeed is "bad" again -> ValueError -> speed 1 -> 10 m³/h * 5h = 50
+    assert vol == 50.0
+
+
+async def test_cycle_speed_invalid(coordinator):
+    """Timer mode with non-integer speed_cycle -> fallback works."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+    )
+    status["PoolCop"]["settings"]["pump"]["speed_cycle1"] = "bad"
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # speed "bad" -> ValueError -> None -> fallback to pumpspeed 2 -> 15 * 4 = 60
+    assert vol == 60.0
+
+
+async def test_cycle_no_speed_setting(coordinator):
+    """Timer mode with missing speed_cycle key -> fallback to pumpspeed."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+    )
+    del status["PoolCop"]["settings"]["pump"]["speed_cycle1"]
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # speed_cycle1 missing -> None -> fallback to pumpspeed 2 -> 15 * 4 = 60
+    assert vol == 60.0
+
+
+async def test_continuous_mode_bad_timezone(coordinator):
+    """Continuous mode with invalid timezone -> still calculates."""
+    status = _make_status(op_mode=9, pump_speed=2)
+    status["Pool"]["timezone"] = "Invalid/Zone"
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(20, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # Falls back to no tz, 4h * 15 = 60
+    assert vol == 60.0
+
+
+async def test_continuous_mode_bad_pumpspeed(coordinator):
+    """Continuous mode with non-integer pumpspeed -> fallback to speed 1."""
+    status = _make_status(op_mode=9)
+    status["PoolCop"]["status"]["pumpspeed"] = "bad"
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(20, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # pumpspeed "bad" -> ValueError -> None -> speed 1 -> 10 * 4 = 40
+    assert vol == 40.0
+
+
+async def test_continuous_mode_datetime_exception(coordinator):
+    """Continuous mode when datetime.now raises -> 0.0."""
+    status = _make_status(op_mode=9)
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.side_effect = OSError("clock error")
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    assert vol == 0.0
+
+
+async def test_cycle_bad_timezone_fallback(coordinator):
+    """Cycle timer with invalid timezone -> falls back, still works."""
+    status = _make_status(
+        op_mode=4,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+    )
+    status["Pool"]["timezone"] = "Bogus/TZ"
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(10, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # Timezone fallback to None, still calculates: 4h * 15 = 60
+    assert vol == 60.0
