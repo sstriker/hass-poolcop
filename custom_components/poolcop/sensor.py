@@ -20,6 +20,7 @@ from homeassistant.const import (
     UnitOfPressure,
     UnitOfTemperature,
     UnitOfTime,
+    UnitOfVolume,
     UnitOfVolumeFlowRate,
 )
 from homeassistant.core import HomeAssistant
@@ -854,8 +855,10 @@ async def async_setup_entry(
         if PoolCopEntity.is_component_installed(coordinator, description.key)
     ]
 
-    # Add the flow rate sensor
+    # Add computed flow/volume sensors
     entities.append(FlowRateSensor(coordinator=coordinator))
+    entities.append(DailyFiltrationVolumeSensor(coordinator=coordinator))
+    entities.append(DailyTurnoverSensor(coordinator=coordinator))
 
     # Add settings sensors (skip uninstalled components)
     entities.extend(
@@ -955,7 +958,7 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
 
 
 class FlowRateSensor(PoolCopSensorEntity):
-    """Flow rate sensor that calculates flow based on pump speed."""
+    """Flow rate sensor based on pump state, speed, and valve position."""
 
     _attr_has_entity_name = True
     _attr_native_unit_of_measurement = UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR
@@ -963,47 +966,62 @@ class FlowRateSensor(PoolCopSensorEntity):
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:water-pump"
 
-    def __init__(
-        self,
-        *,
-        coordinator: PoolCopDataUpdateCoordinator,
-    ) -> None:
+    def __init__(self, *, coordinator: PoolCopDataUpdateCoordinator) -> None:
         """Initialize the flow rate sensor."""
-        # Create a simple description for this sensor
         description = PoolCopSensorEntityDescription(
             key="pump_flow_rate",
             name="Pump Flow Rate",
-            value_fn=lambda data: None,  # We'll override native_value
+            value_fn=lambda data: None,
+        )
+        super().__init__(coordinator=coordinator, description=description)
+
+    @property
+    def native_value(self) -> float:
+        """Return the current effective flow rate."""
+        return self.coordinator.get_current_flow_rate()
+
+
+class DailyFiltrationVolumeSensor(PoolCopSensorEntity):
+    """Accumulated filtration volume for the current day."""
+
+    _attr_has_entity_name = True
+    _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
+    _attr_device_class = SensorDeviceClass.VOLUME
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:water-sync"
+
+    def __init__(self, *, coordinator: PoolCopDataUpdateCoordinator) -> None:
+        """Initialize the daily filtration volume sensor."""
+        description = PoolCopSensorEntityDescription(
+            key="daily_filtration_volume",
+            name="Daily Filtration Volume",
+            value_fn=lambda data: None,
+        )
+        super().__init__(coordinator=coordinator, description=description)
+
+    @property
+    def native_value(self) -> float:
+        """Return the accumulated filtration volume today in m³."""
+        return self.coordinator.daily_volume
+
+
+class DailyTurnoverSensor(PoolCopSensorEntity):
+    """Number of pool turnovers completed today."""
+
+    _attr_has_entity_name = True
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:sync"
+
+    def __init__(self, *, coordinator: PoolCopDataUpdateCoordinator) -> None:
+        """Initialize the daily turnover sensor."""
+        description = PoolCopSensorEntityDescription(
+            key="daily_turnovers",
+            name="Daily Turnovers",
+            value_fn=lambda data: None,
         )
         super().__init__(coordinator=coordinator, description=description)
 
     @property
     def native_value(self) -> float | None:
-        """Return the current flow rate based on pump speed."""
-        # First check if the pump is on
-        is_pump_on = bool(self.coordinator.data.status_value("status.pump"))
-        if not is_pump_on:
-            return 0.0
-
-        # Get the current pump speed level (discrete value 0-3)
-        speed_level = self.coordinator.data.status_value("status.pumpspeed")
-        if speed_level is None:
-            return None
-
-        try:
-            speed_level = int(speed_level)
-        except (ValueError, TypeError):
-            LOGGER.warning(
-                "Invalid pump speed level: %s, flow rate unavailable", speed_level
-            )
-            return None
-
-        if speed_level in self.coordinator.flow_rates:
-            flow_rate = self.coordinator.flow_rates[speed_level]
-            LOGGER.debug(
-                "Using flow rate for speed %s: %s m³/h", speed_level, flow_rate
-            )
-            return flow_rate
-
-        LOGGER.warning("Unknown speed level: %s, flow rate unavailable", speed_level)
-        return None
+        """Return the number of pool turnovers today."""
+        return self.coordinator.daily_turnovers

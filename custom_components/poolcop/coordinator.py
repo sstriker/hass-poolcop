@@ -130,6 +130,11 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         self._active_alarms = []
         self._previous_alarm_count = 0
 
+        # Daily filtration volume tracking
+        self._daily_volume: float = 0.0  # m³ filtered today
+        self._daily_volume_date: str | None = None  # YYYY-MM-DD of current accumulation
+        self._last_flow_update: float | None = None  # monotonic timestamp of last update
+
         # Cycle tracking
         self._last_operation_mode = None
         self._current_cycle_start = None
@@ -173,6 +178,75 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         # Schedule next update
         self._next_update_time = now + new_interval
+
+    def get_current_flow_rate(self) -> float:
+        """Return the current effective flow rate in m³/h.
+
+        Returns 0.0 if pump is off or valve is not in a flowing position.
+        Uses configured flow rates based on pump speed level.
+        """
+        if not hasattr(self, "data") or self.data is None:
+            return 0.0
+
+        # Pump must be on
+        if not self.data.status_value("status.pump"):
+            return 0.0
+
+        # Valve must be in a position that moves water through the filter
+        # 0=Filter, 4=Bypass (still flowing), 5=Rinse (flowing)
+        valve_pos = self.data.status_value("status.valveposition")
+        if valve_pos is not None and valve_pos not in (0, 4, 5):
+            return 0.0
+
+        # Look up flow rate for current speed
+        speed_level = self.data.status_value("status.pumpspeed")
+        if speed_level is None:
+            return 0.0
+
+        try:
+            speed_level = int(speed_level)
+        except (ValueError, TypeError):
+            return 0.0
+
+        return self.flow_rates.get(speed_level, 0.0)
+
+    def _update_daily_volume(self) -> None:
+        """Accumulate filtered volume based on current flow rate and elapsed time."""
+        now = time.monotonic()
+
+        # Reset at midnight (check date string)
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+        except Exception:  # noqa: BLE001
+            today = None
+
+        if today and today != self._daily_volume_date:
+            self._daily_volume = 0.0
+            self._daily_volume_date = today
+
+        if self._last_flow_update is not None:
+            elapsed_seconds = now - self._last_flow_update
+            # Sanity cap: skip if gap > 10 minutes (probably a restart)
+            if 0 < elapsed_seconds <= 600:
+                flow_rate = self.get_current_flow_rate()
+                self._daily_volume += flow_rate * (elapsed_seconds / 3600.0)
+
+        self._last_flow_update = now
+
+    @property
+    def daily_volume(self) -> float:
+        """Return the accumulated daily filtration volume in m³."""
+        return round(self._daily_volume, 3)
+
+    @property
+    def daily_turnovers(self) -> float | None:
+        """Return the number of pool turnovers today (1.0 = one full turnover)."""
+        if not hasattr(self, "data") or self.data is None:
+            return None
+        pool_volume = self.data.status_value("settings.pool.volume")
+        if not pool_volume or pool_volume <= 0:
+            return None
+        return round(self._daily_volume / pool_volume, 2)
 
     def _update_cycle_tracking(self, status_data: dict) -> dict:
         """Track cycle changes and update predictions."""
@@ -497,6 +571,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 cycle_status=self._update_cycle_tracking(status),
                 next_timer_event=next_timer_event,
             )
+
+            # Accumulate daily filtration volume
+            self._update_daily_volume()
 
             # Dynamic update interval adjustment based on both cycle and timer events
             interval = NORMAL_UPDATE_INTERVAL
