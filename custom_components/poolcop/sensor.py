@@ -72,6 +72,7 @@ class PoolCopSensorEntityDescription(
     """Describes PoolCop sensor entity."""
 
     extra_attrs_fn: Callable[[PoolCopData], dict[str, Any]] | None = None
+    available_fn: Callable[[PoolCopData], bool] | None = None
 
 
 def _value_fn(
@@ -117,35 +118,6 @@ def _description_attrs_fn(
 
     return attrs_fn
 
-
-def _active_alarm_value_fn(
-    attribute: str,
-) -> Callable[[PoolCopData], str | int | float | datetime | None]:
-    """Return value function for active alarm data."""
-
-    def value_fn(data: PoolCopData) -> str | int | float | datetime | None:
-        if not data.active_alarms:
-            return None
-        # Return the attribute from the most recent active alarm
-        return data.active_alarms[0].get(attribute)
-
-    return value_fn
-
-
-def _active_alarm_timestamp_fn(
-    attribute: str,
-) -> Callable[[PoolCopData], datetime | None]:
-    """Return timestamp function for active alarm data."""
-
-    def value_fn(data: PoolCopData) -> datetime | None:
-        if not data.active_alarms:
-            return None
-        timestamp = data.active_alarms[0].get(attribute)
-        if not timestamp:
-            return None
-        return datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S%z")
-
-    return value_fn
 
 
 def _is_cycle_mode(data: PoolCopData) -> bool:
@@ -427,24 +399,6 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(WATER_VALVE_POSITIONS.values()),
         value_fn=_state_mapping_fn("status.watervalve", WATER_VALVE_POSITIONS),
-    ),
-    PoolCopSensorEntityDescription(
-        key="active_alarm_code",
-        name="Alarm Code",
-        icon="mdi:alert-circle",
-        value_fn=_active_alarm_value_fn("code"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="active_alarm_description",
-        name="Alarm Description",
-        icon="mdi:alert-circle",
-        value_fn=_active_alarm_value_fn("description"),
-    ),
-    PoolCopSensorEntityDescription(
-        key="active_alarm_timestamp",
-        name="Alarm Time",
-        device_class=SensorDeviceClass.TIMESTAMP,
-        value_fn=_active_alarm_timestamp_fn("timestamp"),
     ),
     # Cycle tracking sensors
     PoolCopSensorEntityDescription(
@@ -977,6 +931,15 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
     ) -> None:
         """Initialize PoolCop sensor."""
         super().__init__(coordinator=coordinator, description=description)
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        if self.entity_description.available_fn is not None:
+            return super().available and self.entity_description.available_fn(
+                self.coordinator.data
+            )
+        return super().available
 
     @property
     def native_value(self) -> str | int | float | datetime | None:

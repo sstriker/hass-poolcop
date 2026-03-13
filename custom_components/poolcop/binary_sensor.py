@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -41,6 +42,8 @@ class PoolCopBinarySensorEntityDescription(
     BinarySensorEntityDescription, PoolCopBinarySensorEntityDescriptionMixin
 ):
     """A class that describes PoolCop binary sensor entities."""
+
+    extra_attrs_fn: Callable[[PoolCopData], dict[str, Any]] | None = None
 
 
 def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
@@ -161,6 +164,13 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=lambda data: data.has_active_alarms(),
         on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
+        extra_attrs_fn=lambda data: {
+            "code": data.active_alarms[0].get("code"),
+            "description": data.active_alarms[0].get("description"),
+            "timestamp": data.active_alarms[0].get("timestamp"),
+        }
+        if data.active_alarms
+        else {"code": None, "description": None, "timestamp": None},
     ),
     # These binary sensors represent settings control states
     PoolCopBinarySensorEntityDescription(
@@ -285,6 +295,13 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
     def is_on(self) -> bool:
         """Return true if the binary sensor is on."""
         return self.entity_description.is_on_fn(self.coordinator.data)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
+        if self.entity_description.extra_attrs_fn:
+            return self.entity_description.extra_attrs_fn(self.coordinator.data)
+        return None
 
     @property
     def icon(self) -> str | None:
