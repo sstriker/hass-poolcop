@@ -511,37 +511,39 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         try:
             status = await self.poolcopilot.status()
 
-            # Check for alarm counts in the status data
+            # Active alarms from status alerts array (always present, no extra API call)
             alarm_data = None
-            current_time = time.time()
-            alarm_count = status.get("PoolCop", {}).get("alarms", {}).get("count", 0)
+            status_alerts = status.get("PoolCop", {}).get("alerts", [])
+            self._active_alarms = status_alerts if status_alerts else []
 
-            # Only fetch alarm details when:
-            # 1. We haven't fetched alarms in the last 4 hours AND there are alarms, OR
-            # 2. The alarm count has changed since our last check
+            # Optionally fetch detailed alarm history for richer data
+            current_time = time.time()
+            alarm_count = len(status_alerts)
             should_fetch_alarms = (
-                current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
-                and alarm_count > 0
-            ) or (alarm_count != self._previous_alarm_count)
+                alarm_count > 0
+                and (
+                    current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
+                    or alarm_count != self._previous_alarm_count
+                )
+            )
 
             if should_fetch_alarms:
                 LOGGER.debug(
-                    "Fetching alarm data: interval=%s, previous_count=%s, current_count=%s",
-                    current_time - self._last_alarm_fetch,
+                    "Fetching alarm history: previous_count=%s, current_count=%s",
                     self._previous_alarm_count,
                     alarm_count,
                 )
-                # Fetch current alarms (only offsetting by 0 to get most recent)
                 alarm_data = await self.poolcopilot.alarm_history(0)
 
-                # Filter for active alarms
+                # If alarm_history returns richer data, prefer it
                 if alarm_data and "alarms" in alarm_data:
-                    # Get alarms that don't have a cleared timestamp
-                    self._active_alarms = [
+                    history_alarms = [
                         alarm
                         for alarm in alarm_data.get("alarms", [])
                         if not alarm.get("cleared")
                     ]
+                    if history_alarms:
+                        self._active_alarms = history_alarms
 
                 self._last_alarm_fetch = current_time
                 self._previous_alarm_count = alarm_count

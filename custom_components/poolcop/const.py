@@ -308,6 +308,112 @@ AUX_LABEL_ICONS: Final[dict[int, tuple[str, str]]] = {
 }
 
 
+# Alarm names (from cloud API enum PCFR.PoolCopilot.Xml.Alarm)
+# The legacy API returns "alert_title_N" where N is the 0-based index.
+ALARM_NAMES: Final[dict[int, str]] = {
+    0: "None",
+    1: "Freezing Risk",
+    2: "Consumables Level Low (Disinfection)",
+    3: "Pressure Low",
+    4: "Pressure Zero",
+    5: "pH Low",
+    6: "pH High",
+    7: "AutoChlor Acid Depleted",
+    8: "Ioniser Copper Electrodes",
+    9: "Cleaning Limit Reached",
+    10: "Electrolyser Production Limited",
+    11: "Ioniser Conductivity Error",
+    12: "Water Level Sensor Cable Failure",
+    13: "Valve Scan Error",
+    14: "pH Out of Bounds",
+    15: "Comm Bus Failure",
+    16: "Comm Bus Timeout",
+    17: "Pool Cover Open",
+    18: "Valve Disk Failure",
+    19: "Water Refill Timeout",
+    20: "Battery Low",
+    21: "Consumables Level Low (pH)",
+    22: "Cleaning Cycle Aborted",
+    23: "Valve Rotation Inhibited (High Pressure)",
+    24: "Salt System Needs Attention",
+    25: "Pressure Out of Bounds",
+    26: "Cleaning Required",
+    27: "Reduction Limit Reached",
+    28: "Consumables Level Low",
+    29: "Water Level Not Optimum",
+    30: "Valve Rotation Inhibited (Water Ingress)",
+    31: "Valve Position Not Reached",
+    32: "Water Temperature Faulty",
+    33: "ORP Out of Bounds",
+    34: "Disinfection Stopped (Low Temperature)",
+    35: "Disinfection Control Inefficient",
+    36: "pH Control Inefficient",
+    37: "Clock Not Running",
+    38: "Free Available Chlorine Low",
+    39: "Free Available Chlorine High",
+    40: "Free Available Chlorine Error",
+    41: "Manual Alarm",
+    42: "Water No Flow Detected",
+    43: "Free Available Chlorine Needs Maintenance",
+    44: "Flow Rate Low",
+    45: "Flow Rate High",
+    46: "FAC Negative",
+    47: "Free Available Chlorine Initial Calibration Required",
+    48: "Free Available Chlorine Periodic Calibration Required",
+    49: "Pressure Inhibited",
+    50: "Freezing Risk (External)",
+    51: "Consumables Level Low (Disinfection)",
+    52: "Consumables Level Low (pH)",
+    53: "Consumables Level Low",
+    54: "Pool Cover Open",
+    55: "Salt System Needs Attention",
+    56: "Pump Start Request",
+    57: "Pump Stop Request",
+    58: "Jet Stream Button Activated",
+    59: "Water Flow Switch Activated",
+    60: "Flooding",
+    61: "Flooding (Stop Filtration)",
+    62: "Free Chlorine Sensor Low Flow",
+    63: "Consumables Level Low (ACO)",
+    64: "Consumables Level Low (Flocculant)",
+    65: "Overflow Requested",
+    66: "Open Cover Button Activated",
+    67: "Close Cover Button Activated",
+    68: "Water Flow Switch for Electrolyser Activated",
+    69: "Aux Activated by Input",
+}
+
+# Alarm severity levels (from cloud API enum PCFR.PoolCopilot.Xml.AlarmSeverity)
+ALARM_SEVERITIES: Final[dict[str, str]] = {
+    "Remind": "Reminder",
+    "Warning": "Warning",
+    "Error": "Error",
+    "Failure": "Failure",
+}
+
+
+def alert_title_id(api_name: str) -> int | None:
+    """Extract the numeric alarm ID from an API alert string like 'alert_title_5'."""
+    if api_name and api_name.startswith("alert_title_"):
+        try:
+            return int(api_name.removeprefix("alert_title_"))
+        except ValueError:
+            pass
+    return None
+
+
+def alert_display_name(api_name: str) -> str:
+    """Resolve an API alert name to a human-readable name.
+
+    The API returns "alert_title_N" where N is the numeric alarm code.
+    Maps to a human-readable name via ALARM_NAMES.
+    """
+    alarm_id = alert_title_id(api_name)
+    if alarm_id is not None:
+        return ALARM_NAMES.get(alarm_id, f"Alarm {alarm_id}")
+    return api_name or "Unknown Alarm"
+
+
 def aux_label_id(api_label: str) -> int | None:
     """Extract the numeric label ID from an API label string like 'label_aux_17'."""
     if api_label and api_label.startswith("label_aux_"):

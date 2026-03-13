@@ -22,6 +22,7 @@ from .const import (
     AUX_RELAY_LABELS,
     AUX_VALVE_LABELS,
     DOMAIN,
+    alert_display_name,
     aux_display_name,
     aux_label_id,
 )
@@ -53,6 +54,34 @@ def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
         return bool(data.status_value(path))
 
     return is_on_fn
+
+
+def _resolve_alarm(alarm: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a single alarm dict to human-readable fields."""
+    code = alarm.get("code") or alarm.get("id")
+    description = alarm.get("description", "")
+    if isinstance(description, str) and description.startswith("alert_title_"):
+        description = alert_display_name(description)
+    name = alarm.get("name", "")
+    if isinstance(name, str) and name.startswith("alert_title_"):
+        name = alert_display_name(name)
+    return {
+        "code": code,
+        "description": description or name,
+        "timestamp": alarm.get("timestamp") or alarm.get("date"),
+    }
+
+
+def _alarm_attrs(data: PoolCopData) -> dict[str, Any]:
+    """Return alarm attributes with resolved names for all active alarms."""
+    if not data.active_alarms:
+        return {"alarm_count": 0, "alarms": []}
+    resolved = [_resolve_alarm(a) for a in data.active_alarms]
+    return {
+        "alarm_count": len(resolved),
+        **resolved[0],
+        "alarms": resolved,
+    }
 
 
 def _watervalve_is_on(data: PoolCopData) -> bool:
@@ -164,13 +193,7 @@ BINARY_SENSORS = (
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=lambda data: data.has_active_alarms(),
         on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
-        extra_attrs_fn=lambda data: {
-            "code": data.active_alarms[0].get("code"),
-            "description": data.active_alarms[0].get("description"),
-            "timestamp": data.active_alarms[0].get("timestamp"),
-        }
-        if data.active_alarms
-        else {"code": None, "description": None, "timestamp": None},
+        extra_attrs_fn=lambda data: _alarm_attrs(data),
     ),
     # These binary sensors represent settings control states
     PoolCopBinarySensorEntityDescription(
