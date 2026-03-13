@@ -290,6 +290,21 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if op_mode in (0, 1, 5, 6, 7):
             return 0.0
 
+        # Check the configured filter timer mode for modes that the
+        # operating mode alone cannot distinguish.
+        filter_timer = self.data.status_value("settings.filter.timer")
+
+        # Filter timer 8 (24/24 Always On): pump runs 24/7, no cycles.
+        # The operating mode may report as Continuous (9) or another
+        # mode, but the intent is always-on filtration until midnight.
+        if filter_timer == 8:
+            return self._remaining_hours_volume()
+
+        # Filter timer 4 (CONTINUOUS 23h/day): two 11h30 cycles,
+        # always reports as op_mode 9.  Use remaining hours capped.
+        if filter_timer == 4 or op_mode == 9:
+            return self._remaining_hours_volume()
+
         # Mode 2: Forced - use status.forced.remaining_hours × flow rate
         if op_mode == 2:
             remaining_hours = self.data.status_value("status.forced.remaining_hours")
@@ -322,10 +337,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     flow = self._get_flow_rate_for_speed(speed)
                     total += flow * (remaining_secs / 3600.0)
             return round(total, 3)
-
-        # Mode 9: Continuous - remaining hours today × flow rate
-        if op_mode == 9:
-            return self._remaining_hours_volume()
 
         return 0.0
 

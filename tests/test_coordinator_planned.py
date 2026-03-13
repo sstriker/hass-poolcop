@@ -14,6 +14,7 @@ from custom_components.poolcop.coordinator import (
 
 def _make_status(
     op_mode=3,
+    filter_timer=1,
     cycle1_enabled=1,
     cycle1_start="08:00:00",
     cycle1_stop="12:00:00",
@@ -32,6 +33,9 @@ def _make_status(
     op_mode maps to status.poolcop (the actual operating mode):
       0=Stop, 1=Freeze, 2=Forced, 3=Auto, 4=Timer,
       5=Manual, 6=Paused, 7=External, 8=Eco+, 9=Continuous
+    filter_timer maps to settings.filter.timer (the configured filter timer mode):
+      0=STOP, 1=TIMER, 2=ECO+, 3=VOLUME, 4=CONTINUOUS,
+      5-7=FORCE 24/48/72H, 8=24/24 Always On
     """
     return {
         "PoolCop": {
@@ -47,7 +51,7 @@ def _make_status(
             },
             "settings": {
                 "pool": {"volume": pool_volume},
-                "filter": {"timer": 1},
+                "filter": {"timer": filter_timer},
                 "pump": {
                     "speed_cycle1": speed_cycle1,
                     "speed_cycle2": speed_cycle2,
@@ -221,8 +225,8 @@ async def test_manual_mode_returns_zero(coordinator):
 
 
 async def test_continuous_mode_remaining_hours(coordinator):
-    """op_mode=9 (Continuous) -> remaining hours × flow rate."""
-    status = _make_status(op_mode=9, pump_speed=2)
+    """filter_timer=4 (CONTINUOUS 23h/day) -> remaining hours × flow rate."""
+    status = _make_status(op_mode=9, filter_timer=4, pump_speed=2)
     coordinator.data = PoolCopData(status=status)
 
     with patch(
@@ -237,9 +241,47 @@ async def test_continuous_mode_remaining_hours(coordinator):
     assert vol == 60.0
 
 
+async def test_always_on_mode(coordinator):
+    """filter_timer=8 (24/24 Always On) -> remaining hours × flow rate."""
+    status = _make_status(op_mode=9, filter_timer=8, pump_speed=2)
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(20, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # 4h remaining * 15 m³/h = 60
+    assert vol == 60.0
+
+
+async def test_always_on_overrides_op_mode(coordinator):
+    """filter_timer=8 (24/24) takes priority even if op_mode is Auto (3)."""
+    status = _make_status(
+        op_mode=3, filter_timer=8,
+        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="16:00:00",
+        pump_speed=2,
+    )
+    coordinator.data = PoolCopData(status=status)
+
+    with patch(
+        "custom_components.poolcop.coordinator.datetime",
+        wraps=datetime,
+    ) as mock_dt:
+        mock_dt.now.return_value = _freeze_time(20, 0)
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        vol = coordinator.planned_remaining_volume
+
+    # Should use remaining hours (4h * 15 = 60), NOT cycle timers (which would give 0)
+    assert vol == 60.0
+
+
 async def test_forced_mode_uses_remaining_hours(coordinator):
     """op_mode=2 (Forced) -> forced.remaining_hours × flow rate."""
-    status = _make_status(op_mode=2, pump_speed=2, forced_remaining=10)
+    status = _make_status(op_mode=2, filter_timer=1, pump_speed=2, forced_remaining=10)
     coordinator.data = PoolCopData(status=status)
 
     vol = coordinator.planned_remaining_volume
