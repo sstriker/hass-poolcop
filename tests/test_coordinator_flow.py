@@ -6,6 +6,10 @@ from unittest.mock import patch
 import pytest
 from homeassistant.core import HomeAssistant
 
+from custom_components.poolcop.const import (
+    QUOTA_CONSTRAINED_INTERVAL,
+    TRANSITION_UPDATE_INTERVAL,
+)
 from custom_components.poolcop.coordinator import (
     PoolCopData,
     PoolCopDataUpdateCoordinator,
@@ -22,7 +26,14 @@ def _make_status(pump=1, valve=0, speed=2, pool_volume=50):
                 "pumpspeed": speed,
                 "poolcop": 3,
             },
-            "conf": {"orp": 0, "pH": 0, "waterlevel": 0, "ioniser": 0, "autochlor": 0, "air": 0},
+            "conf": {
+                "orp": 0,
+                "pH": 0,
+                "waterlevel": 0,
+                "ioniser": 0,
+                "autochlor": 0,
+                "air": 0,
+            },
             "alerts": [],
             "settings": {"pool": {"volume": pool_volume}},
             "timers": {},
@@ -154,7 +165,9 @@ async def test_daily_volume_skips_large_gaps(coordinator):
 
 async def test_daily_turnovers(coordinator):
     """Test daily turnovers calculation."""
-    coordinator.data = PoolCopData(status=_make_status(pump=1, valve=0, speed=2, pool_volume=50))
+    coordinator.data = PoolCopData(
+        status=_make_status(pump=1, valve=0, speed=2, pool_volume=50)
+    )
     coordinator._daily_volume = 25.0  # Half the pool volume
     assert coordinator.daily_turnovers == 0.5
 
@@ -187,3 +200,125 @@ async def test_has_active_alarms():
         active_alarms=[{"name": "alert_title_5", "id": "5", "date": "2025-01-01"}],
     )
     assert data_with_alarms.has_active_alarms() is True
+
+
+# --- Quota-aware polling tests ---
+
+
+def _make_backwash_status():
+    """Create a status dict with backwash mode active."""
+    status = _make_status()
+    status["PoolCop"]["status"]["poolcop"] = 2  # Backwash mode
+    return status
+
+
+async def test_quota_allows_transition_interval(coordinator):
+    """Test that transition interval is used when quota is sufficient."""
+    # Set up: already in backwash mode, approaching cycle end
+    coordinator._last_operation_mode = 2
+    coordinator._cycle_durations[2] = 600  # 10 min backwash
+    coordinator._current_cycle_start = (
+        time.time() - 480
+    )  # 8 min elapsed → 2 min remaining
+    coordinator.data = PoolCopData(status=_make_backwash_status())
+
+    coordinator.poolcopilot.token_limit = 50
+    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+
+    with patch.object(coordinator, "_store"):
+        await coordinator._async_update_data()
+
+    assert coordinator.update_interval.total_seconds() == TRANSITION_UPDATE_INTERVAL
+
+
+async def test_low_quota_uses_constrained_interval(coordinator):
+    """Test that constrained interval is used when quota is low."""
+    coordinator._last_operation_mode = 2
+    coordinator._cycle_durations[2] = 600
+    coordinator._current_cycle_start = time.time() - 480
+    coordinator.data = PoolCopData(status=_make_backwash_status())
+
+    coordinator.poolcopilot.token_limit = 5
+    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+
+    with patch.object(coordinator, "_store"):
+        await coordinator._async_update_data()
+
+    assert coordinator.update_interval.total_seconds() == QUOTA_CONSTRAINED_INTERVAL
+
+
+async def test_none_quota_treated_as_has_quota(coordinator):
+    """Test that None quota (first call) is treated as having quota."""
+    coordinator._last_operation_mode = 2
+    coordinator._cycle_durations[2] = 600
+    coordinator._current_cycle_start = time.time() - 480
+    coordinator.data = PoolCopData(status=_make_backwash_status())
+
+    coordinator.poolcopilot.token_limit = None
+    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+
+    with patch.object(coordinator, "_store"):
+        await coordinator._async_update_data()
+
+    assert coordinator.update_interval.total_seconds() == TRANSITION_UPDATE_INTERVAL
+
+
+# --- Settings-derived cycle duration seeding tests ---
+
+
+async def test_seed_backwash_from_settings(coordinator):
+    """Test that backwash duration is seeded from settings."""
+    status = _make_status()
+    status["PoolCop"]["settings"]["filter"] = {
+        "backwash_duration": 180,
+        "rinse_duration": 60,
+    }
+
+    coordinator._seed_cycle_durations_from_settings(status)
+
+    assert coordinator._cycle_durations[2] == 180.0  # Backwash
+    assert coordinator._cycle_durations[5] == 60.0  # Rinse
+
+
+async def test_seed_does_not_override_learned(coordinator):
+    """Test that seeding doesn't override EMA-learned values."""
+    # Simulate a learned value different from default
+    coordinator._cycle_durations[2] = 250.0  # Learned from EMA
+
+    status = _make_status()
+    status["PoolCop"]["settings"]["filter"] = {
+        "backwash_duration": 180,
+    }
+
+    coordinator._seed_cycle_durations_from_settings(status)
+
+    # Should NOT override the learned value
+    assert coordinator._cycle_durations[2] == 250.0
+
+
+async def test_seed_ignores_zero_and_missing(coordinator):
+    """Test that seeding ignores zero/missing/invalid values."""
+    original_backwash = coordinator._cycle_durations[2]
+    original_rinse = coordinator._cycle_durations[5]
+
+    status = _make_status()
+    status["PoolCop"]["settings"]["filter"] = {
+        "backwash_duration": 0,
+        # rinse_duration missing
+    }
+
+    coordinator._seed_cycle_durations_from_settings(status)
+
+    assert coordinator._cycle_durations[2] == original_backwash
+    assert coordinator._cycle_durations[5] == original_rinse
+
+
+async def test_seed_ignores_no_settings(coordinator):
+    """Test that seeding handles missing settings gracefully."""
+    original = coordinator._cycle_durations.copy()
+
+    coordinator._seed_cycle_durations_from_settings({"PoolCop": {}})
+    assert coordinator._cycle_durations == original
+
+    coordinator._seed_cycle_durations_from_settings({})
+    assert coordinator._cycle_durations == original

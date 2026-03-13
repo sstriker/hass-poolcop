@@ -11,7 +11,7 @@ LOGGER = logging.getLogger(__package__)
 
 # Update intervals (in seconds)
 NORMAL_UPDATE_INTERVAL = 120  # 2 minutes during normal operation
-TRANSITION_UPDATE_INTERVAL = 15  # 15 seconds when transitions are imminent
+TRANSITION_UPDATE_INTERVAL = 30  # 30 seconds when transitions are imminent
 CYCLE_END_PREDICTION_WINDOW = 300  # 5 minutes before predicted cycle end
 
 # Alarm fetching interval (in seconds)
@@ -29,6 +29,9 @@ CONF_FLOW_RATE_3 = "flow_rate_3"  # High speed
 # The PoolCopilot API provides 90 requests per 900s (15 minutes) token.
 # With variable update frequency, we ensure staying within rate limits
 # while providing more timely updates during important transitions.
+QUOTA_TRANSITION_THRESHOLD = 20  # Min remaining calls to allow transition speed-up
+QUOTA_CONSTRAINED_INTERVAL = 300  # 5 min fallback when quota is low
+
 SCAN_INTERVAL = timedelta(seconds=NORMAL_UPDATE_INTERVAL)
 
 # Services
@@ -237,11 +240,6 @@ POOL_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
     2: "Infinity edge pool, type B. Overflow to balance tank.",
     3: "Spa or hot tub. Typically smaller volume with higher turnover.",
 }
-
-# Timer-related constants
-DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes
-APPROACHING_TIMER_UPDATE_INTERVAL = 60  # 1 minute
-TIMER_APPROACHING_THRESHOLD = 10 * 60  # 10 minutes
 
 # Aux label display names (maps numeric label IDs to human-readable names)
 # Without the X-PoolCopilot-Lang header, the API returns "label_aux_N" keys

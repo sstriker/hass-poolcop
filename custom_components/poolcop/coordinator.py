@@ -32,6 +32,8 @@ from .const import (
     DOMAIN,
     LOGGER,
     NORMAL_UPDATE_INTERVAL,
+    QUOTA_CONSTRAINED_INTERVAL,
+    QUOTA_TRANSITION_THRESHOLD,
     STORAGE_KEY,
     STORAGE_VERSION,
     TRANSITION_UPDATE_INTERVAL,
@@ -133,7 +135,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         # Daily filtration volume tracking
         self._daily_volume: float = 0.0  # m³ filtered today
         self._daily_volume_date: str | None = None  # YYYY-MM-DD of current accumulation
-        self._last_flow_update: float | None = None  # monotonic timestamp of last update
+        self._last_flow_update: float | None = (
+            None  # monotonic timestamp of last update
+        )
 
         # Cycle tracking
         self._last_operation_mode = None
@@ -179,7 +183,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         # Reset at midnight (check date string)
         try:
             today = datetime.now().strftime("%Y-%m-%d")
-        except Exception:  # noqa: BLE001
+        except Exception:
             today = None
 
         if today and today != self._daily_volume_date:
@@ -293,6 +297,25 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             pass
 
         return cycle_status
+
+    def _seed_cycle_durations_from_settings(self, status_data: dict) -> None:
+        """Seed cycle duration predictions from API settings."""
+        settings = status_data.get("PoolCop", {}).get("settings", {})
+
+        seeds = {
+            2: settings.get("filter", {}).get("backwash_duration"),  # Backwash mode
+            5: settings.get("filter", {}).get("rinse_duration"),  # Rinse mode
+        }
+
+        for mode, value in seeds.items():
+            if (
+                value
+                and isinstance(value, int | float)
+                and value > 0
+                and self._cycle_durations[mode] == DEFAULT_CYCLE_DURATIONS[mode]
+            ):
+                self._cycle_durations[mode] = float(value)
+                LOGGER.debug("Seeded mode %d duration from settings: %ds", mode, value)
 
     def _check_upcoming_timer_events(self) -> dict | None:
         """Check for upcoming timer events and adjust update interval accordingly."""
@@ -472,6 +495,10 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Fetch data from PoolCop."""
         try:
             status = await self.poolcopilot.status()
+            remaining_quota = self.poolcopilot.token_limit
+
+            # Seed cycle durations from settings (only overrides defaults)
+            self._seed_cycle_durations_from_settings(status)
 
             # Active alarms from status alerts array (always present, no extra API call)
             alarm_data = None
@@ -481,12 +508,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             # Optionally fetch detailed alarm history for richer data
             current_time = time.time()
             alarm_count = len(status_alerts)
-            should_fetch_alarms = (
-                alarm_count > 0
-                and (
-                    current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
-                    or alarm_count != self._previous_alarm_count
-                )
+            should_fetch_alarms = alarm_count > 0 and (
+                current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
+                or alarm_count != self._previous_alarm_count
             )
 
             if should_fetch_alarms:
@@ -539,10 +563,13 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             # Accumulate daily filtration volume
             self._update_daily_volume()
 
-            # Dynamic update interval adjustment based on both cycle and timer events
+            # Dynamic update interval adjustment based on cycle, timer, and quota
             interval = NORMAL_UPDATE_INTERVAL
+            has_quota = (
+                remaining_quota is None or remaining_quota > QUOTA_TRANSITION_THRESHOLD
+            )
 
-            # First check cycle-based timing
+            # Cycle-based speed-up
             if (
                 data.cycle_status
                 and data.cycle_status.get("remaining_time") is not None
@@ -550,38 +577,35 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 < data.cycle_status.get("remaining_time", 0)
                 < CYCLE_END_PREDICTION_WINDOW
             ):
-                interval = TRANSITION_UPDATE_INTERVAL
+                if has_quota:
+                    interval = TRANSITION_UPDATE_INTERVAL
+                else:
+                    interval = QUOTA_CONSTRAINED_INTERVAL
                 LOGGER.debug(
-                    "Cycle approaching end (%.1f minutes remaining). Using faster update interval.",
+                    "Cycle approaching end (%.1f min remaining). Interval=%ds, quota=%s",
                     data.cycle_status["remaining_time"] / 60,
+                    interval,
+                    remaining_quota,
                 )
 
-            # Then check timer-based timing (takes precedence if closer)
+            # Timer-based speed-up
             if next_timer_event:
                 seconds_until = next_timer_event["seconds_until"]
-                if seconds_until < 300:  # 5 minutes
-                    # Use faster polling as we approach a timer event
-                    interval = TRANSITION_UPDATE_INTERVAL
-                    LOGGER.debug(
-                        "Timer event %s approaching (%.1f minutes remaining). Using faster update interval.",
-                        next_timer_event["type"],
-                        seconds_until / 60,
-                    )
+                if seconds_until < 300:
+                    if has_quota:
+                        interval = min(interval, TRANSITION_UPDATE_INTERVAL)
+                    elif interval > QUOTA_CONSTRAINED_INTERVAL:
+                        interval = QUOTA_CONSTRAINED_INTERVAL
                 elif interval == NORMAL_UPDATE_INTERVAL:
-                    # Don't wait longer than 5 minutes if there's an upcoming event
-                    # but don't override transition interval if it's already set
                     interval = min(NORMAL_UPDATE_INTERVAL, int(seconds_until / 2))
-                    LOGGER.debug(
-                        "Upcoming timer event %s (%.1f minutes). Setting interval to %d seconds.",
-                        next_timer_event["type"],
-                        seconds_until / 60,
-                        interval,
-                    )
 
-            # Update the coordinator's update interval if needed
             if self.update_interval.total_seconds() != interval:
                 self.update_interval = timedelta(seconds=interval)
-                LOGGER.debug("Adjusted update interval to %d seconds", interval)
+                LOGGER.debug(
+                    "Update interval: %ds (quota remaining: %s)",
+                    interval,
+                    remaining_quota,
+                )
 
             # Save learned data periodically - every hour
             if (
@@ -597,7 +621,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             retry_after = getattr(err, "retry_after", None)
 
             # Use retry_after if available, otherwise use exponential backoff
-            if retry_after and isinstance(retry_after, (int, float)):
+            if retry_after and isinstance(retry_after, int | float):
                 backoff_time = retry_after
             else:
                 # Calculate exponential backoff based on update interval

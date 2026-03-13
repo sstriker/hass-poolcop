@@ -210,4 +210,6 @@ def mock_poolcop():
         poolcop.alarm_history = AsyncMock(return_value={"alarms": []})
         poolcop.command_history = AsyncMock(return_value={"commands": []})
         poolcop.close = AsyncMock()
+        poolcop.token_limit = 89
+        poolcop.token_expire = 9999999999
         yield poolcop
