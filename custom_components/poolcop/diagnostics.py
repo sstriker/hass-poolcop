@@ -79,7 +79,13 @@ async def async_get_config_entry_diagnostics(
                         )
 
             if "Pool" in status_copy:
-                status_copy["Pool"] = "**REDACTED**"
+                if isinstance(status_copy["Pool"], dict):
+                    status_copy["Pool"] = async_redact_data(
+                        dict(status_copy["Pool"]),
+                        COORDINATOR_FIELDS_TO_REDACT,
+                    )
+                else:
+                    status_copy["Pool"] = "**REDACTED**"
 
             data_copy["status"] = status_copy
 

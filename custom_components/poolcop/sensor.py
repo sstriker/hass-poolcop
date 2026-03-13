@@ -935,6 +935,12 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
         """Initialize PoolCop sensor."""
         super().__init__(coordinator=coordinator, description=description)
 
+        # Set pool image on the operation mode sensor (main/representative entity)
+        if description.key == "poolcop":
+            pool_data = coordinator.data.status_value("", prefix="Pool") or {}
+            if isinstance(pool_data, dict) and pool_data.get("image"):
+                self._attr_entity_picture = pool_data["image"]
+
     @property
     def available(self) -> bool:
         """Return True if entity is available."""

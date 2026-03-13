@@ -65,7 +65,12 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         """Return device information about this PoolCop instance."""
         poolcop_id: str = cast(str, self.coordinator.config_entry.unique_id)
 
-        return DeviceInfo(
+        # Use Pool nickname if available, fall back to "PoolCop"
+        pool_data = self.coordinator.data.status_value("", prefix="Pool") or {}
+        nickname = pool_data.get("nickname") if isinstance(pool_data, dict) else None
+        name = nickname or "PoolCop"
+
+        info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
             identifiers={
                 (
@@ -75,6 +80,8 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
             },
             configuration_url=f"https://poolcopilot.com/mypoolcop/select/{poolcop_id}",
             manufacturer="PCFR",
-            name="PoolCop",
+            name=name,
             sw_version=self.coordinator.data.status_value("network.version"),
         )
+
+        return info
