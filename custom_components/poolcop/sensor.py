@@ -278,7 +278,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Pressure",
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPressure.PA,
+        native_unit_of_measurement=UnitOfPressure.KPA,
         value_fn=_value_fn("pressure"),
     ),
     PoolCopSensorEntityDescription(
