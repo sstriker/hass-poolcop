@@ -29,19 +29,27 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import (
     AUX_FIXED_FUNCTION_LABELS,
     CYCLE_ACTIVE_MODES,
+    DISINFECTANT_TYPE_DESCRIPTIONS,
+    DISINFECTANT_TYPES,
     DOMAIN,
     FILTER_MODES,
-    FILTER_TIMER_MODES,
     FILTER_TIMER_MODE_DESCRIPTIONS,
+    FILTER_TIMER_MODES,
+    FORCED_FILTRATION_DESCRIPTIONS,
     FORCED_FILTRATION_MODES,
     LOGGER,
     OPERATION_MODE_DESCRIPTIONS,
     OPERATION_MODES,
+    PH_TYPE_DESCRIPTIONS,
     PH_TYPES,
+    POOL_TYPE_DESCRIPTIONS,
     POOL_TYPES,
+    PUMP_TYPE_DESCRIPTIONS,
     PUMP_TYPES,
+    VALVE_POSITION_DESCRIPTIONS,
     VALVE_POSITION_NAMES,
     WATER_VALVE_POSITIONS,
+    WATERLEVEL_STATE_DESCRIPTIONS,
     WATERLEVEL_STATES,
     aux_display_name,
     aux_label_id,
@@ -96,6 +104,18 @@ def _datetime_value_fn(
         return parsed
 
     return value_fn
+
+
+def _description_attrs_fn(
+    path: str, descriptions: dict[int, str]
+) -> Callable[[PoolCopData], dict[str, Any]]:
+    """Return extra attrs function that provides a description for the current state."""
+
+    def attrs_fn(data: PoolCopData) -> dict[str, Any]:
+        value = data.status_value(path)
+        return {"description": descriptions.get(value, "") if value is not None else ""}
+
+    return attrs_fn
 
 
 def _active_alarm_value_fn(
@@ -338,6 +358,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(WATERLEVEL_STATES.values()),
         value_fn=_state_mapping_fn("waterlevel", WATERLEVEL_STATES),
+        extra_attrs_fn=_description_attrs_fn("waterlevel", WATERLEVEL_STATE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="valve_position",
@@ -346,6 +367,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(VALVE_POSITION_NAMES.values()),
         value_fn=_state_mapping_fn("status.valveposition", VALVE_POSITION_NAMES),
+        extra_attrs_fn=_description_attrs_fn("status.valveposition", VALVE_POSITION_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed",
@@ -361,11 +383,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(OPERATION_MODES.values()),
         value_fn=_state_mapping_fn("status.poolcop", OPERATION_MODES),
-        extra_attrs_fn=lambda data: {
-            "description": OPERATION_MODE_DESCRIPTIONS.get(
-                data.status_value("status.poolcop"), ""
-            )
-        },
+        extra_attrs_fn=_description_attrs_fn("status.poolcop", OPERATION_MODE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="last_backwash",
@@ -392,6 +410,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(FORCED_FILTRATION_MODES.values()),
         value_fn=_state_mapping_fn("status.forced.mode", FORCED_FILTRATION_MODES),
+        extra_attrs_fn=_description_attrs_fn("status.forced.mode", FORCED_FILTRATION_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="forced_filtration_remaining",
@@ -499,6 +518,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(POOL_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.pool.type", POOL_TYPES),
+        extra_attrs_fn=_description_attrs_fn("settings.pool.type", POOL_TYPE_DESCRIPTIONS),
     ),
     # Filter settings
     PoolCopSensorEntityDescription(
@@ -506,7 +526,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Filter Pressure Threshold",
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPressure.PA,
+        native_unit_of_measurement=UnitOfPressure.KPA,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.filter.pressure"),
     ),
@@ -544,11 +564,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(FILTER_TIMER_MODES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
-        extra_attrs_fn=lambda data: {
-            "description": FILTER_TIMER_MODE_DESCRIPTIONS.get(
-                data.status_value("settings.filter.timer"), ""
-            )
-        },
+        extra_attrs_fn=_description_attrs_fn("settings.filter.timer", FILTER_TIMER_MODE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="filter_mode",
@@ -572,7 +588,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Pump Low Pressure Threshold",
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPressure.PA,
+        native_unit_of_measurement=UnitOfPressure.KPA,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pump.pressure_low"),
     ),
@@ -581,7 +597,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Pump Alarm Pressure Threshold",
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement=UnitOfPressure.PA,
+        native_unit_of_measurement=UnitOfPressure.KPA,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_value_fn("settings.pump.pressure_alarm"),
     ),
@@ -593,6 +609,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(PUMP_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.pump.type", PUMP_TYPES),
+        extra_attrs_fn=_description_attrs_fn("settings.pump.type", PUMP_TYPE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="pump_flowrate",
@@ -649,6 +666,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(PH_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.ph.type", PH_TYPES),
+        extra_attrs_fn=_description_attrs_fn("settings.ph.type", PH_TYPE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="ph_dosing_time",
@@ -682,8 +700,11 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="orp_disinfectant",
         name="ORP Disinfectant Type",
         icon="mdi:water-outline",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(DISINFECTANT_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=_value_fn("settings.orp.disinfectant"),
+        value_fn=_state_mapping_fn("settings.orp.disinfectant", DISINFECTANT_TYPES),
+        extra_attrs_fn=_description_attrs_fn("settings.orp.disinfectant", DISINFECTANT_TYPE_DESCRIPTIONS),
     ),
     PoolCopSensorEntityDescription(
         key="orp_next_injection",

@@ -136,6 +136,30 @@ PH_TYPES = {
     1: "Base (pH+)",
 }
 
+# Descriptions for pH types
+PH_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Acid dosing (pH-). Lowers pH when above setpoint.",
+    1: "Base dosing (pH+). Raises pH when below setpoint.",
+}
+
+# Disinfectant types (from PoolCop Evolution manual §5.4.3 ORP Control)
+DISINFECTANT_TYPES: Final[dict[int, str]] = {
+    0: "Read",
+    1: "Chlorine",
+    2: "Salt",
+    3: "Bromine",
+    4: "Other",
+}
+
+# Descriptions for disinfectant types
+DISINFECTANT_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Read and display ORP only. No dosing control.",
+    1: "Liquid chlorine injection. Controlled by ORP sensor via Aux 6.",
+    2: "Salt water chlorinator. External system controlled via Aux 6.",
+    3: "Bromine dosing. Controlled by ORP sensor via Aux 6.",
+    4: "Other disinfection method. Algorithm not optimized for specific type.",
+}
+
 OPERATION_MODES = {
     0: "Stop",
     1: "Freeze",
@@ -165,6 +189,54 @@ OPERATION_MODE_DESCRIPTIONS: Final[dict[int, str]] = {
 
 # Operating modes where filtration cycles are active and cycle sensors are relevant
 CYCLE_ACTIVE_MODES: Final[set[int]] = {2, 3, 4, 8, 9}
+
+# Descriptions for valve positions (from PoolCop Evolution manual §4.4.4)
+VALVE_POSITION_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Normal operation. Water flows through filter media to pool.",
+    1: "Water bypasses filter and goes to drain. Used to lower water level.",
+    2: "No water flow. Valve sealed.",
+    3: "Reverse flow through filter to clean media. Water sent to drain.",
+    4: "Water recirculates bypassing filter entirely. No filtration.",
+    5: "Brief forward flow to drain after backwash to settle filter media.",
+    6: "Valve position could not be determined.",
+    7: "No multiway valve installed.",
+}
+
+# Descriptions for water level states
+WATERLEVEL_STATE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Water level sensor not installed.",
+    1: "Water level low. Auto refill will start if enabled.",
+    2: "Water level normal. No action required.",
+    3: "Water level high. Reduction may occur if auto reduce is enabled.",
+    4: "Water level sensor error. Check sensor wiring and condition.",
+}
+
+# Descriptions for forced filtration modes (from PoolCop Evolution manual §4.4.4.5.7)
+FORCED_FILTRATION_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "No forced filtration active. Normal timer cycles in effect.",
+    1: "Pump forced on for 24h. Overrides Cycle 1 times, max 23h/day. Reverts when done.",
+    2: "Pump forced on for 48h. Overrides Cycle 1 times, max 23h/day. Reverts when done.",
+    3: "Pump forced on for 72h. Overrides Cycle 1 times, max 23h/day. Reverts when done.",
+}
+
+# Descriptions for pump types (from PoolCop Evolution manual §5.5)
+PUMP_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Pump type not configured.",
+    1: "Single fixed speed. On/off control only.",
+    2: "Two speed motor. Aux 1 controls high/low speed.",
+    3: "Three speed motor. Aux 1-3 control speed selection.",
+    4: "Variable speed drive. Continuous speed adjustment.",
+    5: "Variable speed with 3-step control via aux relays.",
+    6: "Pump controlled by external system. PoolCop does not control start/stop.",
+}
+
+# Descriptions for pool types
+POOL_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
+    0: "Standard skimmer pool. Surface water drawn through skimmers.",
+    1: "Infinity edge pool, type A. Overflow to balance tank.",
+    2: "Infinity edge pool, type B. Overflow to balance tank.",
+    3: "Spa or hot tub. Typically smaller volume with higher turnover.",
+}
 
 # Timer-related constants
 DEFAULT_TIMER_UPDATE_INTERVAL = 15 * 60  # 15 minutes
