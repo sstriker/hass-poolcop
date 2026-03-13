@@ -15,7 +15,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import AUX_FIXED_FUNCTION_LABELS, DOMAIN, aux_display_name, aux_label_id
+from .const import (
+    AUX_FIXED_FUNCTION_LABELS,
+    AUX_RELAY_LABELS,
+    AUX_VALVE_LABELS,
+    DOMAIN,
+    aux_display_name,
+    aux_label_id,
+)
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -180,14 +187,6 @@ BINARY_SENSORS = (
         on_off_icons=("mdi:shield", "mdi:shield-off"),
     ),
     PoolCopBinarySensorEntityDescription(
-        key="filter_waste_valve",
-        name="Waste Valve",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        is_on_fn=_is_on_fn("settings.filter.waste_valve"),
-        on_off_icons=("mdi:valve-open", "mdi:valve-closed"),
-    ),
-    PoolCopBinarySensorEntityDescription(
         key="orp_control_enabled",
         name="ORP Control",
         device_class=BinarySensorDeviceClass.RUNNING,
@@ -312,6 +311,12 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
         label = aux_display_name(api_label, self._aux_id)
         lid = aux_label_id(api_label)
 
+        # Fixed-function aux ports have first-class entity counterparts
+        # — show as "Label (Aux N)" and mark diagnostic
+        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
+            label = f"{label} (Aux {self._aux_id})"
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
         super().__init__(
             coordinator=coordinator,
             description=EntityDescription(
@@ -320,10 +325,12 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
             ),
         )
 
-        # Fixed-function aux ports (Speed Control, Waste Valve, ORP Control)
-        # have first-class entity counterparts — mark as diagnostic
-        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
-            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        # Valve-type aux ports: Open/Closed
+        if lid is not None and lid in AUX_VALVE_LABELS:
+            self._attr_device_class = BinarySensorDeviceClass.OPENING
+        # Relay-type aux ports with first-class counterparts: On/Off
+        elif lid is not None and lid in AUX_RELAY_LABELS:
+            self._attr_device_class = BinarySensorDeviceClass.POWER
 
     @property
     def is_on(self) -> bool | None:
@@ -353,4 +360,6 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
     @property
     def icon(self) -> str | None:
         """Return the icon."""
+        if self._attr_device_class == BinarySensorDeviceClass.OPENING:
+            return "mdi:valve-open" if self.is_on else "mdi:valve-closed"
         return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"

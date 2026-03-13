@@ -27,6 +27,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    AUX_FIXED_FUNCTION_LABELS,
     DOMAIN,
     FILTER_MODES,
     FILTER_TIMER_MODES,
@@ -40,6 +41,7 @@ from .const import (
     WATER_VALVE_POSITIONS,
     WATERLEVEL_STATES,
     aux_display_name,
+    aux_label_id,
 )
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
@@ -867,12 +869,16 @@ async def async_setup_entry(
     )
 
     # Add dynamic aux timer sensors from API aux array
+    # Skip fixed-function aux (firmware-managed, not user-scheduled)
     aux_list = coordinator.data.status_value("aux") or []
     timers = coordinator.data.status_value("timers") or {}
     for aux in aux_list:
         aux_id = aux["id"]
         timer_key = f"aux{aux_id}"
         if timer_key not in timers:
+            continue
+        lid = aux_label_id(aux.get("label", ""))
+        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
             continue
         label = aux_display_name(aux.get("label", ""), aux_id)
         entities.append(

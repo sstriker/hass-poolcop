@@ -179,6 +179,12 @@ AUX_LABEL_NAMES: Final[dict[int, str]] = {
 # Fixed-function label IDs (16+) that have first-class entity counterparts
 AUX_FIXED_FUNCTION_LABELS: Final[set[int]] = {16, 17, 18}
 
+# Valve-type aux label IDs — OPENING device class (Open/Closed)
+AUX_VALVE_LABELS: Final[set[int]] = {16, 23, 24, 27}
+
+# Relay-type aux label IDs with first-class counterparts — POWER device class (On/Off)
+AUX_RELAY_LABELS: Final[set[int]] = {17, 18}
+
 
 def aux_label_id(api_label: str) -> int | None:
     """Extract the numeric label ID from an API label string like 'label_aux_17'."""
