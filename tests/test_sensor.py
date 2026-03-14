@@ -176,3 +176,207 @@ async def test_planned_remaining_volume_value(
     # Value should match what coordinator returns (numeric string)
     expected = str(coordinator.planned_remaining_volume)
     assert state.state == expected
+
+
+async def test_cycle_time_remaining_fn_no_remaining_time():
+    """_cycle_time_remaining_fn returns None when cycle_status has no remaining_time (line 133)."""
+    # In cycle mode (mode 3 = Auto) but cycle_status has no remaining_time
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 3}}},
+        cycle_status={},
+    )
+    result = _cycle_time_remaining_fn(data)
+    assert result is None
+
+
+async def test_cycle_time_remaining_fn_not_in_cycle_mode():
+    """_cycle_time_remaining_fn returns None when not in cycle mode."""
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 0}}},  # mode 0 = Stop
+        cycle_status={"remaining_time": 120},
+    )
+    result = _cycle_time_remaining_fn(data)
+    assert result is None
+
+
+async def test_cycle_end_time_fn_not_in_cycle():
+    """_cycle_end_time_fn returns None when not in cycle mode (line 142)."""
+    from custom_components.poolcop.sensor import _cycle_end_time_fn
+
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 0}}},
+        cycle_status={"predicted_end": 9999999999},
+    )
+    assert _cycle_end_time_fn(data) is None
+
+
+async def test_cycle_end_time_fn_with_predicted_end():
+    """_cycle_end_time_fn returns datetime when predicted_end exists (lines 144-145)."""
+    import time
+
+    from custom_components.poolcop.sensor import _cycle_end_time_fn
+
+    now_ts = time.time() + 300  # 5 minutes from now
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 3}}},
+        cycle_status={"predicted_end": now_ts},
+    )
+    result = _cycle_end_time_fn(data)
+    assert isinstance(result, datetime)
+
+
+async def test_cycle_elapsed_time_fn_not_in_cycle():
+    """_cycle_elapsed_time_fn returns None when not in cycle mode (line 152)."""
+    from custom_components.poolcop.sensor import _cycle_elapsed_time_fn
+
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 0}}},
+        cycle_status={"elapsed_time": 120},
+    )
+    assert _cycle_elapsed_time_fn(data) is None
+
+
+async def test_cycle_elapsed_time_fn_no_elapsed():
+    """_cycle_elapsed_time_fn returns None when no elapsed_time (line 154)."""
+    from custom_components.poolcop.sensor import _cycle_elapsed_time_fn
+
+    data = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 3}}},
+        cycle_status={},
+    )
+    assert _cycle_elapsed_time_fn(data) is None
+
+    # Also test with elapsed_time explicitly None
+    data2 = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 3}}},
+        cycle_status={"elapsed_time": None},
+    )
+    assert _cycle_elapsed_time_fn(data2) is None
+
+    # Test with valid elapsed_time to cover line 154
+    data3 = PoolCopData(
+        status={"PoolCop": {"status": {"poolcop": 3}}},
+        cycle_status={"elapsed_time": 300},
+    )
+    assert _cycle_elapsed_time_fn(data3) == 300
+
+
+async def test_time_str_to_time_today_tomorrow_shift():
+    """_time_str_to_time_today shifts to tomorrow when result < now and hour < 12 (line 171)."""
+    from unittest.mock import patch as mock_patch
+
+    import zoneinfo
+
+    utc = zoneinfo.ZoneInfo("UTC")
+    real_datetime = datetime
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz:
+                return real_datetime(2026, 3, 14, 23, 0, 0, tzinfo=tz)
+            return real_datetime(2026, 3, 14, 23, 0, 0)
+
+    with mock_patch("custom_components.poolcop.sensor.datetime", FakeDatetime):
+        result = _time_str_to_time_today("02:00:00", "UTC")
+
+    # 02:00 < 23:00 and hour 2 < 12, so result shifts to tomorrow
+    assert result is not None
+    assert result.day == 15
+
+
+async def test_time_str_to_time_today_falsy_input():
+    """_time_str_to_time_today returns None for falsy or '00:00:00' input (line 171)."""
+    assert _time_str_to_time_today("", "UTC") is None
+    assert _time_str_to_time_today("00:00:00", "UTC") is None
+    assert _time_str_to_time_today(None, "UTC") is None
+
+
+async def test_time_str_to_time_today_value_error():
+    """_time_str_to_time_today returns None for invalid time_str (lines 201-202)."""
+    result = _time_str_to_time_today("invalid", "UTC")
+    assert result is None
+
+    result = _time_str_to_time_today("not:a:time", "UTC")
+    assert result is None
+
+
+async def test_timer_fn_exception():
+    """_timer_fn handles KeyError/AttributeError (lines 215-216)."""
+    from custom_components.poolcop.sensor import _timer_fn
+
+    # Timer data that is not a dict → timer.get() would raise AttributeError
+    data = PoolCopData(
+        status={"PoolCop": {"timers": {"cycle1": "not_a_dict"}}},
+    )
+    fn = _timer_fn("cycle1", "enabled")
+    result = fn(data)
+    assert result is None
+
+
+async def test_timer_time_fn_exception():
+    """_timer_time_fn handles exceptions (lines 236-237)."""
+    from custom_components.poolcop.sensor import _timer_time_fn
+
+    # Timer data is a non-dict truthy value → .get() raises AttributeError
+    data = PoolCopData(
+        status={
+            "PoolCop": {"timers": {"cycle1": "corrupted_data"}},
+            "Pool": {"timezone": "UTC"},
+        },
+    )
+    fn = _timer_time_fn("cycle1", "start")
+    result = fn(data)
+    assert result is None
+
+
+async def test_weekday_mapping_fn_non_integer_value():
+    """_weekday_mapping_fn returns None for non-integer value (lines 264-265)."""
+    fn = _weekday_mapping_fn("settings.orp.hyper_day")
+    data = PoolCopData(
+        status={"PoolCop": {"settings": {"orp": {"hyper_day": "bad"}}}}
+    )
+    assert fn(data) is None
+
+
+async def test_aux_timer_fixed_function_label_skipped(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Aux with fixed-function label and timer entry → skipped (line 889)."""
+    # aux1 has label_aux_17 which is in AUX_FIXED_FUNCTION_LABELS (17)
+    # Add a timer for aux1 — it should be skipped
+    mock_poolcop_data["PoolCop"]["timers"]["aux1"] = {
+        "enabled": 1,
+        "start": "10:00:00",
+        "stop": "12:00:00",
+    }
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    states = hass.states.async_all("sensor")
+    sensor_keys = {s.entity_id for s in states}
+    # Should NOT create sensors for aux1 since label_aux_17 is fixed-function
+    assert not any("aux1_enabled" in s for s in sensor_keys)
+
+
+async def test_sensor_available_fn_returns_false(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Sensor with available_fn that returns False → unavailable (line 944)."""
+    from custom_components.poolcop.sensor import (
+        PoolCopSensorEntity,
+        PoolCopSensorEntityDescription,
+    )
+
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+
+    # Create a sensor with an available_fn that always returns False
+    description = PoolCopSensorEntityDescription(
+        key="test_unavailable",
+        name="Test Unavailable",
+        value_fn=lambda data: 42,
+        available_fn=lambda data: False,
+    )
+    sensor = PoolCopSensorEntity(coordinator=coordinator, description=description)
+    # The available property should return False
+    assert sensor.available is False

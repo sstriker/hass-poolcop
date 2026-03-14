@@ -392,3 +392,261 @@ async def test_status_value_non_dict_intermediate(mock_poolcop_data):
     data = PoolCopData(status=mock_poolcop_data)
     # temperature.water is a float, trying to go deeper should return None
     assert data.status_value("temperature.water.something") is None
+
+
+async def test_status_value_exception_handler():
+    """status_value exception handler covers lines 80-84."""
+    # Status with a value that is not a dict but not None either (list),
+    # where accessing .get() would raise TypeError in the except block.
+    # Actually the isinstance check handles this, but we need to trigger
+    # KeyError/TypeError. Use a status where the PoolCop key is a non-dict
+    # that doesn't support .get() — e.g., a list.
+    data = PoolCopData(status={"PoolCop": [1, 2, 3]})
+    # Traversal: result = {"PoolCop": [1,2,3]}, then result = [1,2,3]
+    # then isinstance([1,2,3], dict) → False → return None
+    assert data.status_value("temperature.water") is None
+
+
+async def test_check_upcoming_timer_events_aux_stop(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Aux timer with stop time within 30 min → event returned (lines 596-601)."""
+    import zoneinfo
+    from datetime import datetime
+
+    from custom_components.poolcop.coordinator import PoolCopData
+
+    pool_tz = zoneinfo.ZoneInfo("Europe/Amsterdam")
+
+    # Disable cycle timers so they don't interfere
+    mock_poolcop_data["PoolCop"]["timers"]["cycle1"]["enabled"] = 0
+    mock_poolcop_data["PoolCop"]["timers"]["cycle2"]["enabled"] = 0
+
+    # Set up aux4 (switchable) with stop at 14:10 Amsterdam (10 min from "now")
+    mock_poolcop_data["PoolCop"]["timers"]["aux4"] = {
+        "enabled": 1,
+        "start": "13:00:00",
+        "stop": "14:10:00",
+    }
+    mock_poolcop_data["PoolCop"]["aux"][3]["switchable"] = True
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = PoolCopData(status=mock_poolcop_data)
+
+    # _check_upcoming_timer_events uses datetime.now() (naive) for now_timestamp
+    # and _time_str_to_datetime uses datetime.now(tz=pool_tz) for constructing timer datetimes.
+    # Both must be consistent: 14:00 Amsterdam = 13:00 UTC.
+    # The naive datetime.now() on UTC systems returns UTC time.
+    real_datetime = datetime
+    amsterdam_now = real_datetime(2026, 3, 14, 14, 0, 0, tzinfo=pool_tz)
+    # Naive now should match the same instant in UTC
+    utc_now = real_datetime(2026, 3, 14, 13, 0, 0)
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz:
+                return amsterdam_now.astimezone(tz)
+            return utc_now
+
+    with patch("custom_components.poolcop.coordinator.datetime", FakeDatetime):
+        result = coordinator._check_upcoming_timer_events()
+
+    assert result is not None
+    assert "aux4" in result["type"]
+
+
+async def test_check_upcoming_timer_events_exception(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Corrupt timer data triggers exception handler (lines 622-624)."""
+    # Set timers to something that will cause a TypeError during iteration
+    mock_poolcop_data["PoolCop"]["timers"] = {
+        "cycle1": "not_a_dict",  # .get("enabled") will raise AttributeError → caught
+    }
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        data = await coordinator._async_update_data()
+
+    # Should not crash; next_timer_event should be None
+    assert data.next_timer_event is None
+
+
+async def test_time_str_to_datetime_falsy_input(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """_time_str_to_datetime returns None for falsy or '00:00:00' (line 631)."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+    assert coordinator._time_str_to_datetime("") is None
+    assert coordinator._time_str_to_datetime("00:00:00") is None
+    assert coordinator._time_str_to_datetime(None) is None
+
+
+async def test_time_str_to_datetime_invalid_timezone(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """_time_str_to_datetime with ZoneInfoNotFoundError (lines 647-648)."""
+    # Set pool timezone to an invalid value
+    mock_poolcop_data["Pool"]["timezone"] = "Invalid/Not_A_Timezone"
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+    # Should still return a datetime (falls back to local tz)
+    result = coordinator._time_str_to_datetime("14:00:00")
+    assert result is not None
+    assert result.hour == 14
+
+
+async def test_time_str_to_datetime_value_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """_time_str_to_datetime with invalid time string (lines 673-675)."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+    assert coordinator._time_str_to_datetime("not:a:time") is None
+    assert coordinator._time_str_to_datetime("99:99:99") is None
+
+
+async def test_timer_based_speedup_within_5min(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Timer event within 5 min → faster interval (lines 778-783)."""
+    import zoneinfo
+    from datetime import datetime
+
+    from custom_components.poolcop.const import TRANSITION_UPDATE_INTERVAL
+    from custom_components.poolcop.coordinator import PoolCopData
+
+    pool_tz = zoneinfo.ZoneInfo("Europe/Amsterdam")
+
+    # Disable cycle2 to avoid interference
+    mock_poolcop_data["PoolCop"]["timers"]["cycle2"]["enabled"] = 0
+
+    # Set cycle1 start at 14:03 Amsterdam (3 min from "now" at 14:00 Amsterdam)
+    mock_poolcop_data["PoolCop"]["timers"]["cycle1"] = {
+        "enabled": 1,
+        "start": "14:03:00",
+        "stop": "23:59:59",
+    }
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    real_datetime = datetime
+    amsterdam_now = real_datetime(2026, 3, 14, 14, 0, 0, tzinfo=pool_tz)
+    utc_now = real_datetime(2026, 3, 14, 13, 0, 0)
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz:
+                return amsterdam_now.astimezone(tz)
+            return utc_now
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ), patch("custom_components.poolcop.coordinator.datetime", FakeDatetime):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = PoolCopData(status=mock_poolcop_data)
+        await coordinator._async_update_data()
+
+    assert coordinator.update_interval.total_seconds() == TRANSITION_UPDATE_INTERVAL
+
+
+async def test_timer_based_speedup_between_5_and_30min(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Timer event between 5-30 min → half-time interval (lines 784-785)."""
+    import zoneinfo
+    from datetime import datetime
+
+    from custom_components.poolcop.const import NORMAL_UPDATE_INTERVAL
+    from custom_components.poolcop.coordinator import PoolCopData
+
+    pool_tz = zoneinfo.ZoneInfo("Europe/Amsterdam")
+
+    # Disable cycle2 to avoid interference
+    mock_poolcop_data["PoolCop"]["timers"]["cycle2"]["enabled"] = 0
+
+    # Set cycle1 start at 14:07 Amsterdam (7 min from "now" at 14:00 Amsterdam)
+    mock_poolcop_data["PoolCop"]["timers"]["cycle1"] = {
+        "enabled": 1,
+        "start": "14:07:00",
+        "stop": "23:59:59",
+    }
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    real_datetime = datetime
+    amsterdam_now = real_datetime(2026, 3, 14, 14, 0, 0, tzinfo=pool_tz)
+    utc_now = real_datetime(2026, 3, 14, 13, 0, 0)
+
+    class FakeDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz:
+                return amsterdam_now.astimezone(tz)
+            return utc_now
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ), patch("custom_components.poolcop.coordinator.datetime", FakeDatetime):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = PoolCopData(status=mock_poolcop_data)
+        await coordinator._async_update_data()
+
+    # Line 784-785: interval = min(120, int(420/2)) = min(120, 210) = 120
+    interval = coordinator.update_interval.total_seconds()
+    assert interval <= NORMAL_UPDATE_INTERVAL

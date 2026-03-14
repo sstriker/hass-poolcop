@@ -322,3 +322,19 @@ async def test_seed_ignores_no_settings(coordinator):
 
     coordinator._seed_cycle_durations_from_settings({})
     assert coordinator._cycle_durations == original
+
+
+async def test_flow_rate_pumpspeed_none(coordinator):
+    """Test flow rate returns 0 when pumpspeed is None (line 170)."""
+    status = _make_status(pump=1, valve=0, speed=2)
+    status["PoolCop"]["status"]["pumpspeed"] = None
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.get_current_flow_rate() == 0.0
+
+
+async def test_flow_rate_pumpspeed_non_integer(coordinator):
+    """Test flow rate returns 0 when pumpspeed is non-integer string (lines 174-175)."""
+    status = _make_status(pump=1, valve=0, speed=2)
+    status["PoolCop"]["status"]["pumpspeed"] = "bad"
+    coordinator.data = PoolCopData(status=status)
+    assert coordinator.get_current_flow_rate() == 0.0
