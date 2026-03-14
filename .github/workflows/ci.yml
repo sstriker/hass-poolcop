@@ -35,6 +35,7 @@ jobs:
       - uses: codespell-project/actions-codespell@v2
         with:
           skip: "*.json"
+          ignore_words_list: "hass"
 
   test:
     runs-on: ubuntu-latest

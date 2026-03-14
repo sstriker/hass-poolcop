@@ -1,7 +1,7 @@
 """Test PoolCop coordinator flow rate and volume tracking."""
 
 import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.core import HomeAssistant
@@ -212,7 +212,7 @@ async def test_dynamic_interval_normal_quota(coordinator):
     coordinator.poolcopilot.token_expire = time.time() + 900
     coordinator.poolcopilot.status.return_value = _make_status()
 
-    with patch.object(coordinator, "_store"):
+    with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
     interval = coordinator.update_interval.total_seconds()
@@ -226,7 +226,7 @@ async def test_dynamic_interval_low_quota(coordinator):
     coordinator.poolcopilot.token_expire = time.time() + 900
     coordinator.poolcopilot.status.return_value = _make_status()
 
-    with patch.object(coordinator, "_store"):
+    with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
     # 900 / 3 = 300 → clamped to MAX_UPDATE_INTERVAL (120)
@@ -241,7 +241,7 @@ async def test_dynamic_interval_high_quota(coordinator):
     coordinator.poolcopilot.token_expire = time.time() + 900
     coordinator.poolcopilot.status.return_value = _make_status()
 
-    with patch.object(coordinator, "_store"):
+    with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
     # 900 / 200 = 4.5 → clamped to MIN_UPDATE_INTERVAL (10)
@@ -258,7 +258,7 @@ async def test_dynamic_interval_none_quota_skips(coordinator):
 
     original_interval = coordinator.update_interval.total_seconds()
 
-    with patch.object(coordinator, "_store"):
+    with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
     assert coordinator.update_interval.total_seconds() == original_interval
