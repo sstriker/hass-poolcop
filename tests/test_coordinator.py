@@ -289,10 +289,11 @@ async def test_save_load_learned_data(
 
         # Mock the Store methods directly
         coordinator._store.async_save = AsyncMock()
+        # JSON serializes int keys as strings; simulate that
         coordinator._store.async_load = AsyncMock(
             return_value={
-                "cycle_durations": {1: 9999},
-                "flow_rates": {2: 18.0},
+                "cycle_durations": {"1": 9999},
+                "flow_rates": {"2": 18.0},
             }
         )
 
@@ -303,7 +304,7 @@ async def test_save_load_learned_data(
         assert "cycle_durations" in saved
         assert "flow_rates" in saved
 
-        # Verify load restores data
+        # Verify load converts string keys back to int
         await coordinator.async_load_learned_data()
         assert coordinator._cycle_durations[1] == 9999
         assert coordinator.flow_rates[2] == 18.0

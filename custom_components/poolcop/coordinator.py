@@ -602,11 +602,15 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         stored_data = await self._store.async_load()
         if stored_data:
             if "cycle_durations" in stored_data:
-                self._cycle_durations.update(stored_data["cycle_durations"])
+                # JSON serializes int keys as strings; convert back
+                for k, v in stored_data["cycle_durations"].items():
+                    self._cycle_durations[int(k)] = int(v)
                 LOGGER.debug("Loaded saved cycle durations: %s", self._cycle_durations)
 
             if "flow_rates" in stored_data:
-                self.flow_rates.update(stored_data["flow_rates"])
+                # JSON serializes int keys as strings; convert back
+                for k, v in stored_data["flow_rates"].items():
+                    self.flow_rates[int(k)] = v
                 LOGGER.debug("Loaded saved flow rates: %s", self.flow_rates)
 
     async def async_config_entry_first_refresh(self) -> None:
