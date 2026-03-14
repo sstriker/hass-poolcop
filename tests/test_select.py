@@ -96,3 +96,80 @@ async def test_pump_speed_set(
         blocking=True,
     )
     mock_poolcop.set_pump_speed.assert_called_once_with(3)
+
+
+async def test_pump_speed_invalid_value(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Non-numeric pump speed → ValueError logged, no crash (lines 44-45)."""
+    from custom_components.poolcop.select import _async_set_pump_speed
+
+    coordinator = await _setup_integration(
+        hass, mock_config_entry, mock_poolcop, mock_poolcop_data
+    )
+    # Should not raise — logs error
+    await _async_set_pump_speed(coordinator, "not_a_number")
+    mock_poolcop.set_pump_speed.assert_not_called()
+
+
+async def test_pump_speed_non_int_pumpspeed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """pumpspeed is not an int → current_option=None (line 57)."""
+    mock_poolcop_data["PoolCop"]["status"]["pumpspeed"] = "bad"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("select.test_pool_pump_speed")
+    assert state is not None
+    assert state.state == "unknown"
+
+
+async def test_pump_speed_fallback_pump_type_3(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """nb_speed missing, pump_type=3 → 4 options (line 72)."""
+    del mock_poolcop_data["PoolCop"]["settings"]["pump"]["nb_speed"]
+    mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 3
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("select.test_pool_pump_speed")
+    assert state is not None
+    assert state.attributes.get("options") == ["0", "1", "2", "3"]
+
+
+async def test_pump_speed_fallback_pump_type_2(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """nb_speed missing, pump_type=2 → 3 options (line 74)."""
+    del mock_poolcop_data["PoolCop"]["settings"]["pump"]["nb_speed"]
+    mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 2
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("select.test_pool_pump_speed")
+    assert state is not None
+    assert state.attributes.get("options") == ["0", "1", "2"]
+
+
+async def test_pump_speed_fallback_pump_type_1(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """nb_speed missing, pump_type=1 → 2 options (line 76)."""
+    del mock_poolcop_data["PoolCop"]["settings"]["pump"]["nb_speed"]
+    mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 1
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("select.test_pool_pump_speed")
+    assert state is not None
+    assert state.attributes.get("options") == ["0", "1"]
+
+
+async def test_valve_position_unknown_value(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Unknown valve position value → None (line 106)."""
+    mock_poolcop_data["PoolCop"]["status"]["valveposition"] = 99
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("select.test_pool_valve_position")
+    assert state is not None
+    assert state.state == "unknown"

@@ -130,3 +130,57 @@ async def test_icon_selection(
     assert state is not None
     # Pump is on (status.pump=1)
     assert state.attributes.get("icon") == "mdi:pump"
+
+
+async def test_resolve_alarm_name_field():
+    """alarm with name='alert_title_6' → resolved via name field (line 67)."""
+    alarm = {"id": 6, "name": "alert_title_6"}
+    resolved = _resolve_alarm(alarm)
+    assert resolved["code"] == 6
+    # name was resolved, description was empty → description = resolved name
+    assert "pH" in resolved["description"]  # alert_title_6 = "pH High"
+
+
+async def test_aux_binary_sensor_not_found(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Aux removed from data after setup → is_on=None, attrs={} (lines 384, 400)."""
+    # aux1 is non-switchable → gets a binary sensor
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    # Find the aux1 entity
+    states = hass.states.async_all("binary_sensor")
+    aux1_states = [s for s in states if "aux_1" in s.entity_id]
+    assert len(aux1_states) >= 1
+
+    # Now clear the aux list so the entity can't find its aux_id
+    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    status = dict(coordinator.data.status)
+    status["PoolCop"] = dict(status["PoolCop"])
+    status["PoolCop"]["aux"] = []
+    coordinator.data = coordinator.data._replace(status=status)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(aux1_states[0].entity_id)
+    # is_on returns None → HA shows "unknown"
+    assert state.state == "unknown"
+
+
+async def test_aux_binary_sensor_icon_with_label(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Aux with known label_id and status → icon from AUX_LABEL_ICONS (line 409)."""
+    # Use aux1 with label_aux_0 (Pool Light) which IS in AUX_LABEL_ICONS.
+    # aux1 is non-switchable (switchable=False) → binary sensor.
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 1:
+            aux["label"] = "label_aux_0"  # Pool Light
+            aux["status"] = 1
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    # Entity name is derived from label: "Pool Light" → "pool_light"
+    state = hass.states.get("binary_sensor.test_pool_pool_light")
+    assert state is not None
+    # label_id=0 (Pool Light), status=1 → icons[0] = "mdi:lightbulb-on"
+    assert state.attributes.get("icon") == "mdi:lightbulb-on"
