@@ -19,7 +19,7 @@ from .entity import PoolCopEntity
 VALVE_POSITION_OPTIONS: Final = list(VALVE_POSITIONS.keys())
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopSelectEntityDescriptionMixin:
     """Mixin for PoolCop select entity description."""
 
@@ -27,7 +27,7 @@ class PoolCopSelectEntityDescriptionMixin:
     current_fn: Callable[[PoolCopDataUpdateCoordinator], str | None]
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopSelectEntityDescription(
     SelectEntityDescription, PoolCopSelectEntityDescriptionMixin
 ):

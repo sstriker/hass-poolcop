@@ -31,7 +31,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):
+class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     """Representation of the PoolCop pump switch."""
 
     _attr_has_entity_name = True
@@ -63,7 +63,7 @@ class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):
         self.async_write_ha_state()
 
 
-class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):
+class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     """Representation of a switchable PoolCop auxiliary output."""
 
     _attr_has_entity_name = True

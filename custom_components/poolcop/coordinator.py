@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from poolcop import (
+from poolcop import (  # type: ignore[attr-defined]  # namespace collision with integration dir
     PoolCopilot,
     PoolCopilotConnectionError,
     PoolCopilotInvalidKeyError,
@@ -38,7 +38,7 @@ from .const import (
 )
 
 # Default cycle durations (in seconds)
-DEFAULT_CYCLE_DURATIONS = {
+DEFAULT_CYCLE_DURATIONS: dict[int, int] = {
     0: 0,  # Idle - no duration
     1: 7200,  # Cycle 1 - start with 2 hours as default
     2: 600,  # Backwash - start with 10 minutes as default
@@ -115,12 +115,12 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self.flow_rates[speed] = value
 
         # Setup storage for persisting learned data
-        self._store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{api_key}")
+        self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{api_key}")
 
         # Track when we last fetched alarms to avoid excessive API calls
-        self._last_alarm_fetch = 0
-        self._active_alarms = []
-        self._previous_alarm_count = 0
+        self._last_alarm_fetch: float = 0
+        self._active_alarms: list[dict[str, Any]] = []
+        self._previous_alarm_count: int = 0
 
         # Daily filtration volume tracking
         self._daily_volume: float = 0.0  # m³ filtered today
@@ -130,10 +130,10 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         )
 
         # Cycle tracking
-        self._last_operation_mode = None
-        self._current_cycle_start = None
-        self._cycle_durations = DEFAULT_CYCLE_DURATIONS.copy()
-        self._cycle_transitions = []  # Track recent cycle transitions for analysis
+        self._last_operation_mode: int | None = None
+        self._current_cycle_start: float | None = None
+        self._cycle_durations: dict[int, int] = dict(DEFAULT_CYCLE_DURATIONS)
+        self._cycle_transitions: list[dict[str, Any]] = []
 
     def get_current_flow_rate(self) -> float:
         """Return the current effective flow rate in m³/h.
@@ -295,7 +295,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if filter_timer == 4 or op_mode == 9:
             return self._remaining_hours_volume()
 
-        # Mode 2: Forced - use status.forced.remaining_hours × flow rate
+        # Mode 2: Forced - use status.forced.remaining_hours x flow rate
         if op_mode == 2:
             remaining_hours = self.data.status_value("status.forced.remaining_hours")
             if remaining_hours is not None and remaining_hours > 0:
@@ -331,7 +331,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         return 0.0
 
     def _remaining_hours_volume(self) -> float:
-        """Calculate volume from remaining hours today × current flow rate."""
+        """Calculate volume from remaining hours today x current flow rate."""
         try:
             # Get timezone
             tz = None
@@ -391,7 +391,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
     def _update_cycle_tracking(self, status_data: dict) -> dict:
         """Track cycle changes and update predictions."""
-        cycle_status = {
+        cycle_status: dict[str, Any] = {
             "previous_mode": self._last_operation_mode,
             "predicted_end": None,
             "elapsed_time": None,
@@ -417,7 +417,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                         # Weight: 30% new, 70% old
                         old_duration = self._cycle_durations[self._last_operation_mode]
                         if old_duration > 0:
-                            new_duration = (0.3 * cycle_duration) + (0.7 * old_duration)
+                            new_duration = int(
+                                (0.3 * cycle_duration) + (0.7 * old_duration)
+                            )
                             self._cycle_durations[self._last_operation_mode] = (
                                 new_duration
                             )
@@ -489,7 +491,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 and value > 0
                 and self._cycle_durations[mode] == DEFAULT_CYCLE_DURATIONS[mode]
             ):
-                self._cycle_durations[mode] = float(value)
+                self._cycle_durations[mode] = int(value)
                 LOGGER.debug("Seeded mode %d duration from settings: %ds", mode, value)
 
     async def _async_update_data(self) -> PoolCopData:
@@ -531,8 +533,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     if history_alarms:
                         self._active_alarms = history_alarms
 
-                self._last_alarm_fetch = current_time
-                self._previous_alarm_count = alarm_count
+                self._last_alarm_fetch = float(current_time)
+                self._previous_alarm_count = int(alarm_count)
 
             data = PoolCopData(
                 status=status,
@@ -582,7 +584,11 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             else:
                 # Calculate exponential backoff based on update interval
                 # Start with 2x normal interval, cap at 30 minutes
-                current_interval = self.update_interval.total_seconds()
+                current_interval = (
+                    self.update_interval.total_seconds()
+                    if self.update_interval
+                    else UPDATE_INTERVAL
+                )
                 backoff_time = min(current_interval * 2, 1800)  # Max 30 minutes
 
             LOGGER.warning(

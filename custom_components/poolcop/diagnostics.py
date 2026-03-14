@@ -49,7 +49,11 @@ async def async_get_config_entry_diagnostics(
         },
         "coordinator": {
             "flow_rates": coordinator.flow_rates,
-            "update_interval_seconds": coordinator.update_interval.total_seconds(),
+            "update_interval_seconds": (
+                coordinator.update_interval.total_seconds()
+                if coordinator.update_interval
+                else None
+            ),
         },
     }
 

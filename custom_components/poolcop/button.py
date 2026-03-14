@@ -21,7 +21,7 @@ async def async_setup_entry(
     async_add_entities([PoolCopClearAlarmButton(coordinator)])
 
 
-class PoolCopClearAlarmButton(PoolCopEntity, ButtonEntity):
+class PoolCopClearAlarmButton(PoolCopEntity, ButtonEntity):  # type: ignore[misc]
     """Button to clear PoolCop alarms."""
 
     _attr_has_entity_name = True

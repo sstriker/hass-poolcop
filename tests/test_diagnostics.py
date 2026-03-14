@@ -106,3 +106,32 @@ async def test_diagnostics_no_data(
 
     assert "config_entry" in result
     assert "data" not in result
+
+
+async def test_diagnostics_redacts_api_token(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """api_token in status → redacted (line 63)."""
+    mock_poolcop_data["api_token"] = {
+        "token": "secret-token-value",
+        "expire": 9999999,
+        "max_limit": 90,
+    }
+    await _setup_coordinator(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    result = await async_get_config_entry_diagnostics(hass, mock_config_entry)
+
+    api_token = result["data"]["status"].get("api_token", {})
+    assert api_token.get("token") == "**REDACTED**"
+
+
+async def test_diagnostics_pool_non_dict(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Pool is non-dict → replaced with REDACTED (line 88)."""
+    mock_poolcop_data["Pool"] = "some-string-value"
+    await _setup_coordinator(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    result = await async_get_config_entry_diagnostics(hass, mock_config_entry)
+
+    assert result["data"]["status"]["Pool"] == "**REDACTED**"

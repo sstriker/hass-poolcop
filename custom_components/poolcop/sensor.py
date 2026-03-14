@@ -5,7 +5,7 @@ from __future__ import annotations
 import zoneinfo
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -59,14 +59,14 @@ from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopSensorEntityDescriptionMixin:
     """Mixin for required keys."""
 
     value_fn: Callable[[PoolCopData], str | int | float | datetime | None]
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopSensorEntityDescription(
     SensorEntityDescription, PoolCopSensorEntityDescriptionMixin
 ):
@@ -174,6 +174,7 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         hour, minute, second = map(int, time_str.split(":"))
 
         # Try using the provided timezone
+        tz_info: tzinfo
         try:
             tz_info = zoneinfo.ZoneInfo(timezone)
         except (ValueError, zoneinfo.ZoneInfoNotFoundError):
@@ -215,6 +216,18 @@ def _timer_fn(timer_name: str, field: str) -> Callable[[PoolCopData], Any]:
         except (KeyError, AttributeError):
             pass
         return None
+
+    return value_fn
+
+
+def _make_enabled_fn(
+    timer_key: str,
+) -> Callable[[PoolCopData], str | None]:
+    """Return a value function that checks if a timer is enabled."""
+
+    def value_fn(data: PoolCopData) -> str | None:
+        val = _timer_fn(timer_key, "enabled")(data)
+        return "Enabled" if val == 1 else "Disabled"
 
     return value_fn
 
@@ -409,8 +422,8 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
         value_fn=lambda data: (
-            round(_cycle_elapsed_time_fn(data) / 60)
-            if _cycle_elapsed_time_fn(data) is not None
+            round(elapsed / 60)
+            if (elapsed := _cycle_elapsed_time_fn(data)) is not None
             else None
         ),
     ),
@@ -421,8 +434,8 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.MINUTES,
         value_fn=lambda data: (
-            round(_cycle_time_remaining_fn(data) / 60)
-            if _cycle_time_remaining_fn(data) is not None
+            round(remaining / 60)
+            if (remaining := _cycle_time_remaining_fn(data)) is not None
             else None
         ),
     ),
@@ -898,9 +911,7 @@ async def async_setup_entry(
                     device_class=SensorDeviceClass.ENUM,
                     options=["Disabled", "Enabled"],
                     entity_category=EntityCategory.DIAGNOSTIC,
-                    value_fn=lambda data, k=timer_key: (
-                        "Enabled" if _timer_fn(k, "enabled")(data) == 1 else "Disabled"
-                    ),
+                    value_fn=_make_enabled_fn(timer_key),
                 ),
             )
         )

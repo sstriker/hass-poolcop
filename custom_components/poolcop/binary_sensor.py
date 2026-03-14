@@ -30,7 +30,7 @@ from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopBinarySensorEntityDescriptionMixin:
     """Mixin for required keys."""
 
@@ -38,7 +38,7 @@ class PoolCopBinarySensorEntityDescriptionMixin:
     on_off_icons: tuple[str, str]
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopBinarySensorEntityDescription(
     BinarySensorEntityDescription, PoolCopBinarySensorEntityDescriptionMixin
 ):
@@ -333,7 +333,7 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
         return icons[0] if self.is_on else icons[1]
 
 
-class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):
+class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore[misc]
     """Binary sensor for a non-switchable PoolCop auxiliary input."""
 
     _attr_has_entity_name = True
