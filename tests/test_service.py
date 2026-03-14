@@ -183,3 +183,87 @@ async def test_service_unload_not_registered(hass: HomeAssistant):
     # Services not registered yet — should not crash
     await async_unload_services(hass)
     assert not hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED)
+
+
+async def test_service_toggle_pump_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """ConnectionError in toggle_pump is logged, not raised."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_poolcop.toggle_pump.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True
+    )
+
+
+async def test_service_toggle_aux_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """ConnectionError in toggle_aux is logged, not raised."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_poolcop.toggle_auxiliary.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_TOGGLE_AUX, {"aux_id": 4}, blocking=True
+    )
+
+
+async def test_service_set_valve_position_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """ConnectionError in set_valve_position is logged, not raised."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_poolcop.set_valve_position.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_SET_VALVE_POSITION, {"position": "filter"}, blocking=True
+    )
+
+
+async def test_service_clear_alarm_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """ConnectionError in clear_alarm is logged, not raised."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    mock_poolcop.clear_alarm.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True
+    )

@@ -107,3 +107,116 @@ async def test_aux_switch_idempotent(
         blocking=True,
     )
     mock_poolcop.toggle_auxiliary.assert_not_called()
+
+
+async def test_aux_switch_is_on_returns_none_when_not_found(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """is_on returns None when aux id not found in aux list."""
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 4:
+            aux["status"] = 1
+    coordinator = await _setup_integration(
+        hass, mock_config_entry, mock_poolcop, mock_poolcop_data
+    )
+
+    # Remove aux 4 from the data so is_on cannot find it
+    from custom_components.poolcop.coordinator import PoolCopData
+
+    modified_data = dict(mock_poolcop_data)
+    modified_data["PoolCop"] = dict(modified_data["PoolCop"])
+    modified_data["PoolCop"]["aux"] = [
+        a for a in modified_data["PoolCop"]["aux"] if a["id"] != 4
+    ]
+    coordinator.data = PoolCopData(status=modified_data)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.test_pool_transfer_pump")
+    assert state is not None
+    # When is_on returns None, HA shows state as unknown
+    assert state.state == "unknown"
+
+
+async def test_aux_switch_extra_state_attributes_not_found(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """extra_state_attributes returns {} when aux not found."""
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 4:
+            aux["status"] = 0
+    coordinator = await _setup_integration(
+        hass, mock_config_entry, mock_poolcop, mock_poolcop_data
+    )
+
+    # Remove aux 4 from data
+    from custom_components.poolcop.coordinator import PoolCopData
+
+    modified_data = dict(mock_poolcop_data)
+    modified_data["PoolCop"] = dict(modified_data["PoolCop"])
+    modified_data["PoolCop"]["aux"] = [
+        a for a in modified_data["PoolCop"]["aux"] if a["id"] != 4
+    ]
+    coordinator.data = PoolCopData(status=modified_data)
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("switch.test_pool_transfer_pump")
+    assert state is not None
+    # No label, slave, or days attributes when aux not found
+    assert "label" not in state.attributes
+    assert "slave" not in state.attributes
+
+
+async def test_aux_switch_icon_no_label_match(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """icon returns None when label_id has no icon mapping."""
+    # Change aux 4's label to one without an icon mapping (label_aux_15 = "Available")
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 4:
+            aux["label"] = "label_aux_15"
+            aux["status"] = 0
+            aux["switchable"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    state = hass.states.get("switch.test_pool_available")
+    assert state is not None
+    # label_id 15 is not in AUX_LABEL_ICONS, so icon should not be set
+    assert "icon" not in state.attributes
+
+
+async def test_aux_switch_turn_off_when_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """turn_off when aux is on calls toggle_auxiliary."""
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 4:
+            aux["status"] = 1
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    await hass.services.async_call(
+        "switch",
+        "turn_off",
+        {"entity_id": "switch.test_pool_transfer_pump"},
+        blocking=True,
+    )
+    mock_poolcop.toggle_auxiliary.assert_called_once_with(4)
+
+
+async def test_aux_switch_turn_off_when_already_off(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """turn_off when already off does not call toggle_auxiliary."""
+    for aux in mock_poolcop_data["PoolCop"]["aux"]:
+        if aux["id"] == 4:
+            aux["status"] = 0
+    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+
+    await hass.services.async_call(
+        "switch",
+        "turn_off",
+        {"entity_id": "switch.test_pool_transfer_pump"},
+        blocking=True,
+    )
+    mock_poolcop.toggle_auxiliary.assert_not_called()

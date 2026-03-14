@@ -98,3 +98,40 @@ async def test_migrate_v1_to_v2(
     assert mock_v1_config_entry.options[CONF_FLOW_RATE_1] == 10.0
     assert mock_v1_config_entry.options[CONF_FLOW_RATE_2] == 15.0
     assert mock_v1_config_entry.options[CONF_FLOW_RATE_3] == 20.0
+
+
+async def test_async_reload_entry(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Test reload entry calls unload then setup."""
+    from unittest.mock import AsyncMock
+
+    from custom_components.poolcop import async_reload_entry
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Patch both unload and setup so reload doesn't need a real coordinator
+    with (
+        patch(
+            "custom_components.poolcop.async_unload_entry",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_unload,
+        patch(
+            "custom_components.poolcop.async_setup_entry",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as mock_setup,
+    ):
+        await async_reload_entry(hass, mock_config_entry)
+
+    mock_unload.assert_called_once_with(hass, mock_config_entry)
+    mock_setup.assert_called_once_with(hass, mock_config_entry)

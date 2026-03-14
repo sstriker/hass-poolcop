@@ -265,3 +265,79 @@ async def test_user_flow_unknown_error(hass: HomeAssistant):
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "unknown"
+
+
+async def test_user_flow_flowrate_conversion_error(hass: HomeAssistant):
+    """Flowrate string that can't be converted to float is logged and skipped."""
+    mock_poolcop = AsyncMock()
+    mock_poolcop.poolcop_id = "test-id"
+    mock_poolcop.status.return_value = {
+        "PoolCop": {
+            "settings": {
+                "pump": {"nb_speed": 3, "flowrate": "not-a-number"},
+                "pool": {"volume": 50},
+            },
+        },
+    }
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "key"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "flow_rates"
+
+
+async def test_reauth_unknown_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop
+):
+    """Generic error during reauth shows unknown error."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": "reauth", "entry_id": mock_config_entry.entry_id},
+        data=mock_config_entry.data,
+    )
+    assert result["step_id"] == "reauth_confirm"
+
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopilot",
+    ) as mock_cls:
+        mock_cls.return_value.status.side_effect = ValueError("boom")
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "new-key"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "unknown"
+
+
+async def test_user_flow_generic_poolcop_error(hass: HomeAssistant):
+    """PoolCopilotError (not connection, not auth) in validate_input raises CannotConnect."""
+    from poolcop import PoolCopilotError
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopilot",
+    ) as mock_cls:
+        mock_cls.return_value.status.side_effect = PoolCopilotError("generic")
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "key"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "cannot_connect"

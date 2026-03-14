@@ -394,6 +394,34 @@ async def test_status_value_non_dict_intermediate(mock_poolcop_data):
     assert data.status_value("temperature.water.something") is None
 
 
+async def test_daily_volume_date_exception(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """datetime.now() exception sets today=None without crashing."""
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+        # Mock datetime.now to raise, triggering the except branch (lines 183-184)
+        with patch(
+            "custom_components.poolcop.coordinator.datetime"
+        ) as mock_dt:
+            mock_dt.now.side_effect = RuntimeError("broken clock")
+            # Should not crash — today=None means no date reset
+            coordinator._update_daily_volume()
+
+    # Verify the method completed without error
+    assert coordinator._last_flow_update is not None
+
+
 async def test_status_value_exception_handler():
     """status_value exception handler covers lines 80-84."""
     # Status with a value that is not a dict but not None either (list),
