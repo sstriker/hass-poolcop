@@ -8,29 +8,50 @@ PoolCop is an advanced pool automation system that monitors and controls essenti
 
 ## Features
 
-- **Comprehensive Sensor Data:**
+- **Sensors:**
   - Water and air temperature
-  - pH and ORP (Oxidation-Reduction Potential) readings with setpoints
+  - pH and ORP (Oxidation-Reduction Potential) readings
   - Pressure readings
   - Water level status
-  - Pump status and speed
-  - Valve positions
-  - Filtration times and statistics
-  - System operation mode
-  - Running status
+  - Pump speed and flow rate (computed from speed + configured rates)
+  - Valve position and operation mode
   - Forced filtration status and remaining time
+  - Daily filtration volume and turnovers (accumulated from pump runtime)
+  - Planned remaining filter volume and turnovers (projected from cycle timers)
+  - Cycle tracking: elapsed time, remaining time, predicted end
+  - Timer sensors for filtration cycles and auxiliary schedules
+  - Diagnostic sensors for pool, pump, filter, pH, ORP, and ioniser settings
 
-- **Control Capabilities:**
-  - Toggle pump on/off
-  - Set pump speed (for variable speed pumps)
-  - Toggle auxiliary outputs (pool lights, water features, etc.)
-  - Set valve position
-  - Clear alarms
-  - Set forced filtration mode (24h, 48h, or 72h)
+- **Binary Sensors:**
+  - Pump running state
+  - Active alarms
+  - pH and ORP control status
+  - Water valve state
+  - Auxiliary output states (with automatic labelling)
+  - Network connectivity
 
-- **Configuration Support:**
-  - Custom auxiliary names from PoolCop configuration are automatically used
-  - Installed equipment detection (pH control, ORP control, ionizer, etc.)
+- **Controls:**
+  - Pump on/off switch
+  - Auxiliary output switches (pool lights, water features, etc.)
+  - Forced filtration mode selector (off, 24h, 48h, 72h)
+  - Clear alarm button
+
+- **Services:**
+  - `poolcop.toggle_pump` — toggle the pump on/off
+  - `poolcop.set_pump_speed` — set speed (1-3)
+  - `poolcop.toggle_aux` — toggle an auxiliary output (1-6)
+  - `poolcop.set_valve_position` — set valve position (1-6)
+  - `poolcop.clear_alarm` — clear active alarms
+  - `poolcop.set_force_filtration` — set forced filtration mode
+
+- **Device Tracker:**
+  - Pool location on the map (from PoolCopilot GPS coordinates)
+  - Pool image from PoolCopilot
+
+- **Smart Polling:**
+  - 45-second normal interval, 30-second during cycle/timer transitions
+  - Quota-aware: backs off automatically when API rate limit is low
+  - Learns cycle durations for better end-time predictions
 
 ## Installation
 
@@ -52,7 +73,8 @@ PoolCop is an advanced pool automation system that monitors and controls essenti
 1. Go to **Settings** > **Devices & Services**
 2. Click **+ Add Integration** and search for "PoolCop"
 3. Enter your PoolCopilot API key (available from [poolcopilot.com/api](https://poolcopilot.com/api))
-4. Click **Submit**
+4. Configure pump flow rates for each speed level (used for volume/turnover calculations)
+5. Click **Submit**
 
 ## API Key
 
@@ -61,20 +83,3 @@ An API key is required to authenticate with the PoolCopilot API. You can obtain 
 1. Creating an account at [poolcopilot.com](https://poolcopilot.com)
 2. Linking your PoolCop device
 3. Requesting an API key from the API section
-
-## Services
-
-The integration provides several services to control your PoolCop system:
-
-- `poolcop.toggle_pump`: Toggle the pump on/off
-- `poolcop.set_pump_speed`: Set the pump speed (1-3)
-- `poolcop.toggle_aux`: Toggle an auxiliary output (1-6)
-- `poolcop.set_valve_position`: Set the valve position (1-6)
-- `poolcop.clear_alarm`: Clear active alarms
-- `poolcop.set_force_filtration`: Set forced filtration mode (24, 48, or 72 hours)
-
-## Troubleshooting
-
-- If sensors show "unavailable," ensure your API key is correct and your PoolCop system is online
-- The integration refreshes data approximately every 12 seconds to respect API rate limits
-- Check Home Assistant logs for detailed error information

@@ -10,7 +10,7 @@ DOMAIN: Final = "poolcop"
 LOGGER = logging.getLogger(__package__)
 
 # Update intervals (in seconds)
-NORMAL_UPDATE_INTERVAL = 120  # 2 minutes during normal operation
+NORMAL_UPDATE_INTERVAL = 45  # 45 seconds during normal operation
 TRANSITION_UPDATE_INTERVAL = 30  # 30 seconds when transitions are imminent
 CYCLE_END_PREDICTION_WINDOW = 300  # 5 minutes before predicted cycle end
 
