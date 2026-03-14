@@ -1,5 +1,6 @@
 """Test PoolCop coordinator functionality."""
 
+import time
 from unittest.mock import patch
 
 import pytest
@@ -209,17 +210,13 @@ async def test_rate_limit_exponential_backoff(
     assert coordinator.update_interval.total_seconds() == 30
 
 
-async def test_alarm_fetch_on_count_change(
+async def test_rate_limit_grace_period_serves_stale_data(
     hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
 ):
-    """New alarm triggers alarm_history call."""
-    mock_poolcop_data["PoolCop"]["alerts"] = [
-        {"code": 5, "description": "alert_title_5"}
-    ]
+    """Rate limit within grace period returns last known data."""
+    from poolcop import PoolCopilotRateLimitError
+
     mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {
-        "alarms": [{"code": 5, "description": "pH Low"}]
-    }
     mock_config_entry.add_to_hass(hass)
 
     with patch(
@@ -229,25 +226,50 @@ async def test_alarm_fetch_on_count_change(
         coordinator = PoolCopDataUpdateCoordinator(
             hass=hass, api_key="test-api-key", config_entry=mock_config_entry
         )
-        await coordinator._async_update_data()
+        # First call succeeds — simulate HA storing the result
+        first_data = await coordinator._async_update_data()
+        coordinator.data = first_data
 
-    mock_poolcop.alarm_history.assert_called_once_with(0)
+        # Second call hits rate limit — should return stale data, not raise
+        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+        result = await coordinator._async_update_data()
+        assert result is first_data
 
 
-async def test_alarm_fetch_filters_cleared(
+async def test_rate_limit_past_grace_period_raises(
     hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
 ):
-    """cleared=True alarms excluded."""
+    """Rate limit beyond grace period raises UpdateFailed."""
+    from poolcop import PoolCopilotRateLimitError
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        first_data = await coordinator._async_update_data()
+        coordinator.data = first_data
+
+        # Simulate rate limit that started long ago
+        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+        coordinator._rate_limit_since = time.time() - 1000  # >900s ago
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+
+
+async def test_active_alarms_from_status(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Active alarms come from status alerts array."""
     mock_poolcop_data["PoolCop"]["alerts"] = [
         {"code": 5, "description": "alert_title_5"}
     ]
     mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {
-        "alarms": [
-            {"code": 5, "description": "pH Low", "cleared": False},
-            {"code": 6, "description": "ORP Low", "cleared": True},
-        ]
-    }
     mock_config_entry.add_to_hass(hass)
 
     with patch(
@@ -259,55 +281,8 @@ async def test_alarm_fetch_filters_cleared(
         )
         data = await coordinator._async_update_data()
 
-    # Only non-cleared alarm should be in active_alarms
     assert len(data.active_alarms) == 1
     assert data.active_alarms[0]["code"] == 5
-
-
-async def test_alarm_fetch_interval_respected(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
-):
-    """Same count within interval → no re-fetch."""
-
-    mock_poolcop_data["PoolCop"]["alerts"] = [
-        {"code": 5, "description": "alert_title_5"}
-    ]
-    mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {"alarms": []}
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        # First call triggers fetch
-        await coordinator._async_update_data()
-        assert mock_poolcop.alarm_history.call_count == 1
-
-        # Second call with same count within interval → no re-fetch
-        await coordinator._async_update_data()
-        assert mock_poolcop.alarm_history.call_count == 1
-
-
-async def test_get_alarm_history_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop
-):
-    """ConnectionError re-raised."""
-    mock_poolcop.alarm_history.side_effect = PoolCopilotConnectionError("error")
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        with pytest.raises(PoolCopilotConnectionError):
-            await coordinator.async_get_alarm_history(0)
 
 
 async def test_get_command_history_error(
@@ -367,10 +342,11 @@ async def test_save_load_learned_data(
 
         # Mock the Store methods directly
         coordinator._store.async_save = AsyncMock()
+        # JSON serializes int keys as strings; simulate that
         coordinator._store.async_load = AsyncMock(
             return_value={
-                "cycle_durations": {1: 9999},
-                "flow_rates": {2: 18.0},
+                "cycle_durations": {"1": 9999},
+                "flow_rates": {"2": 18.0},
             }
         )
 
@@ -381,7 +357,7 @@ async def test_save_load_learned_data(
         assert "cycle_durations" in saved
         assert "flow_rates" in saved
 
-        # Verify load restores data
+        # Verify load converts string keys back to int
         await coordinator.async_load_learned_data()
         assert coordinator._cycle_durations[1] == 9999
         assert coordinator.flow_rates[2] == 18.0
@@ -426,5 +402,3 @@ async def test_status_value_non_dict_node():
     """Non-dict intermediate node (list) → isinstance guard returns None."""
     data = PoolCopData(status={"PoolCop": [1, 2, 3]})
     assert data.status_value("temperature.water") is None
-
-

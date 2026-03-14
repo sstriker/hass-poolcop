@@ -18,8 +18,13 @@ UPDATE_INTERVAL = 15
 MIN_UPDATE_INTERVAL = 10  # Floor: never poll faster than every 10s
 MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 
-# Alarm fetching interval (in seconds)
-ALARM_FETCH_INTERVAL = 14400  # 4 hours
+# Quota reserve: stop polling this many calls before exhaustion so the
+# token window can expire and refresh without hitting a rate limit.
+QUOTA_RESERVE = 3
+
+# How long (seconds) to serve stale data on rate limit before raising UpdateFailed.
+# Roughly one token window (~15 min); if rate-limited longer, something is wrong.
+RATE_LIMIT_GRACE_PERIOD = 900
 
 # Storage constants
 STORAGE_KEY = "poolcop_learned_data"

@@ -206,7 +206,7 @@ async def test_has_active_alarms():
 
 
 async def test_dynamic_interval_normal_quota(coordinator):
-    """Test dynamic interval: 900s remaining / 60 quota = 15s."""
+    """Test dynamic interval: 900s / (60 - 3 reserve) ≈ 15.8s."""
     coordinator.data = PoolCopData(status=_make_status())
     coordinator.poolcopilot.token_limit = 60
     coordinator.poolcopilot.token_expire = time.time() + 900
@@ -216,7 +216,7 @@ async def test_dynamic_interval_normal_quota(coordinator):
         await coordinator._async_update_data()
 
     interval = coordinator.update_interval.total_seconds()
-    assert 14.9 <= interval <= 15.1
+    assert 15.5 <= interval <= 16.0
 
 
 async def test_dynamic_interval_low_quota(coordinator):
@@ -229,7 +229,7 @@ async def test_dynamic_interval_low_quota(coordinator):
     with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
-    # 900 / 3 = 300 → clamped to MAX_UPDATE_INTERVAL (120)
+    # 900 / max(3-3, 1) = 900 → clamped to MAX_UPDATE_INTERVAL (120)
     interval = coordinator.update_interval.total_seconds()
     assert interval == MAX_UPDATE_INTERVAL
 
@@ -244,7 +244,7 @@ async def test_dynamic_interval_high_quota(coordinator):
     with patch.object(coordinator, "_store", AsyncMock()):
         await coordinator._async_update_data()
 
-    # 900 / 200 = 4.5 → clamped to MIN_UPDATE_INTERVAL (10)
+    # 900 / (200-3) ≈ 4.6 → clamped to MIN_UPDATE_INTERVAL (10)
     interval = coordinator.update_interval.total_seconds()
     assert interval == MIN_UPDATE_INTERVAL
 
