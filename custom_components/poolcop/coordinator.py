@@ -613,6 +613,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             ) from err
         except PoolCopilotConnectionError as err:
             raise UpdateFailed("Error communicating with PoolCopilot API") from err
+        except Exception as err:
+            LOGGER.exception("Unexpected error processing PoolCop data: %s", err)
+            raise UpdateFailed(f"Unexpected error: {err}") from err
         else:
             return data
 
