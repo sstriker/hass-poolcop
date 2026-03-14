@@ -399,7 +399,7 @@ async def test_cycle_stop_before_start(coordinator):
 
 
 async def test_cycle_invalid_time_string(coordinator):
-    """Cycle with unparseable time string -> 0 remaining."""
+    """Cycle with unparsable time string -> 0 remaining."""
     status = _make_status(
         op_mode=4,
         cycle1_enabled=1, cycle1_start="bad", cycle1_stop="also_bad",
