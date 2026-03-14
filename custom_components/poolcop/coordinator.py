@@ -66,21 +66,14 @@ class PoolCopData(NamedTuple):
         """Get value from a path (e.g. 'temperature.water') from the Poolcop status."""
         full_path = f"{prefix}.{path}"
 
-        try:
-            result = self.status
-            for part in filter(None, full_path.split(".")):
-                if not isinstance(result, dict):
-                    return None
-                result = result.get(part)
-                if result is None:
-                    return None
-        except (KeyError, TypeError) as err:
-            LOGGER.debug(
-                "Error accessing path %s with prefix %s: %s", path, prefix, err
-            )
-            return None
-        else:
-            return result
+        result = self.status
+        for part in filter(None, full_path.split(".")):
+            if not isinstance(result, dict):
+                return None
+            result = result.get(part)
+            if result is None:
+                return None
+        return result
 
     def has_active_alarms(self) -> bool:
         """Check if there are any active alarms."""

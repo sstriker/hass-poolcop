@@ -422,16 +422,9 @@ async def test_daily_volume_date_exception(
     assert coordinator._last_flow_update is not None
 
 
-async def test_status_value_exception_handler():
-    """status_value exception handler covers lines 80-84."""
-    # Status with a value that is not a dict but not None either (list),
-    # where accessing .get() would raise TypeError in the except block.
-    # Actually the isinstance check handles this, but we need to trigger
-    # KeyError/TypeError. Use a status where the PoolCop key is a non-dict
-    # that doesn't support .get() — e.g., a list.
+async def test_status_value_non_dict_node():
+    """Non-dict intermediate node (list) → isinstance guard returns None."""
     data = PoolCopData(status={"PoolCop": [1, 2, 3]})
-    # Traversal: result = {"PoolCop": [1,2,3]}, then result = [1,2,3]
-    # then isinstance([1,2,3], dict) → False → return None
     assert data.status_value("temperature.water") is None
 
 

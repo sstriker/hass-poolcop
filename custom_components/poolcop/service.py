@@ -96,11 +96,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     async def async_set_valve_position(service_call: ServiceCall) -> None:
         """Set the valve position."""
         position_name = service_call.data["position"]
-        position_value = VALVE_POSITIONS.get(position_name.lower())
-
-        if position_value is None:
-            LOGGER.error("Invalid valve position: %s", position_name)
-            return
+        position_value = VALVE_POSITIONS[position_name.lower()]
 
         coordinators = [
             value
