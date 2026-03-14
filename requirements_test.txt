@@ -3,4 +3,4 @@ pytest-asyncio>=0.21
 pytest-cov>=4.0
 pytest-homeassistant-custom-component>=0.13
 aiohttp>=3.0
-poolcop==0.6.0
+poolcop==0.7.0
