@@ -210,7 +210,6 @@ def mock_poolcop():
         poolcop.set_valve_position = AsyncMock(return_value={"result": "ok"})
         poolcop.clear_alarm = AsyncMock(return_value={"result": "ok"})
         poolcop.set_force_filtration = AsyncMock(return_value={"result": "ok"})
-        poolcop.alarm_history = AsyncMock(return_value={"alarms": []})
         poolcop.command_history = AsyncMock(return_value={"commands": []})
         poolcop.close = AsyncMock()
         poolcop.token_limit = 89

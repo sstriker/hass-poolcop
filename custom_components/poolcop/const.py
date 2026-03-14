@@ -18,9 +18,6 @@ UPDATE_INTERVAL = 15
 MIN_UPDATE_INTERVAL = 10  # Floor: never poll faster than every 10s
 MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 
-# Alarm fetching interval (in seconds)
-ALARM_FETCH_INTERVAL = 14400  # 4 hours
-
 # Storage constants
 STORAGE_KEY = "poolcop_learned_data"
 STORAGE_VERSION = 1

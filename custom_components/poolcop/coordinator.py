@@ -24,7 +24,6 @@ from poolcop import (  # type: ignore[attr-defined]  # namespace collision with 
 )
 
 from .const import (
-    ALARM_FETCH_INTERVAL,
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
@@ -54,8 +53,6 @@ class PoolCopData(NamedTuple):
     """Class for defining data in dict."""
 
     status: dict[str, Any] | None
-    alarms: dict[str, Any] | None = None
-    commands: dict[str, Any] | None = None
     active_alarms: list[dict[str, Any]] | None = None
     cycle_status: dict[str, Any] | None = None  # For tracking cycle information
     last_command_result: dict[str, Any] | None = (
@@ -116,11 +113,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         # Setup storage for persisting learned data
         self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{api_key}")
-
-        # Track when we last fetched alarms to avoid excessive API calls
-        self._last_alarm_fetch: float = 0
-        self._active_alarms: list[dict[str, Any]] = []
-        self._previous_alarm_count: int = 0
 
         # Daily filtration volume tracking
         self._daily_volume: float = 0.0  # m³ filtered today
@@ -510,49 +502,13 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             # Seed cycle durations from settings (only overrides defaults)
             self._seed_cycle_durations_from_settings(status)
 
-            # Active alarms from status alerts array (always present, no extra API call)
-            alarm_data = None
-            status_alerts = status.get("PoolCop", {}).get("alerts", [])
-            self._active_alarms = status_alerts if status_alerts else []
-
-            # Optionally fetch detailed alarm history for richer data
+            # Active alarms from status alerts array (always present)
             current_time = time.time()
-            alarm_count = len(status_alerts)
-            should_fetch_alarms = alarm_count > 0 and (
-                current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
-                or alarm_count != self._previous_alarm_count
-            )
-
-            if should_fetch_alarms:
-                LOGGER.debug(
-                    "Fetching alarm history: previous_count=%s, current_count=%s",
-                    self._previous_alarm_count,
-                    alarm_count,
-                )
-                try:
-                    alarm_data = await self.poolcopilot.alarm_history(0)
-
-                    # If alarm_history returns richer data, prefer it
-                    if alarm_data and "alarms" in alarm_data:
-                        history_alarms = [
-                            alarm
-                            for alarm in alarm_data.get("alarms", [])
-                            if not alarm.get("cleared")
-                        ]
-                        if history_alarms:
-                            self._active_alarms = history_alarms
-
-                    self._last_alarm_fetch = float(current_time)
-                    self._previous_alarm_count = int(alarm_count)
-                except (PoolCopilotConnectionError, PoolCopilotRateLimitError) as err:
-                    LOGGER.warning("Failed to fetch alarm history: %s", err)
-                    # Still mark as fetched to avoid retrying every cycle
-                    self._last_alarm_fetch = float(current_time)
+            status_alerts = status.get("PoolCop", {}).get("alerts", [])
 
             data = PoolCopData(
                 status=status,
-                alarms=alarm_data,
-                active_alarms=self._active_alarms,
+                active_alarms=status_alerts if status_alerts else [],
                 cycle_status=self._update_cycle_tracking(status),
             )
 
@@ -624,14 +580,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         else:
             return data
 
-    async def async_get_alarm_history(self, offset: int = 0) -> dict[str, Any]:
-        """Get alarm history from PoolCop."""
-        try:
-            return await self.poolcopilot.alarm_history(offset)
-        except PoolCopilotConnectionError as err:
-            LOGGER.error("Error fetching alarm history: %s", err)
-            raise
-
     async def async_get_command_history(self, offset: int = 0) -> dict[str, Any]:
         """Get command history from PoolCop."""
         try:
@@ -701,8 +649,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Clear active alarms."""
         result = await self.poolcopilot.clear_alarm()
         self._update_command_result(result)
-        self._last_alarm_fetch = 0
-        self._active_alarms = []
         LOGGER.debug("Cleared alarms, result: %s", result)
 
     async def toggle_auxiliary(self, aux_id: int) -> None:

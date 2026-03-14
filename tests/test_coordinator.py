@@ -209,45 +209,14 @@ async def test_rate_limit_exponential_backoff(
     assert coordinator.update_interval.total_seconds() == 30
 
 
-async def test_alarm_fetch_on_count_change(
+async def test_active_alarms_from_status(
     hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
 ):
-    """New alarm triggers alarm_history call."""
+    """Active alarms come from status alerts array."""
     mock_poolcop_data["PoolCop"]["alerts"] = [
         {"code": 5, "description": "alert_title_5"}
     ]
     mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {
-        "alarms": [{"code": 5, "description": "pH Low"}]
-    }
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        await coordinator._async_update_data()
-
-    mock_poolcop.alarm_history.assert_called_once_with(0)
-
-
-async def test_alarm_fetch_filters_cleared(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
-):
-    """cleared=True alarms excluded."""
-    mock_poolcop_data["PoolCop"]["alerts"] = [
-        {"code": 5, "description": "alert_title_5"}
-    ]
-    mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {
-        "alarms": [
-            {"code": 5, "description": "pH Low", "cleared": False},
-            {"code": 6, "description": "ORP Low", "cleared": True},
-        ]
-    }
     mock_config_entry.add_to_hass(hass)
 
     with patch(
@@ -259,55 +228,8 @@ async def test_alarm_fetch_filters_cleared(
         )
         data = await coordinator._async_update_data()
 
-    # Only non-cleared alarm should be in active_alarms
     assert len(data.active_alarms) == 1
     assert data.active_alarms[0]["code"] == 5
-
-
-async def test_alarm_fetch_interval_respected(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
-):
-    """Same count within interval → no re-fetch."""
-
-    mock_poolcop_data["PoolCop"]["alerts"] = [
-        {"code": 5, "description": "alert_title_5"}
-    ]
-    mock_poolcop.status.return_value = mock_poolcop_data
-    mock_poolcop.alarm_history.return_value = {"alarms": []}
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        # First call triggers fetch
-        await coordinator._async_update_data()
-        assert mock_poolcop.alarm_history.call_count == 1
-
-        # Second call with same count within interval → no re-fetch
-        await coordinator._async_update_data()
-        assert mock_poolcop.alarm_history.call_count == 1
-
-
-async def test_get_alarm_history_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop
-):
-    """ConnectionError re-raised."""
-    mock_poolcop.alarm_history.side_effect = PoolCopilotConnectionError("error")
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        with pytest.raises(PoolCopilotConnectionError):
-            await coordinator.async_get_alarm_history(0)
 
 
 async def test_get_command_history_error(
@@ -426,5 +348,3 @@ async def test_status_value_non_dict_node():
     """Non-dict intermediate node (list) → isinstance guard returns None."""
     data = PoolCopData(status={"PoolCop": [1, 2, 3]})
     assert data.status_value("temperature.water") is None
-
-
