@@ -1060,7 +1060,6 @@ class PlannedRemainingVolumeSensor(PoolCopSensorEntity):
 
     _attr_has_entity_name = True
     _attr_native_unit_of_measurement = UnitOfVolume.CUBIC_METERS
-    _attr_device_class = SensorDeviceClass.VOLUME
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:water-outline"
 

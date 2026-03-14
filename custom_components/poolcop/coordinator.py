@@ -529,20 +529,25 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     self._previous_alarm_count,
                     alarm_count,
                 )
-                alarm_data = await self.poolcopilot.alarm_history(0)
+                try:
+                    alarm_data = await self.poolcopilot.alarm_history(0)
 
-                # If alarm_history returns richer data, prefer it
-                if alarm_data and "alarms" in alarm_data:
-                    history_alarms = [
-                        alarm
-                        for alarm in alarm_data.get("alarms", [])
-                        if not alarm.get("cleared")
-                    ]
-                    if history_alarms:
-                        self._active_alarms = history_alarms
+                    # If alarm_history returns richer data, prefer it
+                    if alarm_data and "alarms" in alarm_data:
+                        history_alarms = [
+                            alarm
+                            for alarm in alarm_data.get("alarms", [])
+                            if not alarm.get("cleared")
+                        ]
+                        if history_alarms:
+                            self._active_alarms = history_alarms
 
-                self._last_alarm_fetch = float(current_time)
-                self._previous_alarm_count = int(alarm_count)
+                    self._last_alarm_fetch = float(current_time)
+                    self._previous_alarm_count = int(alarm_count)
+                except (PoolCopilotConnectionError, PoolCopilotRateLimitError) as err:
+                    LOGGER.warning("Failed to fetch alarm history: %s", err)
+                    # Still mark as fetched to avoid retrying every cycle
+                    self._last_alarm_fetch = float(current_time)
 
             data = PoolCopData(
                 status=status,
@@ -613,6 +618,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             ) from err
         except PoolCopilotConnectionError as err:
             raise UpdateFailed("Error communicating with PoolCopilot API") from err
+        except Exception as err:
+            LOGGER.exception("Unexpected error processing PoolCop data: %s", err)
+            raise UpdateFailed(f"Unexpected error: {err}") from err
         else:
             return data
 
