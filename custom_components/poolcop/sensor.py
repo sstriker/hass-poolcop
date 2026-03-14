@@ -120,7 +120,6 @@ def _description_attrs_fn(
     return attrs_fn
 
 
-
 def _is_cycle_mode(data: PoolCopData) -> bool:
     """Return True if the current operating mode uses filtration cycles."""
     mode = data.status_value("status.poolcop")
@@ -177,7 +176,7 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         tz_info: tzinfo
         try:
             tz_info = zoneinfo.ZoneInfo(timezone)
-        except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+        except ValueError, zoneinfo.ZoneInfoNotFoundError:
             # Fall back to system timezone if provided timezone is invalid
             from datetime import timezone as dt_timezone
             from time import localtime
@@ -199,7 +198,7 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
         if result < now and hour < 12:
             result = result + timedelta(days=1)
-    except (ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError):
+    except ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError:
         return None
     else:
         return result
@@ -213,7 +212,7 @@ def _timer_fn(timer_name: str, field: str) -> Callable[[PoolCopData], Any]:
             timer = data.status_value(f"timers.{timer_name}")
             if timer:
                 return timer.get(field)
-        except (KeyError, AttributeError):
+        except KeyError, AttributeError:
             pass
         return None
 
@@ -274,7 +273,7 @@ def _weekday_mapping_fn(path: str) -> Callable[[PoolCopData], str | None]:
             day_index = int(value)
             if 0 <= day_index < len(WEEKDAYS):
                 return WEEKDAYS[day_index]
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
         return None
 
@@ -344,7 +343,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(WATERLEVEL_STATES.values()),
         value_fn=_state_mapping_fn("waterlevel", WATERLEVEL_STATES),
-        extra_attrs_fn=_description_attrs_fn("waterlevel", WATERLEVEL_STATE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "waterlevel", WATERLEVEL_STATE_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="valve_position",
@@ -353,7 +354,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(VALVE_POSITION_NAMES.values()),
         value_fn=_state_mapping_fn("status.valveposition", VALVE_POSITION_NAMES),
-        extra_attrs_fn=_description_attrs_fn("status.valveposition", VALVE_POSITION_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "status.valveposition", VALVE_POSITION_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed",
@@ -369,7 +372,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(OPERATION_MODES.values()),
         value_fn=_state_mapping_fn("status.poolcop", OPERATION_MODES),
-        extra_attrs_fn=_description_attrs_fn("status.poolcop", OPERATION_MODE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "status.poolcop", OPERATION_MODE_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="last_backwash",
@@ -396,7 +401,9 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(FORCED_FILTRATION_MODES.values()),
         value_fn=_state_mapping_fn("status.forced.mode", FORCED_FILTRATION_MODES),
-        extra_attrs_fn=_description_attrs_fn("status.forced.mode", FORCED_FILTRATION_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "status.forced.mode", FORCED_FILTRATION_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="forced_filtration_remaining",
@@ -486,7 +493,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(POOL_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.pool.type", POOL_TYPES),
-        extra_attrs_fn=_description_attrs_fn("settings.pool.type", POOL_TYPE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "settings.pool.type", POOL_TYPE_DESCRIPTIONS
+        ),
     ),
     # Filter settings
     PoolCopSensorEntityDescription(
@@ -532,7 +541,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(FILTER_TIMER_MODES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.filter.timer", FILTER_TIMER_MODES),
-        extra_attrs_fn=_description_attrs_fn("settings.filter.timer", FILTER_TIMER_MODE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "settings.filter.timer", FILTER_TIMER_MODE_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="filter_mode",
@@ -577,7 +588,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(PUMP_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.pump.type", PUMP_TYPES),
-        extra_attrs_fn=_description_attrs_fn("settings.pump.type", PUMP_TYPE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "settings.pump.type", PUMP_TYPE_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="pump_flowrate",
@@ -672,7 +685,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         options=list(DISINFECTANT_TYPES.values()),
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_state_mapping_fn("settings.orp.disinfectant", DISINFECTANT_TYPES),
-        extra_attrs_fn=_description_attrs_fn("settings.orp.disinfectant", DISINFECTANT_TYPE_DESCRIPTIONS),
+        extra_attrs_fn=_description_attrs_fn(
+            "settings.orp.disinfectant", DISINFECTANT_TYPE_DESCRIPTIONS
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="orp_next_injection",

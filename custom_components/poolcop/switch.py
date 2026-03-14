@@ -118,7 +118,9 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     @property
     def icon(self) -> str | None:
         """Return the icon."""
-        icons = AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        icons = (
+            AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        )
         if icons:
             return icons[0] if self.is_on else icons[1]
         return None

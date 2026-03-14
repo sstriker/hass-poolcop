@@ -404,7 +404,9 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         """Return the icon."""
         if self._attr_device_class == BinarySensorDeviceClass.OPENING:
             return "mdi:valve-open" if self.is_on else "mdi:valve-closed"
-        icons = AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        icons = (
+            AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        )
         if icons:
             return icons[0] if self.is_on else icons[1]
         return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"

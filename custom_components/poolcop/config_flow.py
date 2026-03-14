@@ -74,7 +74,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     LOGGER.debug(
                         "Detected flow rate from API: %s m³/h", self._pump_flowrate
                     )
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     LOGGER.warning(
                         "Failed to convert flowrate value to float: %s", single_flowrate
                     )
