@@ -1,5 +1,6 @@
 """Common fixtures for the PoolCop tests."""
 
+import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -213,5 +214,5 @@ def mock_poolcop():
         poolcop.command_history = AsyncMock(return_value={"commands": []})
         poolcop.close = AsyncMock()
         poolcop.token_limit = 89
-        poolcop.token_expire = 9999999999
+        poolcop.token_expire = time.time() + 900  # 15-min window
         yield poolcop

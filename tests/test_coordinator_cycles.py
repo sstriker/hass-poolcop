@@ -1,7 +1,6 @@
-"""Test PoolCop coordinator cycle tracking and timer events."""
+"""Test PoolCop coordinator cycle tracking."""
 
 import time
-from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -9,7 +8,6 @@ from homeassistant.core import HomeAssistant
 
 from custom_components.poolcop.coordinator import (
     DEFAULT_CYCLE_DURATIONS,
-    PoolCopData,
     PoolCopDataUpdateCoordinator,
 )
 
@@ -132,143 +130,3 @@ async def test_cycle_no_transition_same_mode(coordinator):
     assert len(coordinator._cycle_transitions) == 0
 
 
-# ── Upcoming timer events ───────────────────────────────────────────
-
-
-def _make_timer_data(coordinator, timers, aux_list=None):
-    """Assign data with given timers onto coordinator."""
-    status = {
-        "PoolCop": {
-            "status": {"poolcop": 3, "pump": 1, "valveposition": 0, "pumpspeed": 2},
-            "conf": {},
-            "alarms": {"count": 0},
-            "network": {"version": "1.0"},
-            "aux": aux_list or [],
-            "settings": {"pump": {"nb_speed": 3}, "pool": {"volume": 50}},
-            "timers": timers,
-        },
-        "Pool": {"timezone": "UTC"},
-    }
-    coordinator.data = PoolCopData(status=status)
-
-
-async def test_upcoming_timer_cycle_start(coordinator):
-    """cycle1 start 5 min from now → detected."""
-    import zoneinfo
-
-    tz = zoneinfo.ZoneInfo("UTC")
-    future_dt = datetime.now(tz=tz) + timedelta(minutes=5)
-    future = future_dt.strftime("%H:%M:%S")
-    _make_timer_data(
-        coordinator, {"cycle1": {"enabled": 1, "start": future, "stop": "00:00:00"}}
-    )
-
-    # Mock _time_str_to_datetime to return a tz-aware future datetime
-    with patch.object(coordinator, "_time_str_to_datetime", return_value=future_dt):
-        result = coordinator._check_upcoming_timer_events()
-    assert result is not None
-    assert "cycle1_start" in result["type"]
-
-
-async def test_upcoming_timer_cycle_stop(coordinator):
-    """cycle1 stop 10 min from now → detected."""
-    import zoneinfo
-
-    tz = zoneinfo.ZoneInfo("UTC")
-    future_dt = datetime.now(tz=tz) + timedelta(minutes=10)
-    future = future_dt.strftime("%H:%M:%S")
-    _make_timer_data(
-        coordinator, {"cycle1": {"enabled": 1, "start": "00:00:00", "stop": future}}
-    )
-
-    with patch.object(coordinator, "_time_str_to_datetime", return_value=future_dt):
-        result = coordinator._check_upcoming_timer_events()
-    assert result is not None
-    assert "cycle1_stop" in result["type"]
-
-
-async def test_upcoming_timer_aux_switchable(coordinator):
-    """Switchable aux4 timer detected, non-switchable skipped."""
-    import zoneinfo
-
-    tz = zoneinfo.ZoneInfo("UTC")
-    future_dt = datetime.now(tz=tz) + timedelta(minutes=5)
-    future = future_dt.strftime("%H:%M:%S")
-    aux_list = [
-        {"id": 3, "switchable": False},
-        {"id": 4, "switchable": True},
-    ]
-    timers = {
-        "aux3": {"enabled": 1, "start": future, "stop": "00:00:00"},
-        "aux4": {"enabled": 1, "start": future, "stop": "00:00:00"},
-    }
-    _make_timer_data(coordinator, timers, aux_list)
-
-    with patch.object(coordinator, "_time_str_to_datetime", return_value=future_dt):
-        result = coordinator._check_upcoming_timer_events()
-    assert result is not None
-    assert "aux4" in result["type"]
-
-
-async def test_upcoming_timer_disabled_ignored(coordinator):
-    """Timer with enabled=0 skipped."""
-    future = (datetime.now() + timedelta(minutes=5)).strftime("%H:%M:%S")
-    _make_timer_data(
-        coordinator, {"cycle1": {"enabled": 0, "start": future, "stop": "00:00:00"}}
-    )
-
-    result = coordinator._check_upcoming_timer_events()
-    assert result is None
-
-
-async def test_upcoming_timer_no_data(coordinator):
-    """No data → returns None."""
-    coordinator.data = None
-    result = coordinator._check_upcoming_timer_events()
-    assert result is None
-
-
-# ── Time string parsing ─────────────────────────────────────────────
-
-
-async def test_time_str_with_pool_timezone(coordinator):
-    """'14:00:00' + Europe/Amsterdam → correct tzinfo."""
-    status = {
-        "PoolCop": {
-            "status": {"poolcop": 3},
-            "conf": {},
-            "alarms": {"count": 0},
-            "network": {"version": "1.0"},
-            "aux": [],
-            "settings": {},
-            "timers": {},
-        },
-        "Pool": {"timezone": "Europe/Amsterdam"},
-    }
-    coordinator.data = PoolCopData(status=status)
-
-    result = coordinator._time_str_to_datetime("14:00:00")
-    assert result is not None
-    assert result.hour == 14
-    assert "Amsterdam" in str(result.tzinfo) or result.tzinfo is not None
-
-
-async def test_time_str_fallback_local_tz(coordinator):
-    """No Pool timezone → local tz fallback."""
-    status = {
-        "PoolCop": {
-            "status": {"poolcop": 3},
-            "conf": {},
-            "alarms": {"count": 0},
-            "network": {"version": "1.0"},
-            "aux": [],
-            "settings": {},
-            "timers": {},
-        },
-    }
-    coordinator.data = PoolCopData(status=status)
-
-    result = coordinator._time_str_to_datetime("10:30:00")
-    assert result is not None
-    assert result.hour == 10
-    assert result.minute == 30

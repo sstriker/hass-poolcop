@@ -7,8 +7,8 @@ import pytest
 from homeassistant.core import HomeAssistant
 
 from custom_components.poolcop.const import (
-    QUOTA_CONSTRAINED_INTERVAL,
-    TRANSITION_UPDATE_INTERVAL,
+    MAX_UPDATE_INTERVAL,
+    MIN_UPDATE_INTERVAL,
 )
 from custom_components.poolcop.coordinator import (
     PoolCopData,
@@ -202,65 +202,66 @@ async def test_has_active_alarms():
     assert data_with_alarms.has_active_alarms() is True
 
 
-# --- Quota-aware polling tests ---
+# --- Dynamic interval tests ---
 
 
-def _make_backwash_status():
-    """Create a status dict with backwash mode active."""
-    status = _make_status()
-    status["PoolCop"]["status"]["poolcop"] = 2  # Backwash mode
-    return status
-
-
-async def test_quota_allows_transition_interval(coordinator):
-    """Test that transition interval is used when quota is sufficient."""
-    # Set up: already in backwash mode, approaching cycle end
-    coordinator._last_operation_mode = 2
-    coordinator._cycle_durations[2] = 600  # 10 min backwash
-    coordinator._current_cycle_start = (
-        time.time() - 480
-    )  # 8 min elapsed → 2 min remaining
-    coordinator.data = PoolCopData(status=_make_backwash_status())
-
-    coordinator.poolcopilot.token_limit = 50
-    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+async def test_dynamic_interval_normal_quota(coordinator):
+    """Test dynamic interval: 900s remaining / 60 quota = 15s."""
+    coordinator.data = PoolCopData(status=_make_status())
+    coordinator.poolcopilot.token_limit = 60
+    coordinator.poolcopilot.token_expire = time.time() + 900
+    coordinator.poolcopilot.status.return_value = _make_status()
 
     with patch.object(coordinator, "_store"):
         await coordinator._async_update_data()
 
-    assert coordinator.update_interval.total_seconds() == TRANSITION_UPDATE_INTERVAL
+    interval = coordinator.update_interval.total_seconds()
+    assert 14.9 <= interval <= 15.1
 
 
-async def test_low_quota_uses_constrained_interval(coordinator):
-    """Test that constrained interval is used when quota is low."""
-    coordinator._last_operation_mode = 2
-    coordinator._cycle_durations[2] = 600
-    coordinator._current_cycle_start = time.time() - 480
-    coordinator.data = PoolCopData(status=_make_backwash_status())
-
-    coordinator.poolcopilot.token_limit = 5
-    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+async def test_dynamic_interval_low_quota(coordinator):
+    """Test dynamic interval clamped to MAX when quota is very low."""
+    coordinator.data = PoolCopData(status=_make_status())
+    coordinator.poolcopilot.token_limit = 3
+    coordinator.poolcopilot.token_expire = time.time() + 900
+    coordinator.poolcopilot.status.return_value = _make_status()
 
     with patch.object(coordinator, "_store"):
         await coordinator._async_update_data()
 
-    assert coordinator.update_interval.total_seconds() == QUOTA_CONSTRAINED_INTERVAL
+    # 900 / 3 = 300 → clamped to MAX_UPDATE_INTERVAL (120)
+    interval = coordinator.update_interval.total_seconds()
+    assert interval == MAX_UPDATE_INTERVAL
 
 
-async def test_none_quota_treated_as_has_quota(coordinator):
-    """Test that None quota (first call) is treated as having quota."""
-    coordinator._last_operation_mode = 2
-    coordinator._cycle_durations[2] = 600
-    coordinator._current_cycle_start = time.time() - 480
-    coordinator.data = PoolCopData(status=_make_backwash_status())
+async def test_dynamic_interval_high_quota(coordinator):
+    """Test dynamic interval clamped to MIN when quota is very high."""
+    coordinator.data = PoolCopData(status=_make_status())
+    coordinator.poolcopilot.token_limit = 200
+    coordinator.poolcopilot.token_expire = time.time() + 900
+    coordinator.poolcopilot.status.return_value = _make_status()
 
+    with patch.object(coordinator, "_store"):
+        await coordinator._async_update_data()
+
+    # 900 / 200 = 4.5 → clamped to MIN_UPDATE_INTERVAL (10)
+    interval = coordinator.update_interval.total_seconds()
+    assert interval == MIN_UPDATE_INTERVAL
+
+
+async def test_dynamic_interval_none_quota_skips(coordinator):
+    """Test that None quota (first call) leaves interval unchanged."""
+    coordinator.data = PoolCopData(status=_make_status())
     coordinator.poolcopilot.token_limit = None
-    coordinator.poolcopilot.status.return_value = _make_backwash_status()
+    coordinator.poolcopilot.token_expire = 0
+    coordinator.poolcopilot.status.return_value = _make_status()
+
+    original_interval = coordinator.update_interval.total_seconds()
 
     with patch.object(coordinator, "_store"):
         await coordinator._async_update_data()
 
-    assert coordinator.update_interval.total_seconds() == TRANSITION_UPDATE_INTERVAL
+    assert coordinator.update_interval.total_seconds() == original_interval
 
 
 # --- Settings-derived cycle duration seeding tests ---

@@ -9,10 +9,14 @@ from typing import Final
 DOMAIN: Final = "poolcop"
 LOGGER = logging.getLogger(__package__)
 
-# Update intervals (in seconds)
-NORMAL_UPDATE_INTERVAL = 45  # 45 seconds during normal operation
-TRANSITION_UPDATE_INTERVAL = 30  # 30 seconds when transitions are imminent
-CYCLE_END_PREDICTION_WINDOW = 300  # 5 minutes before predicted cycle end
+# Update interval (in seconds)
+# Initial interval used before the first API response provides quota data.
+# After each call, interval is dynamically adjusted: time_to_renewal / remaining_quota.
+UPDATE_INTERVAL = 15
+
+# Dynamic interval bounds (in seconds)
+MIN_UPDATE_INTERVAL = 10  # Floor: never poll faster than every 10s
+MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 
 # Alarm fetching interval (in seconds)
 ALARM_FETCH_INTERVAL = 14400  # 4 hours
@@ -26,13 +30,7 @@ CONF_FLOW_RATE_1 = "flow_rate_1"  # Low speed
 CONF_FLOW_RATE_2 = "flow_rate_2"  # Medium speed
 CONF_FLOW_RATE_3 = "flow_rate_3"  # High speed
 
-# The PoolCopilot API provides 90 requests per 900s (15 minutes) token.
-# With variable update frequency, we ensure staying within rate limits
-# while providing more timely updates during important transitions.
-QUOTA_TRANSITION_THRESHOLD = 20  # Min remaining calls to allow transition speed-up
-QUOTA_CONSTRAINED_INTERVAL = 300  # 5 min fallback when quota is low
-
-SCAN_INTERVAL = timedelta(seconds=NORMAL_UPDATE_INTERVAL)
+SCAN_INTERVAL = timedelta(seconds=UPDATE_INTERVAL)
 
 # Services
 SERVICE_SET_PUMP_SPEED = "set_pump_speed"

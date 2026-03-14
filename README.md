@@ -49,8 +49,8 @@ PoolCop is an advanced pool automation system that monitors and controls essenti
   - Pool image from PoolCopilot
 
 - **Smart Polling:**
-  - 45-second normal interval, 30-second during cycle/timer transitions
-  - Quota-aware: backs off automatically when API rate limit is low
+  - Dynamic interval: `time_to_key_renewal / remaining_quota` — evenly distributes API calls across the quota window (10s–120s range)
+  - Automatic exponential backoff on rate limit errors
   - Learns cycle durations for better end-time predictions
 
 ## Installation

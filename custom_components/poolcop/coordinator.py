@@ -28,15 +28,13 @@ from .const import (
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
-    CYCLE_END_PREDICTION_WINDOW,
     DOMAIN,
     LOGGER,
-    NORMAL_UPDATE_INTERVAL,
-    QUOTA_CONSTRAINED_INTERVAL,
-    QUOTA_TRANSITION_THRESHOLD,
+    MAX_UPDATE_INTERVAL,
+    MIN_UPDATE_INTERVAL,
     STORAGE_KEY,
     STORAGE_VERSION,
-    TRANSITION_UPDATE_INTERVAL,
+    UPDATE_INTERVAL,
 )
 
 # Default cycle durations (in seconds)
@@ -60,7 +58,6 @@ class PoolCopData(NamedTuple):
     commands: dict[str, Any] | None = None
     active_alarms: list[dict[str, Any]] | None = None
     cycle_status: dict[str, Any] | None = None  # For tracking cycle information
-    next_timer_event: dict[str, Any] | None = None  # For tracking upcoming timer events
     last_command_result: dict[str, Any] | None = (
         None  # Result from the most recent command
     )
@@ -106,7 +103,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             hass,
             LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=NORMAL_UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
         self.poolcopilot = PoolCopilot(
             session=async_get_clientsession(hass),
@@ -502,185 +499,10 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self._cycle_durations[mode] = float(value)
                 LOGGER.debug("Seeded mode %d duration from settings: %ds", mode, value)
 
-    def _check_upcoming_timer_events(self) -> dict | None:
-        """Check for upcoming timer events and adjust update interval accordingly."""
-        if not self.data or not self.data.status:
-            return None
-
-        now = datetime.now()
-        now_timestamp = now.timestamp()
-        upcoming_events = []
-
-        try:
-            # Check enabled filtration cycles
-            timers_data = self.data.status_value("timers")
-            if not timers_data:
-                return None
-
-            # Process cycle timers
-            for cycle_name in ["cycle1", "cycle2"]:
-                cycle = timers_data.get(cycle_name)
-                if not cycle or cycle.get("enabled") != 1:
-                    continue
-
-                # Process start time
-                start_time_str = cycle.get("start")
-                if start_time_str and start_time_str != "00:00:00":
-                    start_time = self._time_str_to_datetime(start_time_str)
-                    if start_time:
-                        seconds_until = start_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"{cycle_name}_start",
-                                    "time": start_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-                # Process stop time
-                stop_time_str = cycle.get("stop")
-                if stop_time_str and stop_time_str != "00:00:00":
-                    stop_time = self._time_str_to_datetime(stop_time_str)
-                    if stop_time:
-                        seconds_until = stop_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"{cycle_name}_stop",
-                                    "time": stop_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-            # Process auxiliary timers that are enabled and switchable
-            for aux_id in range(1, 7):
-                # First check if this aux is switchable by checking the aux data
-                aux_data = next(
-                    (
-                        a
-                        for a in self.data.status_value("aux") or []
-                        if a.get("id") == aux_id
-                    ),
-                    None,
-                )
-                if not aux_data or not aux_data.get("switchable"):
-                    continue
-
-                # Now check the timer
-                aux_timer = timers_data.get(f"aux{aux_id}")
-                if not aux_timer or aux_timer.get("enabled") != 1:
-                    continue
-
-                # Process start time
-                start_time_str = aux_timer.get("start")
-                if start_time_str and start_time_str != "00:00:00":
-                    start_time = self._time_str_to_datetime(start_time_str)
-                    if start_time:
-                        seconds_until = start_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"aux{aux_id}_start",
-                                    "time": start_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-                # Process stop time
-                stop_time_str = aux_timer.get("stop")
-                if stop_time_str and stop_time_str != "00:00:00":
-                    stop_time = self._time_str_to_datetime(stop_time_str)
-                    if stop_time:
-                        seconds_until = stop_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"aux{aux_id}_stop",
-                                    "time": stop_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-            # No upcoming events found
-            if not upcoming_events:
-                return None
-
-            # Find the closest upcoming event
-            upcoming_events.sort(key=lambda e: e["seconds_until"])
-            next_event = upcoming_events[0]
-
-            LOGGER.debug(
-                "Found upcoming timer event: %s in %.1f minutes",
-                next_event["type"],
-                next_event["seconds_until"] / 60,
-            )
-        except (KeyError, TypeError, ValueError) as err:
-            LOGGER.debug("Error checking timer events: %s", err)
-            return None
-        else:
-            return next_event
-
-    def _time_str_to_datetime(self, time_str: str) -> datetime | None:
-        """Convert a time string (HH:MM:SS) to a datetime object for today/tomorrow."""
-        if not time_str or time_str == "00:00:00":
-            return None
-
-        try:
-            # Get timezone from Pool data
-            timezone = None
-            if self.data and self.data.status:
-                pool_data = self.data.status_value("", prefix="Pool")
-                if (
-                    pool_data
-                    and isinstance(pool_data, dict)
-                    and "timezone" in pool_data
-                ):
-                    try:
-                        import zoneinfo
-
-                        timezone = zoneinfo.ZoneInfo(pool_data["timezone"])
-                    except (ImportError, zoneinfo.ZoneInfoNotFoundError):
-                        LOGGER.debug("Could not use timezone %s", pool_data["timezone"])
-
-            # If we couldn't get the timezone from pool data, use local timezone
-            if timezone is None:
-                from datetime import timezone as dt_timezone
-                from time import localtime
-
-                utc_offset = -localtime().tm_gmtoff
-                timezone = dt_timezone(timedelta(seconds=utc_offset))
-
-            hour, minute, second = map(int, time_str.split(":"))
-            now = datetime.now(tz=timezone)
-            result = datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=hour,
-                minute=minute,
-                second=second,
-                tzinfo=timezone,
-            )
-
-            # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
-            if result < now and hour < 12:
-                result = result + timedelta(days=1)
-        except (ValueError, TypeError) as err:
-            LOGGER.debug("Error parsing time string %s: %s", time_str, err)
-            return None
-        else:
-            return result
-
     async def _async_update_data(self) -> PoolCopData:
         """Fetch data from PoolCop."""
         try:
             status = await self.poolcopilot.status()
-            remaining_quota = self.poolcopilot.token_limit
 
             # Seed cycle durations from settings (only overrides defaults)
             self._seed_cycle_durations_from_settings(status)
@@ -719,78 +541,34 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self._last_alarm_fetch = current_time
                 self._previous_alarm_count = alarm_count
 
-            # Create a placeholder for the data
             data = PoolCopData(
                 status=status,
                 alarms=alarm_data,
                 active_alarms=self._active_alarms,
                 cycle_status=self._update_cycle_tracking(status),
-            )
-
-            # Check for upcoming timer events
-            if hasattr(self, "data") and self.data:
-                # We need to create temporary data before checking timer events
-                # to ensure the status_value method works correctly
-                self.data = data
-
-            # Check for timer events now that we have data
-            next_timer_event = self._check_upcoming_timer_events()
-
-            # Create the final data object with the timer event
-            data = PoolCopData(
-                status=status,
-                alarms=alarm_data,
-                active_alarms=self._active_alarms,
-                cycle_status=self._update_cycle_tracking(status),
-                next_timer_event=next_timer_event,
             )
 
             # Accumulate daily filtration volume
             self._update_daily_volume()
 
-            # Dynamic update interval adjustment based on cycle, timer, and quota
-            interval = NORMAL_UPDATE_INTERVAL
-            has_quota = (
-                remaining_quota is None or remaining_quota > QUOTA_TRANSITION_THRESHOLD
-            )
-
-            # Cycle-based speed-up
-            if (
-                data.cycle_status
-                and data.cycle_status.get("remaining_time") is not None
-                and 0
-                < data.cycle_status.get("remaining_time", 0)
-                < CYCLE_END_PREDICTION_WINDOW
-            ):
-                if has_quota:
-                    interval = TRANSITION_UPDATE_INTERVAL
-                else:
-                    interval = QUOTA_CONSTRAINED_INTERVAL
-                LOGGER.debug(
-                    "Cycle approaching end (%.1f min remaining). Interval=%ds, quota=%s",
-                    data.cycle_status["remaining_time"] / 60,
-                    interval,
-                    remaining_quota,
-                )
-
-            # Timer-based speed-up
-            if next_timer_event:
-                seconds_until = next_timer_event["seconds_until"]
-                if seconds_until < 300:
-                    if has_quota:
-                        interval = min(interval, TRANSITION_UPDATE_INTERVAL)
-                    elif interval > QUOTA_CONSTRAINED_INTERVAL:
-                        interval = QUOTA_CONSTRAINED_INTERVAL
-                elif interval == NORMAL_UPDATE_INTERVAL:
-                    interval = min(NORMAL_UPDATE_INTERVAL, int(seconds_until / 2))
-
-            if self.update_interval.total_seconds() != interval:
-                self.update_interval = timedelta(seconds=interval)
-                LOGGER.debug(
-                    "Update interval: %ds (quota remaining: %s)",
-                    interval,
-                    remaining_quota,
-                )
+            # Dynamic polling: distribute remaining quota evenly across the window
+            remaining_quota = self.poolcopilot.token_limit
+            token_expire = self.poolcopilot.token_expire
+            if remaining_quota and remaining_quota > 0 and token_expire > 0:
+                time_remaining = max(0, token_expire - time.time())
+                if time_remaining > 0:
+                    interval = time_remaining / remaining_quota
+                    interval = max(
+                        MIN_UPDATE_INTERVAL,
+                        min(MAX_UPDATE_INTERVAL, interval),
+                    )
+                    self.update_interval = timedelta(seconds=interval)
+                    LOGGER.debug(
+                        "Dynamic interval: %.1fs (quota=%d, window=%.0fs)",
+                        interval,
+                        remaining_quota,
+                        time_remaining,
+                    )
 
             # Save learned data periodically - every hour
             if (
