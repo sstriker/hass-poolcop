@@ -2,19 +2,84 @@
   "config": {
     "step": {
       "user": {
-        "description": "[%key:common::config_flow::description::confirm_setup%]",
+        "description": "Enter your PoolCop API key from the PoolCopilot account",
         "data": {
-          "api_key": "[%key:common::config_flow::data::api_key%]"
+          "api_key": "API Key"
+        }
+      },
+      "flow_rates": {
+        "description": "Your pool pump has {pump_speeds} speeds. Configure the flow rates for each speed.\n\nPool volume: {vol} m\u00b3\nDetected flow rate: {flowrate} m\u00b3/h",
+        "data": {
+          "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
+          "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
+          "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+        }
+      },
+      "reauth_confirm": {
+        "description": "Your PoolCopilot API key is no longer valid. Please enter a new API key.",
+        "data": {
+          "api_key": "API Key"
         }
       }
     },
     "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "Device is already configured",
+      "reauth_successful": "Re-authentication successful"
     },
     "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid API key",
+      "unknown": "Unexpected error"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "poolcop": {
+        "name": "Operation Mode",
+        "state": {
+          "stop": "Stop",
+          "freeze": "Freeze",
+          "forced": "Forced",
+          "auto": "Auto",
+          "timer": "Timer",
+          "manual": "Manual",
+          "paused": "Paused",
+          "external": "External",
+          "eco_": "Eco+",
+          "continuous": "Continuous"
+        },
+        "state_attributes": {
+          "description": {
+            "name": "Description"
+          }
+        }
+      },
+      "filter_timer_mode": {
+        "name": "Filter Timer Mode",
+        "state": {
+          "stop_disabled": "STOP - Disabled",
+          "timer_manual_schedule": "TIMER - Manual Schedule",
+          "eco_intelligent": "ECO+ - Intelligent",
+          "volume_pool_volume": "VOLUME - Pool Volume",
+          "continuous_23h_day": "CONTINUOUS - 23h/day",
+          "force_24h": "FORCE 24H",
+          "force_48h": "FORCE 48H",
+          "force_72h": "FORCE 72H",
+          "_24_24_always_on": "24/24 - Always On"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume.",
+        "data": {
+          "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
+          "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
+          "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+        }
+      }
     }
   }
 }

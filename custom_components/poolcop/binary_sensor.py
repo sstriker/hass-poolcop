@@ -1,25 +1,36 @@
 """Support for PoolCop binary sensors."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
-    DOMAIN as BINARY_SENSOR_DOMAIN,
     BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import (
+    AUX_FIXED_FUNCTION_LABELS,
+    AUX_LABEL_ICONS,
+    AUX_RELAY_LABELS,
+    AUX_VALVE_LABELS,
+    DOMAIN,
+    alert_display_name,
+    aux_display_name,
+    aux_label_id,
+)
 from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopBinarySensorEntityDescriptionMixin:
     """Mixin for required keys."""
 
@@ -27,11 +38,13 @@ class PoolCopBinarySensorEntityDescriptionMixin:
     on_off_icons: tuple[str, str]
 
 
-@dataclass
+@dataclass(frozen=True)
 class PoolCopBinarySensorEntityDescription(
     BinarySensorEntityDescription, PoolCopBinarySensorEntityDescriptionMixin
 ):
     """A class that describes PoolCop binary sensor entities."""
+
+    extra_attrs_fn: Callable[[PoolCopData], dict[str, Any]] | None = None
 
 
 def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
@@ -43,10 +56,45 @@ def _is_on_fn(path: str) -> Callable[[PoolCopData], bool]:
     return is_on_fn
 
 
+def _resolve_alarm(alarm: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a single alarm dict to human-readable fields."""
+    code = alarm.get("code") or alarm.get("id")
+    description = alarm.get("description", "")
+    if isinstance(description, str) and description.startswith("alert_title_"):
+        description = alert_display_name(description)
+    name = alarm.get("name", "")
+    if isinstance(name, str) and name.startswith("alert_title_"):
+        name = alert_display_name(name)
+    return {
+        "code": code,
+        "description": description or name,
+        "timestamp": alarm.get("timestamp") or alarm.get("date"),
+    }
+
+
+def _alarm_attrs(data: PoolCopData) -> dict[str, Any]:
+    """Return alarm attributes with resolved names for all active alarms."""
+    if not data.active_alarms:
+        return {"alarm_count": 0, "alarms": []}
+    resolved = [_resolve_alarm(a) for a in data.active_alarms]
+    return {
+        "alarm_count": len(resolved),
+        **resolved[0],
+        "alarms": resolved,
+    }
+
+
+def _watervalve_is_on(data: PoolCopData) -> bool:
+    """Return true if the water valve is open."""
+    return data.status_value("status.watervalve") == 1  # Refill
+
+
 FILTER_CYCLE_ICONS = ("mdi:sync", "mdi:sync-off")
 PUMP_ICONS = ("mdi:pump", "mdi:pump-off")
 VALVE_ICONS = ("mdi:valve-open", "mdi:valve-closed")
+INSTALLED_ICONS = ("mdi:check-circle-outline", "mdi:close-circle-outline")
 BINARY_SENSORS = (
+    # These binary sensors represent components that are always running when active
     PoolCopBinarySensorEntityDescription(
         key="pump",
         name="Pump",
@@ -58,7 +106,7 @@ BINARY_SENSORS = (
         key="watervalve",
         name="Watervalve",
         device_class=BinarySensorDeviceClass.OPENING,
-        is_on_fn=_is_on_fn("status.watervalve"),
+        is_on_fn=_watervalve_is_on,
         on_off_icons=VALVE_ICONS,
     ),
     PoolCopBinarySensorEntityDescription(
@@ -75,125 +123,181 @@ BINARY_SENSORS = (
         is_on_fn=_is_on_fn("status.orp_control"),
         on_off_icons=PUMP_ICONS,
     ),
-    #   "autochlor": 0,
-    #   "ioniser": 0,
     PoolCopBinarySensorEntityDescription(
-        key="aux1",
-        name="aux 1",
+        key="autochlor_control",
+        name="Autochlor",
         device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux1"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        is_on_fn=_is_on_fn("status.autochlor"),
+        on_off_icons=PUMP_ICONS,
     ),
     PoolCopBinarySensorEntityDescription(
-        key="aux2",
-        name="aux 2",
+        key="ioniser_control",
+        name="Ioniser",
         device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux2"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        is_on_fn=_is_on_fn("status.ioniser"),
+        on_off_icons=PUMP_ICONS,
     ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux3",
-        name="aux 3",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux3"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux4",
-        name="aux 4",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux4"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux5",
-        name="aux 5",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux5"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
-    PoolCopBinarySensorEntityDescription(
-        key="aux6",
-        name="aux 6",
-        device_class=BinarySensorDeviceClass.RUNNING,
-        is_on_fn=_is_on_fn("status.aux6"),
-        on_off_icons=FILTER_CYCLE_ICONS,
-    ),
+    # These binary sensors represent equipment installation status (connectivity)
     PoolCopBinarySensorEntityDescription(
         key="orp_installed",
         name="ORP control installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.orp"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="pH_installed",
         name="pH control installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.pH"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_installed",
         name="Waterlevel control installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.waterlevel"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="ioniser_installed",
         name="Ioniser installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.ioniser"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="autochlor_installed",
         name="Autochlor installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.autochlor"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
     PoolCopBinarySensorEntityDescription(
         key="air_installed",
         name="Air installed",
-        device_class=BinarySensorDeviceClass.RUNNING,
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=_is_on_fn("conf.air"),
-        on_off_icons=FILTER_CYCLE_ICONS,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    # PoolCopBinarySensorEntityDescription(
-    #     key="filter_cycle_2",
-    #     name="Filter2",
-    #     device_class=BinarySensorDeviceClass.RUNNING,
-    #     is_on_fn=lambda data: data.filter_cycle_2_running,
-    #     on_off_icons=FILTER_CYCLE_ICONS,
-    # ),
+    # Special binary sensors
+    PoolCopBinarySensorEntityDescription(
+        key="active_alarm",
+        name="Active Alarm",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        is_on_fn=lambda data: data.has_active_alarms(),
+        on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
+        extra_attrs_fn=lambda data: _alarm_attrs(data),
+    ),
+    # These binary sensors represent settings control states
+    PoolCopBinarySensorEntityDescription(
+        key="pool_freeze_protection",
+        name="Freeze Protection",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.pool.freeze_protection"),
+        on_off_icons=("mdi:snowflake-alert", "mdi:snowflake-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="pool_service_mode",
+        name="Service Mode",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.pool.service"),
+        on_off_icons=("mdi:tools", "mdi:tools-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="pump_protect",
+        name="Pump Protection",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.pump.protect"),
+        on_off_icons=("mdi:shield", "mdi:shield-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="orp_control_enabled",
+        name="ORP Control",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.orp.control"),
+        on_off_icons=("mdi:toggle-switch", "mdi:toggle-switch-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_auto_add",
+        name="Auto Water Add",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.waterlevel.auto_add"),
+        on_off_icons=("mdi:water-plus", "mdi:water-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_continuous",
+        name="Continuous Water Level",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.waterlevel.continuous"),
+        on_off_icons=("mdi:water-sync", "mdi:water-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_auto_reduce",
+        name="Auto Water Reduce",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.waterlevel.auto_reduce"),
+        on_off_icons=("mdi:water-minus", "mdi:water-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="autochlor_auto",
+        name="Autochlor Auto",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.autochlor.auto"),
+        on_off_icons=("mdi:auto-fix", "mdi:auto-fix-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="autochlor_acid",
+        name="Autochlor Acid",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.autochlor.acid"),
+        on_off_icons=("mdi:flask", "mdi:flask-empty"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="ioniser_mode",
+        name="Ioniser Mode",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=_is_on_fn("settings.ioniser.mode"),
+        on_off_icons=("mdi:lightning-bolt", "mdi:lightning-bolt-off"),
+    ),
 )
-
-# "status": {
-
-#   "forced": {
-#   }
-
-
-# CIRCULATION_PUMP_DESCRIPTION = PoolCopBinarySensorEntityDescription(
-#     key="circulation_pump",
-#     name="Circ Pump",
-#     device_class=BinarySensorDeviceClass.RUNNING,
-#     is_on_fn=lambda spa: (pump := spa.circulation_pump) is not None and pump.state > 0,
-#     on_off_icons=("mdi:pump", "mdi:pump-off"),
-# )
 
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    """Set up PoolCop sensors based on a config entry."""
+    """Set up PoolCop binary sensors based on a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
+
+    entities: list[BinarySensorEntity] = [
         PoolCopBinarySensorEntity(coordinator=coordinator, description=description)
         for description in BINARY_SENSORS
-    )
+        if PoolCopEntity.is_component_installed(coordinator, description.key)
+    ]
+
+    # Dynamic aux binary sensors for non-switchable or slaved aux ports
+    aux_list = coordinator.data.status_value("aux") or []
+    for aux in aux_list:
+        if not aux.get("switchable") or aux.get("slave"):
+            entities.append(PoolCopAuxBinarySensor(coordinator, aux))
+
+    async_add_entities(entities)
 
 
 class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
@@ -209,7 +313,6 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
     ) -> None:
         """Initialize a PoolCop binary sensor."""
         super().__init__(coordinator=coordinator, description=description)
-        self.entity_id = f"{BINARY_SENSOR_DOMAIN}.{self._attr_unique_id}"
 
     @property
     def is_on(self) -> bool:
@@ -217,7 +320,93 @@ class PoolCopBinarySensorEntity(PoolCopEntity, BinarySensorEntity):
         return self.entity_description.is_on_fn(self.coordinator.data)
 
     @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return extra state attributes."""
+        if self.entity_description.extra_attrs_fn:
+            return self.entity_description.extra_attrs_fn(self.coordinator.data)
+        return None
+
+    @property
     def icon(self) -> str | None:
         """Return the icon to use in the frontend, if any."""
         icons = self.entity_description.on_off_icons
         return icons[0] if self.is_on else icons[1]
+
+
+class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore[misc]
+    """Binary sensor for a non-switchable PoolCop auxiliary input."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.RUNNING
+
+    def __init__(
+        self,
+        coordinator: PoolCopDataUpdateCoordinator,
+        aux_data: dict,
+    ) -> None:
+        """Initialize the aux binary sensor."""
+        from homeassistant.helpers.entity import EntityDescription
+
+        self._aux_id: int = aux_data["id"]
+        api_label = aux_data.get("label", "")
+        label = aux_display_name(api_label, self._aux_id)
+        self._label_id = aux_label_id(api_label)
+        lid = self._label_id
+
+        # Fixed-function aux ports have first-class entity counterparts
+        # — show as "Label (Aux N)" and mark diagnostic
+        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
+            label = f"{label} (Aux {self._aux_id})"
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+
+        super().__init__(
+            coordinator=coordinator,
+            description=EntityDescription(
+                key=f"aux_{self._aux_id}",
+                name=label,
+            ),
+        )
+
+        # Valve-type aux ports: Open/Closed
+        if lid is not None and lid in AUX_VALVE_LABELS:
+            self._attr_device_class = BinarySensorDeviceClass.OPENING
+        # Relay-type aux ports with first-class counterparts: On/Off
+        elif lid is not None and lid in AUX_RELAY_LABELS:
+            self._attr_device_class = BinarySensorDeviceClass.POWER
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if the aux input is active."""
+        aux_list = self.coordinator.data.status_value("aux") or []
+        for aux in aux_list:
+            if aux.get("id") == self._aux_id:
+                return bool(aux.get("status"))
+        return None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        """Return extra state attributes."""
+        aux_list = self.coordinator.data.status_value("aux") or []
+        for aux in aux_list:
+            if aux.get("id") == self._aux_id:
+                attrs = {}
+                if "slave" in aux:
+                    attrs["slave"] = aux["slave"]
+                if "days" in aux:
+                    attrs["days"] = aux["days"]
+                if "label" in aux:
+                    attrs["label"] = aux["label"]
+                return attrs
+        return {}
+
+    @property
+    def icon(self) -> str | None:
+        """Return the icon."""
+        if self._attr_device_class == BinarySensorDeviceClass.OPENING:
+            return "mdi:valve-open" if self.is_on else "mdi:valve-closed"
+        icons = (
+            AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
+        )
+        if icons:
+            return icons[0] if self.is_on else icons[1]
+        return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"

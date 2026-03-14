@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "pytest",
+      "type": "shell",
+      "command": "pytest -q",
+      "group": "test",
+      "problemMatcher": ["$python"]
+    },
+    {
+      "label": "ruff-lint",
+      "type": "shell",
+      "command": "ruff check .",
+      "group": "build"
+    },
+    {
+      "label": "ruff-fix",
+      "type": "shell",
+      "command": "ruff check . --fix",
+      "group": "build"
+    },
+    {
+      "label": "format",
+      "type": "shell",
+      "command": "ruff format .",
+      "group": "build"
+    },
+    {
+      "label": "hassfest",
+      "type": "shell",
+      "command": "python3 -m hassfest .",
+      "group": "build"
+    },
+    {
+      "label": "run-home-assistant",
+      "type": "shell",
+      "command": "hass -c /config",
+      "group": "build"
+    }
+  ]
+}

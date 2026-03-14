@@ -3,7 +3,9 @@
   "name": "PoolCop",
   "codeowners": ["@sstriker"],
   "config_flow": true,
-  "documentation": "https://www.home-assistant.io/integrations/poolcop",
+  "documentation": "https://github.com/sstriker/hass-poolcop",
+  "issue_tracker": "https://github.com/sstriker/hass-poolcop/issues",
   "iot_class": "cloud_polling",
-  "requirements": ["poolcop==0.0.1"]
+  "requirements": ["poolcop==0.5.0"],
+  "version": "2.0.0"
 }
