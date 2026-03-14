@@ -1,5 +1,6 @@
 """Test PoolCop coordinator functionality."""
 
+import time
 from unittest.mock import patch
 
 import pytest
@@ -207,6 +208,58 @@ async def test_rate_limit_exponential_backoff(
 
     # Default interval is 15, so backoff should be min(30, 1800) = 30
     assert coordinator.update_interval.total_seconds() == 30
+
+
+async def test_rate_limit_grace_period_serves_stale_data(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Rate limit within grace period returns last known data."""
+    from poolcop import PoolCopilotRateLimitError
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        # First call succeeds — simulate HA storing the result
+        first_data = await coordinator._async_update_data()
+        coordinator.data = first_data
+
+        # Second call hits rate limit — should return stale data, not raise
+        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+        result = await coordinator._async_update_data()
+        assert result is first_data
+
+
+async def test_rate_limit_past_grace_period_raises(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Rate limit beyond grace period raises UpdateFailed."""
+    from poolcop import PoolCopilotRateLimitError
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        first_data = await coordinator._async_update_data()
+        coordinator.data = first_data
+
+        # Simulate rate limit that started long ago
+        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+        coordinator._rate_limit_since = time.time() - 1000  # >900s ago
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
 
 
 async def test_active_alarms_from_status(

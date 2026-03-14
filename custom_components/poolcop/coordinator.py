@@ -31,6 +31,8 @@ from .const import (
     LOGGER,
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
+    QUOTA_RESERVE,
+    RATE_LIMIT_GRACE_PERIOD,
     STORAGE_KEY,
     STORAGE_VERSION,
     UPDATE_INTERVAL,
@@ -120,6 +122,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         self._last_flow_update: float | None = (
             None  # monotonic timestamp of last update
         )
+
+        # Rate limit grace period: keep serving stale data until this expires
+        self._rate_limit_since: float | None = None
 
         # Cycle tracking
         self._last_operation_mode: int | None = None
@@ -515,13 +520,15 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             # Accumulate daily filtration volume
             self._update_daily_volume()
 
-            # Dynamic polling: distribute remaining quota evenly across the window
+            # Dynamic polling: distribute remaining quota evenly across the window,
+            # keeping a small reserve so we never exhaust the quota entirely.
             remaining_quota = self.poolcopilot.token_limit
             token_expire = self.poolcopilot.token_expire
             if remaining_quota and remaining_quota > 0 and token_expire > 0:
                 time_remaining = max(0, token_expire - time.time())
                 if time_remaining > 0:
-                    interval = time_remaining / remaining_quota
+                    usable_quota = max(remaining_quota - QUOTA_RESERVE, 1)
+                    interval = time_remaining / usable_quota
                     interval = max(
                         MIN_UPDATE_INTERVAL,
                         min(MAX_UPDATE_INTERVAL, interval),
@@ -541,36 +548,53 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             ):
                 self.hass.async_create_task(self.async_save_learned_data())
                 self._last_save_time = current_time
+
+            # Successful fetch — clear any rate limit grace period
+            self._rate_limit_since = None
         except PoolCopilotInvalidKeyError as err:
             raise ConfigEntryAuthFailed("API key is invalid or expired") from err
         except PoolCopilotRateLimitError as err:
-            # Add specific handling for rate limit errors with exponential backoff
-            retry_after = getattr(err, "retry_after", None)
+            now = time.time()
+            if self._rate_limit_since is None:
+                self._rate_limit_since = now
 
-            # Use retry_after if available, otherwise use exponential backoff
+            # Exponential backoff on the polling interval
+            retry_after = getattr(err, "retry_after", None)
             if retry_after and isinstance(retry_after, int | float):
                 backoff_time = retry_after
             else:
-                # Calculate exponential backoff based on update interval
-                # Start with 2x normal interval, cap at 30 minutes
                 current_interval = (
                     self.update_interval.total_seconds()
                     if self.update_interval
                     else UPDATE_INTERVAL
                 )
-                backoff_time = min(current_interval * 2, 1800)  # Max 30 minutes
+                backoff_time = min(current_interval * 2, 1800)
 
-            LOGGER.warning(
-                "PoolCopilot API rate limit reached. Backing off for %d seconds",
-                backoff_time,
-            )
-
-            # Update the coordinator's update interval temporarily
             self.update_interval = timedelta(seconds=backoff_time)
 
-            # Propagate a more specific error
+            # If rate-limited longer than a full token window, raise UpdateFailed
+            # so HA marks entities unavailable — something is genuinely wrong.
+            elapsed = now - self._rate_limit_since
+            if elapsed > RATE_LIMIT_GRACE_PERIOD:
+                LOGGER.warning(
+                    "PoolCopilot API rate-limited for %.0fs, marking unavailable",
+                    elapsed,
+                )
+                raise UpdateFailed(
+                    "PoolCopilot API rate limit exceeded for too long"
+                ) from err
+
+            # Within grace period — keep serving last known data
+            LOGGER.warning(
+                "PoolCopilot API rate limit hit, serving stale data "
+                "(%.0fs into grace period, backing off %ds)",
+                elapsed,
+                backoff_time,
+            )
+            if self.data is not None:
+                return self.data
             raise UpdateFailed(
-                "PoolCopilot API rate limit reached, backing off"
+                "PoolCopilot API rate limit hit with no prior data"
             ) from err
         except PoolCopilotConnectionError as err:
             raise UpdateFailed("Error communicating with PoolCopilot API") from err
