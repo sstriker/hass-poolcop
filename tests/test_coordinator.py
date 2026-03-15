@@ -1,6 +1,7 @@
 """Test PoolCop coordinator functionality."""
 
 import time
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -310,25 +311,62 @@ async def test_save_load_learned_data(
 
         # Mock the Store methods directly
         coordinator._store.async_save = AsyncMock()
-        # JSON serializes int keys as strings; simulate that
-        coordinator._store.async_load = AsyncMock(
-            return_value={
-                "cycle_durations": {"1": 9999},
-                "flow_rates": {"2": 18.0},
-            }
-        )
 
-        # Verify save calls the store
+        # Verify save includes daily_volume fields
+        coordinator._daily_volume = 1.234
+        coordinator._daily_volume_date = "2026-03-15"
         await coordinator.async_save_learned_data()
         coordinator._store.async_save.assert_called_once()
         saved = coordinator._store.async_save.call_args[0][0]
         assert "cycle_durations" in saved
         assert "flow_rates" in saved
+        assert saved["daily_volume"] == 1.234
+        assert saved["daily_volume_date"] == "2026-03-15"
 
-        # Verify load converts string keys back to int
+        # JSON serializes int keys as strings; simulate that
+        today = datetime.now().strftime("%Y-%m-%d")
+        coordinator._store.async_load = AsyncMock(
+            return_value={
+                "cycle_durations": {"1": 9999},
+                "flow_rates": {"2": 18.0},
+                "daily_volume": 2.567,
+                "daily_volume_date": today,
+            }
+        )
+
+        # Verify load converts string keys back to int and restores daily volume
         await coordinator.async_load_learned_data()
         assert coordinator._cycle_durations[1] == 9999
         assert coordinator.flow_rates[2] == 18.0
+        assert coordinator._daily_volume == 2.567
+
+
+async def test_load_stale_daily_volume_discarded(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop
+):
+    """Daily volume from a previous day is not restored."""
+    from unittest.mock import AsyncMock
+
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        coordinator._store.async_load = AsyncMock(
+            return_value={
+                "cycle_durations": {},
+                "flow_rates": {},
+                "daily_volume": 5.0,
+                "daily_volume_date": "2020-01-01",
+            }
+        )
+        await coordinator.async_load_learned_data()
+        # Stale date → volume should NOT be restored
+        assert coordinator._daily_volume == 0.0
 
 
 async def test_status_value_non_dict_intermediate(mock_poolcop_data):
