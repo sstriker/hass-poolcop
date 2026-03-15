@@ -393,9 +393,7 @@ async def test_daily_volume_date_exception(
         coordinator.data = await coordinator._async_update_data()
 
         # Mock datetime.now to raise, triggering the except branch (lines 183-184)
-        with patch(
-            "custom_components.poolcop.coordinator.datetime"
-        ) as mock_dt:
+        with patch("custom_components.poolcop.coordinator.datetime") as mock_dt:
             mock_dt.now.side_effect = RuntimeError("broken clock")
             # Should not crash — today=None means no date reset
             coordinator._update_daily_volume()

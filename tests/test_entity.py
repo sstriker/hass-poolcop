@@ -74,8 +74,16 @@ def test_is_component_installed_autochlor():
     data_off = _make_data({"autochlor": 0})
     data_on = _make_data({"autochlor": 1})
 
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "autochlor_control") is False
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "autochlor_auto") is True
+    assert (
+        PoolCopEntity.is_component_installed(
+            FakeCoordinator(data_off), "autochlor_control"
+        )
+        is False
+    )
+    assert (
+        PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "autochlor_auto")
+        is True
+    )
 
 
 def test_is_component_installed_waterlevel():
@@ -83,8 +91,16 @@ def test_is_component_installed_waterlevel():
     data_on = _make_data({"waterlevel": 1})
     data_off = _make_data({"waterlevel": 0})
 
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "waterlevel_auto_add") is True
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "water_level") is False
+    assert (
+        PoolCopEntity.is_component_installed(
+            FakeCoordinator(data_on), "waterlevel_auto_add"
+        )
+        is True
+    )
+    assert (
+        PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "water_level")
+        is False
+    )
 
 
 def test_is_component_installed_air():
@@ -92,8 +108,18 @@ def test_is_component_installed_air():
     data_on = _make_data({"air": 1})
     data_off = _make_data({"air": 0})
 
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "temperature_air") is True
-    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "temperature_air") is False
+    assert (
+        PoolCopEntity.is_component_installed(
+            FakeCoordinator(data_on), "temperature_air"
+        )
+        is True
+    )
+    assert (
+        PoolCopEntity.is_component_installed(
+            FakeCoordinator(data_off), "temperature_air"
+        )
+        is False
+    )
 
 
 def test_is_component_installed_always_true():
