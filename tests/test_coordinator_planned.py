@@ -1,6 +1,6 @@
 """Test planned remaining volume/turnovers coordinator logic."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -69,7 +69,14 @@ def _make_status(
                     "stop": cycle2_stop,
                 },
             },
-            "conf": {"orp": 0, "pH": 0, "waterlevel": 0, "ioniser": 0, "autochlor": 0, "air": 0},
+            "conf": {
+                "orp": 0,
+                "pH": 0,
+                "waterlevel": 0,
+                "ioniser": 0,
+                "autochlor": 0,
+                "air": 0,
+            },
             "alerts": [],
         },
         "Pool": {
@@ -92,7 +99,7 @@ async def coordinator(hass: HomeAssistant, mock_config_entry, mock_poolcop):
     return coord
 
 
-def _freeze_time(hour, minute=0, tz=timezone.utc):
+def _freeze_time(hour, minute=0, tz=UTC):
     """Return a fixed datetime for mocking."""
     return datetime(2026, 3, 14, hour, minute, 0, tzinfo=tz)
 
@@ -101,9 +108,14 @@ async def test_auto_mode_both_cycles_future(coordinator):
     """Both cycles ahead of now -> full volume from both (op_mode=3 Auto)."""
     status = _make_status(
         op_mode=3,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
-        cycle2_enabled=1, cycle2_start="20:00:00", cycle2_stop="22:00:00",
-        speed_cycle1=2, speed_cycle2=1,
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
+        cycle2_enabled=1,
+        cycle2_start="20:00:00",
+        cycle2_stop="22:00:00",
+        speed_cycle1=2,
+        speed_cycle2=1,
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -123,7 +135,9 @@ async def test_timer_mode_cycle1_in_progress(coordinator):
     """Mid-cycle1 -> partial remaining volume (op_mode=4 Timer)."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="08:00:00", cycle1_stop="12:00:00",
+        cycle1_enabled=1,
+        cycle1_start="08:00:00",
+        cycle1_stop="12:00:00",
         speed_cycle1=2,
     )
     coordinator.data = PoolCopData(status=status)
@@ -144,7 +158,9 @@ async def test_timer_mode_cycle1_done(coordinator):
     """Past stop -> 0 for cycle1 (op_mode=4 Timer)."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="06:00:00", cycle1_stop="08:00:00",
+        cycle1_enabled=1,
+        cycle1_start="06:00:00",
+        cycle1_stop="08:00:00",
         speed_cycle1=2,
     )
     coordinator.data = PoolCopData(status=status)
@@ -164,7 +180,9 @@ async def test_timer_mode_cycle2_disabled(coordinator):
     """Only cycle1 contributes when cycle2 is disabled (op_mode=4 Timer)."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
         cycle2_enabled=0,
         speed_cycle1=2,
     )
@@ -186,7 +204,9 @@ async def test_eco_mode_uses_timers(coordinator):
     """ECO+ filter mode (timer=2) with Auto running status uses timer logic."""
     status = _make_status(
         op_mode=3,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="16:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="16:00:00",
         speed_cycle1=2,
     )
     coordinator.data = PoolCopData(status=status)
@@ -225,7 +245,7 @@ async def test_manual_mode_returns_zero(coordinator):
 
 
 async def test_continuous_mode_remaining_hours(coordinator):
-    """filter_timer=4 (CONTINUOUS 23h/day) -> remaining hours × flow rate."""
+    """filter_timer=4 (CONTINUOUS 23h/day) -> remaining hours x flow rate."""
     status = _make_status(op_mode=9, filter_timer=4, pump_speed=2)
     coordinator.data = PoolCopData(status=status)
 
@@ -242,7 +262,7 @@ async def test_continuous_mode_remaining_hours(coordinator):
 
 
 async def test_always_on_mode(coordinator):
-    """filter_timer=8 (24/24 Always On) -> remaining hours × flow rate."""
+    """filter_timer=8 (24/24 Always On) -> remaining hours x flow rate."""
     status = _make_status(op_mode=9, filter_timer=8, pump_speed=2)
     coordinator.data = PoolCopData(status=status)
 
@@ -261,8 +281,11 @@ async def test_always_on_mode(coordinator):
 async def test_always_on_overrides_op_mode(coordinator):
     """filter_timer=8 (24/24) takes priority even if op_mode is Auto (3)."""
     status = _make_status(
-        op_mode=3, filter_timer=8,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="16:00:00",
+        op_mode=3,
+        filter_timer=8,
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="16:00:00",
         pump_speed=2,
     )
     coordinator.data = PoolCopData(status=status)
@@ -280,7 +303,7 @@ async def test_always_on_overrides_op_mode(coordinator):
 
 
 async def test_forced_mode_uses_remaining_hours(coordinator):
-    """op_mode=2 (Forced) -> forced.remaining_hours × flow rate."""
+    """op_mode=2 (Forced) -> forced.remaining_hours x flow rate."""
     status = _make_status(op_mode=2, filter_timer=1, pump_speed=2, forced_remaining=10)
     coordinator.data = PoolCopData(status=status)
 
@@ -301,7 +324,9 @@ async def test_no_flow_rates_returns_zero(coordinator):
     coordinator.flow_rates = {}  # Clear all flow rates
 
     status = _make_status(
-        op_mode=4, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        op_mode=4,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -320,8 +345,11 @@ async def test_turnovers_normal(coordinator):
     """volume / pool_volume gives correct turnovers."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
-        speed_cycle1=2, pool_volume=50,
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
+        speed_cycle1=2,
+        pool_volume=50,
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -373,7 +401,9 @@ async def test_cycle_with_zero_times(coordinator):
     """Cycle enabled but times 00:00:00 -> 0 remaining."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="00:00:00", cycle1_stop="00:00:00",
+        cycle1_enabled=1,
+        cycle1_start="00:00:00",
+        cycle1_stop="00:00:00",
     )
     coordinator.data = PoolCopData(status=status)
     assert coordinator.planned_remaining_volume == 0.0
@@ -383,7 +413,9 @@ async def test_cycle_stop_before_start(coordinator):
     """Cycle where stop < start (overnight) -> 0 remaining."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="22:00:00", cycle1_stop="06:00:00",
+        cycle1_enabled=1,
+        cycle1_start="22:00:00",
+        cycle1_stop="06:00:00",
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -402,7 +434,9 @@ async def test_cycle_invalid_time_string(coordinator):
     """Cycle with unparsable time string -> 0 remaining."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="bad", cycle1_stop="also_bad",
+        cycle1_enabled=1,
+        cycle1_start="bad",
+        cycle1_stop="also_bad",
     )
     coordinator.data = PoolCopData(status=status)
     assert coordinator.planned_remaining_volume == 0.0
@@ -418,9 +452,11 @@ async def test_flow_rate_fallback_to_pumpspeed(coordinator):
     """When speed_cycle has no matching flow rate, fall back to pumpspeed."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
         speed_cycle1=99,  # No flow rate configured for speed 99
-        pump_speed=2,     # Fallback to pumpspeed=2 -> 15 m³/h
+        pump_speed=2,  # Fallback to pumpspeed=2 -> 15 m³/h
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -440,9 +476,11 @@ async def test_flow_rate_fallback_unknown_speeds(coordinator):
     """When both speed_cycle and pumpspeed are unconfigured -> 0."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
         speed_cycle1=99,  # Unknown - no flow rate for 99
-        pump_speed=99,    # Also unknown
+        pump_speed=99,  # Also unknown
     )
     coordinator.data = PoolCopData(status=status)
 
@@ -462,7 +500,9 @@ async def test_flow_rate_fallback_to_speed1(coordinator):
     """When pumpspeed is missing from status, fall back to speed 1."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
         speed_cycle1=99,  # Unknown
     )
     del status["PoolCop"]["status"]["pumpspeed"]  # No pumpspeed at all
@@ -496,7 +536,9 @@ async def test_cycle_speed_invalid(coordinator):
     """Timer mode with non-integer speed_cycle -> fallback works."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
     )
     status["PoolCop"]["settings"]["pump"]["speed_cycle1"] = "bad"
     coordinator.data = PoolCopData(status=status)
@@ -517,7 +559,9 @@ async def test_cycle_no_speed_setting(coordinator):
     """Timer mode with missing speed_cycle key -> fallback to pumpspeed."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
     )
     del status["PoolCop"]["settings"]["pump"]["speed_cycle1"]
     coordinator.data = PoolCopData(status=status)
@@ -590,7 +634,9 @@ async def test_cycle_bad_timezone_fallback(coordinator):
     """Cycle timer with invalid timezone -> falls back, still works."""
     status = _make_status(
         op_mode=4,
-        cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="18:00:00",
+        cycle1_enabled=1,
+        cycle1_start="14:00:00",
+        cycle1_stop="18:00:00",
     )
     status["Pool"]["timezone"] = "Bogus/TZ"
     coordinator.data = PoolCopData(status=status)
