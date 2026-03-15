@@ -163,34 +163,10 @@ async def test_update_command_result(
         assert coordinator.data.status == mock_poolcop_data
 
 
-async def test_rate_limit_with_retry_after(
+async def test_rate_limit_raises_update_failed(
     hass: HomeAssistant, mock_config_entry, mock_poolcop
 ):
-    """Error with retry_after=60 → interval set."""
-    from poolcop import PoolCopilotRateLimitError
-
-    err = PoolCopilotRateLimitError("Rate limit")
-    err.retry_after = 60
-    mock_poolcop.status.side_effect = err
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        with pytest.raises(UpdateFailed):
-            await coordinator._async_update_data()
-
-    assert coordinator.update_interval.total_seconds() == 60
-
-
-async def test_rate_limit_exponential_backoff(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop
-):
-    """No retry_after → min(interval*2, 1800)."""
+    """Rate limit raises UpdateFailed immediately."""
     from poolcop import PoolCopilotRateLimitError
 
     mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
@@ -206,17 +182,15 @@ async def test_rate_limit_exponential_backoff(
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
 
-    # Default interval is 15, so backoff should be min(30, 1800) = 30
-    assert coordinator.update_interval.total_seconds() == 30
 
-
-async def test_rate_limit_grace_period_serves_stale_data(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+async def test_rate_limit_schedules_retry_at_token_expire(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop
 ):
-    """Rate limit within grace period returns last known data."""
+    """Rate limit sets update_interval to time remaining in token window."""
     from poolcop import PoolCopilotRateLimitError
 
-    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+    mock_poolcop.token_expire = time.time() + 300  # 5 minutes from now
     mock_config_entry.add_to_hass(hass)
 
     with patch(
@@ -226,40 +200,34 @@ async def test_rate_limit_grace_period_serves_stale_data(
         coordinator = PoolCopDataUpdateCoordinator(
             hass=hass, api_key="test-api-key", config_entry=mock_config_entry
         )
-        # First call succeeds — simulate HA storing the result
-        first_data = await coordinator._async_update_data()
-        coordinator.data = first_data
-
-        # Second call hits rate limit — should return stale data, not raise
-        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
-        result = await coordinator._async_update_data()
-        assert result is first_data
-
-
-async def test_rate_limit_past_grace_period_raises(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
-):
-    """Rate limit beyond grace period raises UpdateFailed."""
-    from poolcop import PoolCopilotRateLimitError
-
-    mock_poolcop.status.return_value = mock_poolcop_data
-    mock_config_entry.add_to_hass(hass)
-
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
-        coordinator = PoolCopDataUpdateCoordinator(
-            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
-        )
-        first_data = await coordinator._async_update_data()
-        coordinator.data = first_data
-
-        # Simulate rate limit that started long ago
-        mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
-        coordinator._rate_limit_since = time.time() - 1000  # >900s ago
         with pytest.raises(UpdateFailed):
             await coordinator._async_update_data()
+
+    # Should schedule retry close to token expiry (~300s, allow 2s tolerance)
+    assert 298 <= coordinator.update_interval.total_seconds() <= 302
+
+
+async def test_rate_limit_expired_token_uses_min_interval(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop
+):
+    """Rate limit with expired token window uses MIN_UPDATE_INTERVAL."""
+    from poolcop import PoolCopilotRateLimitError
+
+    mock_poolcop.status.side_effect = PoolCopilotRateLimitError("Rate limit")
+    mock_poolcop.token_expire = time.time() - 100  # already expired
+    mock_config_entry.add_to_hass(hass)
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass, api_key="test-api-key", config_entry=mock_config_entry
+        )
+        with pytest.raises(UpdateFailed):
+            await coordinator._async_update_data()
+
+    assert coordinator.update_interval.total_seconds() == 10  # MIN_UPDATE_INTERVAL
 
 
 async def test_active_alarms_from_status(

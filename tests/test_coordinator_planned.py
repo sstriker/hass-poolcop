@@ -32,10 +32,10 @@ def _make_status(
 
     op_mode maps to status.poolcop (the actual operating mode):
       0=Stop, 1=Freeze, 2=Forced, 3=Auto, 4=Timer,
-      5=Manual, 6=Paused, 7=External, 8=Eco+, 9=Continuous
+      5=Manual, 6=Paused, 7=External, 8=Water Level Management, 9=24/24
     filter_timer maps to settings.filter.timer (the configured filter timer mode):
       0=STOP, 1=TIMER, 2=ECO+, 3=VOLUME, 4=CONTINUOUS,
-      5-7=FORCE 24/48/72H, 8=24/24 Always On
+      5-7=FORCE 24/48/72H, 8=24/24 Always On, 9=No Pump
     """
     return {
         "PoolCop": {
@@ -183,9 +183,9 @@ async def test_timer_mode_cycle2_disabled(coordinator):
 
 
 async def test_eco_mode_uses_timers(coordinator):
-    """op_mode=8 (Eco+) uses same timer logic as Timer/Auto."""
+    """ECO+ filter mode (timer=2) with Auto running status uses timer logic."""
     status = _make_status(
-        op_mode=8,
+        op_mode=3,
         cycle1_enabled=1, cycle1_start="14:00:00", cycle1_stop="16:00:00",
         speed_cycle1=2,
     )
