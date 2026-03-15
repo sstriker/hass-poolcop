@@ -265,9 +265,6 @@ async def test_time_str_to_time_today_tomorrow_shift():
     """_time_str_to_time_today shifts to tomorrow when result < now and hour < 12 (line 171)."""
     from unittest.mock import patch as mock_patch
 
-    import zoneinfo
-
-    utc = zoneinfo.ZoneInfo("UTC")
     real_datetime = datetime
 
     class FakeDatetime(datetime):
@@ -333,9 +330,7 @@ async def test_timer_time_fn_exception():
 async def test_weekday_mapping_fn_non_integer_value():
     """_weekday_mapping_fn returns None for non-integer value (lines 264-265)."""
     fn = _weekday_mapping_fn("settings.orp.hyper_day")
-    data = PoolCopData(
-        status={"PoolCop": {"settings": {"orp": {"hyper_day": "bad"}}}}
-    )
+    data = PoolCopData(status={"PoolCop": {"settings": {"orp": {"hyper_day": "bad"}}}})
     assert fn(data) is None
 
 
