@@ -32,7 +32,6 @@ from .const import (
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     QUOTA_RESERVE,
-    RATE_LIMIT_GRACE_PERIOD,
     STORAGE_KEY,
     STORAGE_VERSION,
     UPDATE_INTERVAL,
@@ -122,9 +121,6 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         self._last_flow_update: float | None = (
             None  # monotonic timestamp of last update
         )
-
-        # Rate limit grace period: keep serving stale data until this expires
-        self._rate_limit_since: float | None = None
 
         # Cycle tracking
         self._last_operation_mode: int | None = None
@@ -275,8 +271,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             return 0.0
 
         # Modes with no predictable planned filtration
-        # 0=Stop, 1=Freeze, 5=Manual, 6=Paused, 7=External
-        if op_mode in (0, 1, 5, 6, 7):
+        # 0=Stop, 1=Freeze, 5=Manual, 6=Paused, 7=External, 8=Water Level Mgmt
+        if op_mode in (0, 1, 5, 6, 7, 8):
             return 0.0
 
         # Check the configured filter timer mode for modes that the
@@ -308,8 +304,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 return round(flow * remaining_hours, 3)
             return 0.0
 
-        # Modes 3 (Auto), 4 (Timer), 8 (Eco+) - use cycle timers
-        if op_mode in (3, 4, 8):
+        # Modes 3 (Auto), 4 (Timer) - use cycle timers
+        if op_mode in (3, 4):
             total = 0.0
             for cycle_name, speed_key in (
                 ("cycle1", "speed_cycle1"),
@@ -549,53 +545,20 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self.hass.async_create_task(self.async_save_learned_data())
                 self._last_save_time = current_time
 
-            # Successful fetch — clear any rate limit grace period
-            self._rate_limit_since = None
         except PoolCopilotInvalidKeyError as err:
             raise ConfigEntryAuthFailed("API key is invalid or expired") from err
         except PoolCopilotRateLimitError as err:
+            # Schedule next retry for when the token window resets
             now = time.time()
-            if self._rate_limit_since is None:
-                self._rate_limit_since = now
-
-            # Exponential backoff on the polling interval
-            retry_after = getattr(err, "retry_after", None)
-            if retry_after and isinstance(retry_after, int | float):
-                backoff_time = retry_after
-            else:
-                current_interval = (
-                    self.update_interval.total_seconds()
-                    if self.update_interval
-                    else UPDATE_INTERVAL
-                )
-                backoff_time = min(current_interval * 2, 1800)
-
-            self.update_interval = timedelta(seconds=backoff_time)
-
-            # If rate-limited longer than a full token window, raise UpdateFailed
-            # so HA marks entities unavailable — something is genuinely wrong.
-            elapsed = now - self._rate_limit_since
-            if elapsed > RATE_LIMIT_GRACE_PERIOD:
+            token_expire = self.poolcopilot.token_expire
+            if token_expire > 0:
+                wait = max(token_expire - now, MIN_UPDATE_INTERVAL)
+                self.update_interval = timedelta(seconds=wait)
                 LOGGER.warning(
-                    "PoolCopilot API rate-limited for %.0fs, marking unavailable",
-                    elapsed,
+                    "PoolCopilot API rate limit hit, retrying in %.0fs",
+                    wait,
                 )
-                raise UpdateFailed(
-                    "PoolCopilot API rate limit exceeded for too long"
-                ) from err
-
-            # Within grace period — keep serving last known data
-            LOGGER.warning(
-                "PoolCopilot API rate limit hit, serving stale data "
-                "(%.0fs into grace period, backing off %ds)",
-                elapsed,
-                backoff_time,
-            )
-            if self.data is not None:
-                return self.data
-            raise UpdateFailed(
-                "PoolCopilot API rate limit hit with no prior data"
-            ) from err
+            raise UpdateFailed("PoolCopilot API rate limit exceeded") from err
         except PoolCopilotConnectionError as err:
             raise UpdateFailed("Error communicating with PoolCopilot API") from err
         except Exception as err:

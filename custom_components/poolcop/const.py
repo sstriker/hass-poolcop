@@ -22,10 +22,6 @@ MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 # token window can expire and refresh without hitting a rate limit.
 QUOTA_RESERVE = 3
 
-# How long (seconds) to serve stale data on rate limit before raising UpdateFailed.
-# Roughly one token window (~15 min); if rate-limited longer, something is wrong.
-RATE_LIMIT_GRACE_PERIOD = 900
-
 # Storage constants
 STORAGE_KEY = "poolcop_learned_data"
 STORAGE_VERSION = 1
@@ -60,26 +56,28 @@ VALVE_POSITION_NAMES = {
     3: "Backwash",
     4: "Bypass",
     5: "Rinse",
-    6: "Unknown",
-    7: "None",
+    6: "Error (Position)",
+    7: "Error (Rotation)",
+    8: "Error (No Disk)",
+    9: "Rotating",
 }
 
 WATERLEVEL_STATES = {
-    0: "Not Installed",
+    0: "Faulty",
     1: "Low",
     2: "Normal",
     3: "High",
-    4: "Error",
+    4: "Very High",
 }
 
 WATER_VALVE_POSITIONS = {
-    0: "Standby",
-    1: "Refill",
-    2: "Measure",
+    0: "Closed",
+    1: "Open",
+    2: "Measuring",
 }
 
-# Add a mapping for 'Watervalve' (valve used for water level control)
-WATERVALVE_STATES = {0: "Standby", 1: "Open", 2: "Closed", 3: "Measure"}
+# Water level valve states (from cloud API enum WaterLevelValve)
+WATERVALVE_STATES = {0: "Closed", 1: "Open", 2: "Measuring"}
 
 FORCED_FILTRATION_MODES = {
     0: "None",
@@ -95,14 +93,25 @@ POOL_TYPES = {
     3: "Spa",
 }
 
+# Pump types (from PoolCop Evolution manual §5.6.2 Pump Data)
 PUMP_TYPES = {
-    0: "Unknown",
-    1: "Single Speed",
-    2: "Two Speed",
-    3: "Three Speed",
-    4: "Variable Speed",
-    5: "Variable Speed (3-step)",
-    6: "External",
+    0: "Single Speed",
+    1: "Pentair IntelliComm",
+    2: "Pentair SuperFlo VS",
+    3: "Hayward Eco Star",
+    4: "Hayward Range VSTD",
+    5: "Badu Eco Touch-Pro",
+    6: "Badu 90 Eco Motion",
+    7: "Zodiac FloPro VS",
+    8: "Invertek OptiDrive",
+    9: "Binary Combination",
+    10: "Davey ProMaster VSD400",
+    11: "ACIS VIPool MKB",
+    12: "DAB E.Swim / E.Pro",
+    13: "Aquagem / Pahlen",
+    14: "SACI Epool Ejoy",
+    15: "Schneider ATV212",
+    16: "No Pump",
 }
 
 FILTER_MODES = {
@@ -122,6 +131,7 @@ FILTER_TIMER_MODES = {
     6: "FORCE 48H",
     7: "FORCE 72H",
     8: "24/24 - Always On",
+    9: "No Pump",
 }
 
 # Descriptions for filter timer modes (from PoolCop Evolution manual §4.4.4.6)
@@ -135,6 +145,7 @@ FILTER_TIMER_MODE_DESCRIPTIONS: Final[dict[int, str]] = {
     6: "Overrides normal cycles. Pump runs for 48h then reverts to previous settings.",
     7: "Overrides normal cycles. Pump runs for 72h then reverts to previous settings.",
     8: "True continuous mode. Pump runs 24/7. No cycles.",
+    9: "No pump installed. Filtration not controlled by PoolCop.",
 }
 
 PH_TYPES = {
@@ -150,20 +161,26 @@ PH_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
 
 # Disinfectant types (from PoolCop Evolution manual §5.4.3 ORP Control)
 DISINFECTANT_TYPES: Final[dict[int, str]] = {
-    0: "Read",
+    0: "Read Only",
     1: "Chlorine",
     2: "Salt",
     3: "Bromine",
-    4: "Other",
+    4: "PoolCop Ocean",
+    5: "DA Space",
+    6: "DA Gen",
+    7: "Aquark",
 }
 
 # Descriptions for disinfectant types
 DISINFECTANT_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
     0: "Read and display ORP only. No dosing control.",
-    1: "Liquid chlorine injection. Controlled by ORP sensor via Aux 6.",
-    2: "Salt water chlorinator. External system controlled via Aux 6.",
-    3: "Bromine dosing. Controlled by ORP sensor via Aux 6.",
-    4: "Other disinfection method. Algorithm not optimized for specific type.",
+    1: "Liquid chlorine injection. Controlled by ORP sensor.",
+    2: "Salt water chlorinator. External system controlled.",
+    3: "Bromine dosing. Controlled by ORP sensor.",
+    4: "PoolCop Ocean integrated disinfection system.",
+    5: "Dryden Aqua DA Space disinfection system.",
+    6: "Dryden Aqua DA Gen disinfection system.",
+    7: "Aquark disinfection system.",
 }
 
 OPERATION_MODES = {
@@ -175,8 +192,8 @@ OPERATION_MODES = {
     5: "Manual",
     6: "Paused",
     7: "External",
-    8: "Eco+",
-    9: "Continuous",
+    8: "Water Level Management",
+    9: "24/24",
 }
 
 # Descriptions for operating modes (from PoolCop Evolution manual §4.4.4.4)
@@ -189,12 +206,12 @@ OPERATION_MODE_DESCRIPTIONS: Final[dict[int, str]] = {
     5: "Manual mode. Pump started by user, runs outside programmed timer periods.",
     6: "Paused. All automatic actions suspended.",
     7: "External mode. Pump controlled by external system.",
-    8: "Eco+ intelligent mode. Runtime adjusted based on water temperature.",
-    9: "Continuous mode. Runs 23h/day in two 11h30 cycles.",
+    8: "Water level management in progress. Refill or reduction active.",
+    9: "24/24 continuous mode. Pump runs non-stop.",
 }
 
-# Operating modes where filtration cycles are active and cycle sensors are relevant
-CYCLE_ACTIVE_MODES: Final[set[int]] = {2, 3, 4, 8, 9}
+# Running status modes where filtration cycles are active and cycle sensors are relevant
+CYCLE_ACTIVE_MODES: Final[set[int]] = {2, 3, 4, 9}
 
 # Descriptions for valve positions (from PoolCop Evolution manual §4.4.4)
 VALVE_POSITION_DESCRIPTIONS: Final[dict[int, str]] = {
@@ -204,17 +221,19 @@ VALVE_POSITION_DESCRIPTIONS: Final[dict[int, str]] = {
     3: "Reverse flow through filter to clean media. Water sent to drain.",
     4: "Water recirculates bypassing filter entirely. No filtration.",
     5: "Brief forward flow to drain after backwash to settle filter media.",
-    6: "Valve position could not be determined.",
-    7: "No multiway valve installed.",
+    6: "Valve position error. Position could not be determined.",
+    7: "Valve rotation error. Rotation failed.",
+    8: "Valve error. No disk detected.",
+    9: "Valve is currently rotating to target position.",
 }
 
 # Descriptions for water level states
 WATERLEVEL_STATE_DESCRIPTIONS: Final[dict[int, str]] = {
-    0: "Water level sensor not installed.",
+    0: "Water level sensor faulty. Check sensor wiring and condition.",
     1: "Water level low. Auto refill will start if enabled.",
     2: "Water level normal. No action required.",
     3: "Water level high. Reduction may occur if auto reduce is enabled.",
-    4: "Water level sensor error. Check sensor wiring and condition.",
+    4: "Water level very high. Draining may occur if auto reduce is enabled.",
 }
 
 # Descriptions for forced filtration modes (from PoolCop Evolution manual §4.4.4.5.7)
@@ -225,15 +244,25 @@ FORCED_FILTRATION_DESCRIPTIONS: Final[dict[int, str]] = {
     3: "Pump forced on for 72h. Overrides Cycle 1 times, max 23h/day. Reverts when done.",
 }
 
-# Descriptions for pump types (from PoolCop Evolution manual §5.5)
+# Descriptions for pump types (from PoolCop Evolution manual §5.6.2 Pump Data)
 PUMP_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
-    0: "Pump type not configured.",
-    1: "Single fixed speed. On/off control only.",
-    2: "Two speed motor. Aux 1 controls high/low speed.",
-    3: "Three speed motor. Aux 1-3 control speed selection.",
-    4: "Variable speed drive. Continuous speed adjustment.",
-    5: "Variable speed with 3-step control via aux relays.",
-    6: "Pump controlled by external system. PoolCop does not control start/stop.",
+    0: "Single fixed speed. On/off control only.",
+    1: "Pentair IntelliComm variable speed pump.",
+    2: "Pentair SuperFlo VS variable speed pump.",
+    3: "Hayward Eco Star variable speed pump.",
+    4: "Hayward Range VSTD variable speed pump.",
+    5: "Speck Badu Eco Touch-Pro variable speed pump.",
+    6: "Speck Badu 90 Eco Motion variable speed pump.",
+    7: "Zodiac FloPro VS variable speed pump.",
+    8: "Invertek OptiDrive variable frequency drive.",
+    9: "Binary combination speed control via aux relays.",
+    10: "Davey ProMaster VSD400 variable speed pump.",
+    11: "ACIS VIPool MKB variable speed pump.",
+    12: "DAB E.Swim / E.Pro variable speed pump.",
+    13: "Aquagem / Pahlen variable speed pump.",
+    14: "SACI Epool Ejoy variable speed pump.",
+    15: "Schneider ATV212 variable frequency drive.",
+    16: "No pump installed. PoolCop does not control filtration.",
 }
 
 # Descriptions for pool types
