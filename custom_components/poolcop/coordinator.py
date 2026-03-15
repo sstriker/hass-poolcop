@@ -580,6 +580,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         data = {
             "cycle_durations": self._cycle_durations,
             "flow_rates": self.flow_rates,
+            "daily_volume": self._daily_volume,
+            "daily_volume_date": self._daily_volume_date,
         }
         await self._store.async_save(data)
         LOGGER.debug("Saved learned data to persistent storage")
@@ -599,6 +601,15 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 for k, v in stored_data["flow_rates"].items():
                     self.flow_rates[int(k)] = v
                 LOGGER.debug("Loaded saved flow rates: %s", self.flow_rates)
+
+            if "daily_volume" in stored_data and "daily_volume_date" in stored_data:
+                today = datetime.now().strftime("%Y-%m-%d")
+                if stored_data["daily_volume_date"] == today:
+                    self._daily_volume = float(stored_data["daily_volume"])
+                    self._daily_volume_date = today
+                    LOGGER.debug(
+                        "Restored daily volume: %.3f m³", self._daily_volume
+                    )
 
     async def async_config_entry_first_refresh(self) -> None:
         """First refresh handling."""
