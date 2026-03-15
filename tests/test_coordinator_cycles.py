@@ -128,5 +128,3 @@ async def test_cycle_no_transition_same_mode(coordinator):
 
     coordinator._update_cycle_tracking(_make_status(3))
     assert len(coordinator._cycle_transitions) == 0
-
-

@@ -201,9 +201,7 @@ async def test_service_toggle_pump_error(
 
     mock_poolcop.toggle_pump.side_effect = ConnectionError("offline")
 
-    await hass.services.async_call(
-        DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True
-    )
+    await hass.services.async_call(DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True)
 
 
 async def test_service_toggle_aux_error(
@@ -264,6 +262,4 @@ async def test_service_clear_alarm_error(
 
     mock_poolcop.clear_alarm.side_effect = ConnectionError("offline")
 
-    await hass.services.async_call(
-        DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True
-    )
+    await hass.services.async_call(DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True)

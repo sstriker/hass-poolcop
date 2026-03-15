@@ -607,9 +607,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if stored_data["daily_volume_date"] == today:
                     self._daily_volume = float(stored_data["daily_volume"])
                     self._daily_volume_date = today
-                    LOGGER.debug(
-                        "Restored daily volume: %.3f m³", self._daily_volume
-                    )
+                    LOGGER.debug("Restored daily volume: %.3f m³", self._daily_volume)
 
     async def async_config_entry_first_refresh(self) -> None:
         """First refresh handling."""
