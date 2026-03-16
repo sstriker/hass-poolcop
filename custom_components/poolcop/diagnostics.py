@@ -6,30 +6,24 @@ from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .coordinator import PoolCopDataUpdateCoordinator
 
-TO_REDACT = {CONF_API_KEY}
-# Add fields that should be redacted from the coordinator data
-COORDINATOR_FIELDS_TO_REDACT = {
-    "token",
-    "apikey",
-    "poolcop_api_id",
-    "poolcop_id",
-    "ip",
-    "remote",
-    "href",
+TO_REDACT = {"token", "access_token", "refresh_token"}
+DATA_TO_REDACT = {
     "id",
+    "pool_id",
+    "user_id",
+    "uuid",
+    "mac",
     "latitude",
     "longitude",
     "nickname",
-    "poolcop",
-    "image",
-    "mac_address",
-    "dns",
+    "email",
+    "firstname",
+    "lastname",
 }
 
 
@@ -39,58 +33,84 @@ async def async_get_config_entry_diagnostics(
     """Return diagnostics for a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    # Prepare the diagnostic data
-    diagnostics_data = {
-        "config_entry_data": async_redact_data(dict(config_entry.data), TO_REDACT),
-        "coordinator_data": [],
+    diagnostics_data: dict[str, Any] = {
+        "config_entry": {
+            "data": async_redact_data(dict(config_entry.data), TO_REDACT),
+            "options": dict(config_entry.options),
+            "unique_id": config_entry.unique_id,
+            "version": config_entry.version,
+        },
+        "coordinator": {
+            "flow_rates": coordinator.flow_rates,
+            "update_interval_seconds": (
+                coordinator.update_interval.total_seconds()
+                if coordinator.update_interval
+                else None
+            ),
+        },
     }
 
-    # Create a redacted copy of the coordinator data
     if coordinator.data:
-        # Make a copy of the data dictionary
-        data_copy = coordinator.data._asdict()
+        data = coordinator.data
+        device_info = {
+            "id": "**REDACTED**",
+            "nickname": "**REDACTED**",
+            "is_connected": data.device.is_connected,
+            "is_fully_connected": data.device.is_fully_connected,
+        }
 
-        # Handle special case for status data, which is a dictionary
-        if data_copy.get("status"):
-            status_copy = dict(data_copy["status"])
+        state_info = {
+            "status": data.state.status,
+            "water_temperature": data.state.water_temperature,
+            "air_temperature": data.state.air_temperature,
+            "ph": data.state.ph,
+            "orp": data.state.orp,
+            "battery_voltage": data.state.battery_voltage,
+            "mains_power_lost": data.state.mains_power_lost,
+            "pumps_count": len(data.state.pumps),
+            "water_level_installed": data.state.water_level.installed,
+            "water_level_state": data.state.water_level.state,
+        }
 
-            # Redact sensitive information in api_token if present
-            if "api_token" in status_copy:
-                status_copy["api_token"] = async_redact_data(
-                    dict(status_copy["api_token"]), COORDINATOR_FIELDS_TO_REDACT
-                )
+        if data.pump:
+            state_info["pump"] = {
+                "current_speed": data.pump.current_speed,
+                "valve_position": data.pump.valve_position,
+                "pump_state": data.pump.pump_state,
+                "pressure": data.pump.pressure,
+            }
 
-            # Redact network information containing IP addresses
-            if "PoolCop" in status_copy and "network" in status_copy["PoolCop"]:
-                status_copy["PoolCop"]["network"] = async_redact_data(
-                    dict(status_copy["PoolCop"]["network"]),
-                    COORDINATOR_FIELDS_TO_REDACT,
-                )
+        alarm_info = [
+            {
+                "code": a.code,
+                "severity": a.severity,
+                "label": a.label,
+                "is_active": a.is_active,
+            }
+            for a in data.alarms
+        ]
 
-            # Redact URLs in links
-            if "PoolCop" in status_copy and "links" in status_copy["PoolCop"]:
-                # Redact each link href
-                links = status_copy["PoolCop"]["links"]
-                for link_key in links:
-                    if "href" in links[link_key]:
-                        links[link_key] = async_redact_data(
-                            dict(links[link_key]), COORDINATOR_FIELDS_TO_REDACT
-                        )
+        aux_info = [
+            {
+                "module_id": a.module_id,
+                "aux_channel": a.aux_channel,
+                "mode": a.mode,
+                "label": a.label,
+                "is_reserved": a.is_reserved,
+                "status": a.status,
+            }
+            for a in data.auxiliaries
+        ]
 
-            # Completely redact Pool section as it contains personal information
-            if "Pool" in status_copy:
-                status_copy["Pool"] = "**REDACTED**"
-
-            data_copy["status"] = status_copy
-
-        # Remove the coordinator reference as it's not serializable
-        if "_coordinator" in data_copy:
-            del data_copy["_coordinator"]
-
-        diagnostics_data["coordinator_data"] = [data_copy]
-
-    # Add setup times if available
-    if hasattr(config_entry, "runtime_data") and config_entry.runtime_data:
-        diagnostics_data["setup_times"] = config_entry.runtime_data
+        diagnostics_data["data"] = {
+            "device": device_info,
+            "state": state_info,
+            "alarms": alarm_info,
+            "auxiliaries": aux_info,
+            "has_pool": data.pool is not None,
+            "has_pump_config": data.pump_config is not None,
+            "has_filter_config": data.filter_config is not None,
+            "has_equipments": data.equipments is not None,
+        }
 
     return diagnostics_data

@@ -30,75 +30,56 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         poolcop_id = coordinator.config_entry.unique_id
         self._attr_unique_id = f"{DOMAIN}_{poolcop_id}_{description.key}"
         self.entity_description = description
-        self._attr_entity_registry_enabled_default = self._is_component_enabled()
 
-    def _is_component_enabled(self) -> bool:
+    @staticmethod
+    def is_component_installed(
+        coordinator: PoolCopDataUpdateCoordinator, key: str
+    ) -> bool:
         """Check if this entity's component is installed/enabled in PoolCop."""
-        # Default to enabled
-        key = self.entity_description.key
+        data = coordinator.data
+        if data is None:
+            return True
 
-        # Check for specific components that might not be installed
+        equipments = data.equipments or {}
+
         if key == "ph_control" or key.startswith("ph_") or key == "pH":
-            return bool(self.coordinator.data.status_value("conf.pH"))
+            return bool(equipments.get("pH") or equipments.get("ph"))
 
         if key == "orp_control" or key.startswith("orp_"):
-            return bool(self.coordinator.data.status_value("conf.orp"))
+            return bool(equipments.get("orp") or equipments.get("ORP"))
 
         if key in {"ioniser", "ioniser_control"} or key.startswith("ioniser_"):
-            return bool(self.coordinator.data.status_value("conf.ioniser"))
+            return bool(equipments.get("ioniser"))
 
         if key == "autochlor_control" or key.startswith("autochlor_"):
-            return bool(self.coordinator.data.status_value("conf.autochlor"))
+            return bool(equipments.get("autochlor"))
 
         if key.startswith("waterlevel_") or key == "water_level":
-            return bool(self.coordinator.data.status_value("conf.waterlevel"))
+            return data.state.water_level.installed
 
-        # Check for temperature sensors
         if key == "temperature_air":
-            return bool(self.coordinator.data.status_value("conf.airtemp"))
+            return bool(equipments.get("air") or equipments.get("airTemperature"))
 
-        if key == "temperature_water":
-            return bool(self.coordinator.data.status_value("conf.watertemp"))
-
-        if key in {"temperature_solar", "solar_temperature"}:
-            return bool(self.coordinator.data.status_value("conf.solartemp"))
-
-        # Pressure sensor
-        if key == "pressure":
-            return bool(self.coordinator.data.status_value("conf.pressure"))
-
-        # Lighting control
-        if key.startswith("light_") or key == "lighting_control":
-            return bool(self.coordinator.data.status_value("conf.lighting"))
-
-        # Auxiliary controls
-        if key.startswith("aux_") or key == "auxiliary_control":
-            aux_num = key.split("_")[1] if "_" in key else None
-            if aux_num and aux_num.isdigit():
-                return bool(self.coordinator.data.status_value(f"conf.aux{aux_num}"))
-
-        # Solar heating
-        if key.startswith("solar_") or key == "solar_control":
-            return bool(self.coordinator.data.status_value("conf.solar"))
-
-        # Enable all other entities by default
         return True
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return device information about this PoolCop instance."""
         poolcop_id: str = cast(str, self.coordinator.config_entry.unique_id)
+        data = self.coordinator.data
+
+        # Use device nickname or pool nickname
+        name = "PoolCop"
+        if data:
+            if data.device and data.device.nickname:
+                name = data.device.nickname
+            elif data.pool and data.pool.nickname:
+                name = data.pool.nickname
 
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
-            identifiers={
-                (
-                    DOMAIN,
-                    poolcop_id,
-                )
-            },
-            configuration_url=f"https://poolcopilot.com/mypoolcop/select/{poolcop_id}",
+            identifiers={(DOMAIN, poolcop_id)},
+            configuration_url="https://cloud.poolcop.net",
             manufacturer="PCFR",
-            name="PoolCop",
-            sw_version=self.coordinator.data.status_value("network.version"),
+            name=name,
         )

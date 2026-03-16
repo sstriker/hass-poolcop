@@ -2,92 +2,99 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import time
-from typing import Any, NamedTuple
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
 
-from poolcop import PoolCopilot, PoolCopilotConnectionError, PoolCopilotRateLimitError
-
+from aiopoolcop import (
+    PoolCopAlarm,
+    PoolCopAuxiliary,
+    PoolCopCloudAPI,
+    PoolCopCloudAuthError,
+    PoolCopCloudConnectionError,
+    PoolCopCloudRateLimitError,
+    PoolCopDevice,
+    PoolCopState,
+    Pool,
+    PumpInfo,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.storage import Store
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    ConfigEntryAuthFailed,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 
 from .const import (
-    ALARM_FETCH_INTERVAL,
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
-    CYCLE_END_PREDICTION_WINDOW,
+    CONFIG_UPDATE_INTERVAL,
     DOMAIN,
     LOGGER,
-    NORMAL_UPDATE_INTERVAL,
     STORAGE_KEY,
     STORAGE_VERSION,
-    TRANSITION_UPDATE_INTERVAL,
+    UPDATE_INTERVAL,
 )
 
 # Default cycle durations (in seconds)
-DEFAULT_CYCLE_DURATIONS = {
-    0: 0,  # Idle - no duration
-    1: 7200,  # Cycle 1 - start with 2 hours as default
-    2: 600,  # Backwash - start with 10 minutes as default
-    3: 3600,  # Cycle 2 - start with 1 hour as default
-    4: 900,  # Waste - start with 15 minutes as default
-    5: 300,  # Rinse - start with 5 minutes as default
-    6: 0,  # Pause - no predictable duration
-    7: 0,  # External Filter - no predictable duration
+DEFAULT_CYCLE_DURATIONS: dict[str, int] = {
+    "Stop": 0,
+    "Freeze": 7200,
+    "Forced": 7200,
+    "Auto": 3600,
+    "Timer": 7200,
+    "Manual": 0,
+    "Paused": 0,
+    "External": 0,
 }
 
 
-class PoolCopData(NamedTuple):
-    """Class for defining data in dict."""
+@dataclass
+class PoolCopData:
+    """Container for PoolCop cloud API data."""
 
-    status: dict[str, Any] | None
-    alarms: dict[str, Any] | None = None
-    commands: dict[str, Any] | None = None
-    active_alarms: list[dict[str, Any]] | None = None
-    cycle_status: dict[str, Any] | None = None  # For tracking cycle information
-    next_timer_event: dict[str, Any] | None = None  # For tracking upcoming timer events
-    last_command_result: dict[str, Any] | None = (
-        None  # Result from the most recent command
-    )
+    device: PoolCopDevice
+    state: PoolCopState
+    alarms: list[PoolCopAlarm]
+    auxiliaries: list[PoolCopAuxiliary]
+    pool: Pool | None = None
 
-    def status_value(self, path: str, prefix: str = "PoolCop") -> Any:
-        """Get value from a path (e.g. 'temperature.water') from the Poolcop status."""
-        full_path = f"{prefix}.{path}"
+    # Configuration (fetched every 30 min)
+    pump_config: dict[str, Any] | None = None
+    filter_config: dict[str, Any] | None = None
+    pool_config: dict[str, Any] | None = None
+    ph_config: dict[str, Any] | None = None
+    orp_config: dict[str, Any] | None = None
+    waterlevel_config: dict[str, Any] | None = None
+    equipments: dict[str, Any] | None = None
 
-        try:
-            result = self.status
-            for part in filter(None, full_path.split(".")):
-                if not isinstance(result, dict):
-                    return None
-                result = result.get(part)
-                if result is None:
-                    return None
-        except (KeyError, TypeError) as err:
-            LOGGER.debug(
-                "Error accessing path %s with prefix %s: %s", path, prefix, err
-            )
-            return None
-        else:
-            return result
+    # Computed (from coordinator)
+    cycle_status: dict[str, Any] | None = None
+
+    @property
+    def pump(self) -> PumpInfo | None:
+        """Return the first pump info or None."""
+        return self.state.pumps[0] if self.state.pumps else None
 
     def has_active_alarms(self) -> bool:
         """Check if there are any active alarms."""
-        return bool(self.active_alarms)
+        return any(a.is_active for a in self.alarms)
 
 
 class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
-    """Class to manage fetching PoolCop data from single endpoint."""
+    """Class to manage fetching PoolCop data from cloud API."""
 
     config_entry: ConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
-        api_key: str,
+        api: PoolCopCloudAPI,
+        poolcop_id: int,
         config_entry: ConfigEntry,
     ) -> None:
         """Initialize global PoolCop data updater."""
@@ -95,79 +102,128 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             hass,
             LOGGER,
             name=DOMAIN,
-            update_interval=timedelta(seconds=NORMAL_UPDATE_INTERVAL),
+            update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
-        self.poolcopilot = PoolCopilot(
-            session=async_get_clientsession(hass),
-            api_key=api_key,
-        )
+        self.api = api
+        self.poolcop_id = poolcop_id
 
-        # Initialize pump flow rates from defaults
-        self.flow_rates = {}
-
-        # Update flow rates from config entry if available
-        if CONF_FLOW_RATE_1 in config_entry.data:
-            self.flow_rates[1] = config_entry.data[CONF_FLOW_RATE_1]
-        if CONF_FLOW_RATE_2 in config_entry.data:
-            self.flow_rates[2] = config_entry.data[CONF_FLOW_RATE_2]
-        if CONF_FLOW_RATE_3 in config_entry.data:
-            self.flow_rates[3] = config_entry.data[CONF_FLOW_RATE_3]
+        # Initialize pump flow rates from options (preferred) or data
+        self.flow_rates: dict[str, float] = {}
+        for speed_key, conf_key in (
+            ("Speed1", CONF_FLOW_RATE_1),
+            ("Speed2", CONF_FLOW_RATE_2),
+            ("Speed3", CONF_FLOW_RATE_3),
+        ):
+            value = config_entry.options.get(conf_key, config_entry.data.get(conf_key))
+            if value is not None:
+                self.flow_rates[speed_key] = float(value)
 
         # Setup storage for persisting learned data
-        self._store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{api_key}")
+        self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{poolcop_id}")
 
-        # Track when we last fetched alarms to avoid excessive API calls
-        self._last_alarm_fetch = 0
-        self._active_alarms = []
-        self._previous_alarm_count = 0
+        # Daily filtration volume tracking
+        self._daily_volume: float = 0.0
+        self._daily_volume_date: str | None = None
+        self._last_flow_update: float | None = None
 
         # Cycle tracking
-        self._last_operation_mode = None
-        self._current_cycle_start = None
-        self._cycle_durations = DEFAULT_CYCLE_DURATIONS.copy()
-        self._cycle_transitions = []  # Track recent cycle transitions for analysis
-        self._next_update_time = time.time()  # When to perform next update
+        self._last_operation_mode: str | None = None
+        self._current_cycle_start: float | None = None
+        self._cycle_durations: dict[str, int] = dict(DEFAULT_CYCLE_DURATIONS)
 
-    def _adjust_update_interval(self) -> None:
-        """Adjust the update interval based on cycle state."""
-        now = time.time()
-        cycle_mode = self.data.status_value("status.poolcop")
+        # Config fetch tracking
+        self._last_config_fetch: float = 0.0
 
-        # Default to normal interval
-        new_interval = NORMAL_UPDATE_INTERVAL
+    def get_current_flow_rate(self) -> float:
+        """Return the current effective flow rate in m3/h."""
+        if not hasattr(self, "data") or self.data is None:
+            return 0.0
 
-        # If we have a current cycle and know its typical duration
-        if (
-            cycle_mode is not None
-            and self._current_cycle_start is not None
-            and cycle_mode in self._cycle_durations
-            and self._cycle_durations[cycle_mode] > 0
-        ):
-            # Calculate expected end time
-            expected_duration = self._cycle_durations[cycle_mode]
-            cycle_elapsed = now - self._current_cycle_start
-            time_remaining = expected_duration - cycle_elapsed
+        pump = self.data.pump
+        if pump is None or not pump.pump_state:
+            return 0.0
 
-            # If we're approaching the end of a cycle, increase update frequency
-            if 0 < time_remaining < CYCLE_END_PREDICTION_WINDOW:
-                new_interval = TRANSITION_UPDATE_INTERVAL
-                LOGGER.debug(
-                    "Cycle %s approaching end (%.1f minutes remaining). Using faster update interval.",
-                    cycle_mode,
-                    time_remaining / 60,
-                )
+        # Valve must be in a flowing position
+        if pump.valve_position not in ("Filter", "Bypass", "Rinse"):
+            return 0.0
 
-        # Update the coordinator's update interval if it changed
-        if self.update_interval.total_seconds() != new_interval:
-            self.update_interval = timedelta(seconds=new_interval)
-            LOGGER.debug("Adjusted update interval to %s seconds", new_interval)
+        return self.flow_rates.get(pump.current_speed, 0.0)
 
-        # Schedule next update
-        self._next_update_time = now + new_interval
+    def _update_daily_volume(self) -> None:
+        """Accumulate filtered volume based on current flow rate and elapsed time."""
+        now = time.monotonic()
 
-    def _update_cycle_tracking(self, status_data: dict) -> dict:
+        try:
+            today = datetime.now().strftime("%Y-%m-%d")
+        except Exception:
+            today = None
+
+        if today and today != self._daily_volume_date:
+            self._daily_volume = 0.0
+            self._daily_volume_date = today
+
+        if self._last_flow_update is not None:
+            elapsed_seconds = now - self._last_flow_update
+            if 0 < elapsed_seconds <= 600:
+                flow_rate = self.get_current_flow_rate()
+                self._daily_volume += flow_rate * (elapsed_seconds / 3600.0)
+
+        self._last_flow_update = now
+
+    @property
+    def planned_remaining_volume(self) -> float:
+        """Return the planned remaining filtration volume in m3 for today."""
+        if not self.data:
+            return 0.0
+
+        pump = self.data.pump
+        if pump is None:
+            return 0.0
+
+        flow = self.get_current_flow_rate()
+        if flow <= 0:
+            return 0.0
+
+        # Estimate remaining hours until midnight
+        try:
+            now = datetime.now()
+            midnight = now.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + timedelta(days=1)
+            remaining_hours = min((midnight - now).total_seconds() / 3600.0, 23.0)
+        except Exception:
+            return 0.0
+
+        return round(flow * remaining_hours, 3)
+
+    @property
+    def planned_remaining_turnovers(self) -> float | None:
+        """Return planned remaining turnovers."""
+        if not self.data or not self.data.pool_config:
+            return None
+        pool_volume = self.data.pool_config.get("volume")
+        if not pool_volume or pool_volume <= 0:
+            return None
+        return round(self.planned_remaining_volume / pool_volume, 2)
+
+    @property
+    def daily_volume(self) -> float:
+        """Return the accumulated daily filtration volume in m3."""
+        return round(self._daily_volume, 3)
+
+    @property
+    def daily_turnovers(self) -> float | None:
+        """Return the number of pool turnovers today."""
+        if not hasattr(self, "data") or self.data is None or not self.data.pool_config:
+            return None
+        pool_volume = self.data.pool_config.get("volume")
+        if not pool_volume or pool_volume <= 0:
+            return None
+        return round(self._daily_volume / pool_volume, 2)
+
+    def _update_cycle_tracking(self, state: PoolCopState) -> dict[str, Any]:
         """Track cycle changes and update predictions."""
-        cycle_status = {
+        cycle_status: dict[str, Any] = {
             "previous_mode": self._last_operation_mode,
             "predicted_end": None,
             "elapsed_time": None,
@@ -175,427 +231,168 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         }
 
         try:
-            current_mode = status_data["PoolCop"]["status"]["poolcop"]
+            current_mode = state.status
             now = time.time()
 
-            # Check if operation mode changed
-            if self._last_operation_mode != current_mode:
-                if self._last_operation_mode is not None:
-                    # Record cycle transition data
-                    if self._current_cycle_start is not None:
-                        cycle_duration = now - self._current_cycle_start
-
-                        # Only update duration for non-idle/pause/external modes
-                        if self._last_operation_mode in [1, 2, 3, 4, 5]:
-                            # Update the average duration using exponential moving average
-                            # Weight: 30% new, 70% old
-                            old_duration = self._cycle_durations[
-                                self._last_operation_mode
-                            ]
-                            if old_duration > 0:
-                                new_duration = (0.3 * cycle_duration) + (
-                                    0.7 * old_duration
-                                )
-                                self._cycle_durations[self._last_operation_mode] = (
-                                    new_duration
-                                )
-                                LOGGER.debug(
-                                    "Updated duration for mode %s: %.1f minutes",
-                                    self._last_operation_mode,
-                                    new_duration / 60,
-                                )
-
-                        # Record transition for analysis
-                        self._cycle_transitions.append(
-                            {
-                                "from_mode": self._last_operation_mode,
-                                "to_mode": current_mode,
-                                "duration": cycle_duration,
-                                "timestamp": now,
-                            }
+            if (
+                self._last_operation_mode != current_mode
+                and self._last_operation_mode is not None
+            ):
+                if self._current_cycle_start is not None:
+                    cycle_duration = now - self._current_cycle_start
+                    old_duration = self._cycle_durations.get(
+                        self._last_operation_mode, 0
+                    )
+                    if old_duration > 0:
+                        new_duration = int(
+                            (0.3 * cycle_duration) + (0.7 * old_duration)
                         )
+                        self._cycle_durations[self._last_operation_mode] = new_duration
 
-                        # Keep only last 20 transitions
-                        if len(self._cycle_transitions) > 20:
-                            self._cycle_transitions.pop(0)
-
-                # New cycle started
                 self._current_cycle_start = now
-                LOGGER.debug(
-                    "Cycle transition detected: %s -> %s",
-                    self._last_operation_mode,
-                    current_mode,
-                )
 
-            # Update last mode
             self._last_operation_mode = current_mode
 
-            # Calculate elapsed and predicted remaining time
             if self._current_cycle_start is not None:
                 elapsed_time = now - self._current_cycle_start
                 cycle_status["elapsed_time"] = elapsed_time
 
-                # Only predict for cycles with known durations
-                if (
-                    current_mode in [1, 2, 3, 4, 5]
-                    and self._cycle_durations[current_mode] > 0
-                ):
-                    expected_duration = self._cycle_durations[current_mode]
-                    remaining_time = max(0, expected_duration - elapsed_time)
+                expected = self._cycle_durations.get(current_mode, 0)
+                if expected > 0:
+                    remaining_time = max(0, expected - elapsed_time)
                     cycle_status["remaining_time"] = remaining_time
                     cycle_status["predicted_end"] = now + remaining_time
 
         except (KeyError, TypeError):
-            # Don't crash cycle tracking on data parsing errors
             pass
 
         return cycle_status
 
-    def _check_upcoming_timer_events(self) -> dict | None:
-        """Check for upcoming timer events and adjust update interval accordingly."""
-        if not self.data or not self.data.status:
-            return None
-
-        now = datetime.now()
-        now_timestamp = now.timestamp()
-        upcoming_events = []
+    async def _async_fetch_configs(self) -> dict[str, Any]:
+        """Fetch configuration endpoints (less frequently)."""
+        configs: dict[str, Any] = {}
+        try:
+            configs["pump_config"] = await self.api.get_pump_config(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch pump config")
 
         try:
-            # Check enabled filtration cycles
-            timers_data = self.data.status_value("timers")
-            if not timers_data:
-                return None
-
-            # Process cycle timers
-            for cycle_name in ["cycle1", "cycle2"]:
-                cycle = timers_data.get(cycle_name)
-                if not cycle or cycle.get("enabled") != 1:
-                    continue
-
-                # Process start time
-                start_time_str = cycle.get("start")
-                if start_time_str and start_time_str != "00:00:00":
-                    start_time = self._time_str_to_datetime(start_time_str)
-                    if start_time:
-                        seconds_until = start_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"{cycle_name}_start",
-                                    "time": start_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-                # Process stop time
-                stop_time_str = cycle.get("stop")
-                if stop_time_str and stop_time_str != "00:00:00":
-                    stop_time = self._time_str_to_datetime(stop_time_str)
-                    if stop_time:
-                        seconds_until = stop_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"{cycle_name}_stop",
-                                    "time": stop_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-            # Process auxiliary timers that are enabled and switchable
-            for aux_id in range(1, 7):
-                # First check if this aux is switchable by checking the aux data
-                aux_data = next(
-                    (
-                        a
-                        for a in self.data.status_value("aux", [])
-                        if a.get("id") == aux_id
-                    ),
-                    None,
-                )
-                if not aux_data or not aux_data.get("switchable"):
-                    continue
-
-                # Now check the timer
-                aux_timer = timers_data.get(f"aux{aux_id}")
-                if not aux_timer or aux_timer.get("enabled") != 1:
-                    continue
-
-                # Process start time
-                start_time_str = aux_timer.get("start")
-                if start_time_str and start_time_str != "00:00:00":
-                    start_time = self._time_str_to_datetime(start_time_str)
-                    if start_time:
-                        seconds_until = start_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"aux{aux_id}_start",
-                                    "time": start_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-                # Process stop time
-                stop_time_str = aux_timer.get("stop")
-                if stop_time_str and stop_time_str != "00:00:00":
-                    stop_time = self._time_str_to_datetime(stop_time_str)
-                    if stop_time:
-                        seconds_until = stop_time.timestamp() - now_timestamp
-                        # Only consider events in the near future (next 30 minutes)
-                        if 0 < seconds_until < 1800:
-                            upcoming_events.append(
-                                {
-                                    "type": f"aux{aux_id}_stop",
-                                    "time": stop_time,
-                                    "seconds_until": seconds_until,
-                                }
-                            )
-
-            # No upcoming events found
-            if not upcoming_events:
-                return None
-
-            # Find the closest upcoming event
-            upcoming_events.sort(key=lambda e: e["seconds_until"])
-            next_event = upcoming_events[0]
-
-            LOGGER.debug(
-                "Found upcoming timer event: %s in %.1f minutes",
-                next_event["type"],
-                next_event["seconds_until"] / 60,
-            )
-        except (KeyError, TypeError, ValueError) as err:
-            LOGGER.debug("Error checking timer events: %s", err)
-            return None
-        else:
-            return next_event
-
-    def _time_str_to_datetime(self, time_str: str) -> datetime | None:
-        """Convert a time string (HH:MM:SS) to a datetime object for today/tomorrow."""
-        if not time_str or time_str == "00:00:00":
-            return None
+            configs["filter_config"] = await self.api.get_filter_config(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch filter config")
 
         try:
-            # Get timezone from Pool data
-            timezone = None
-            if self.data and self.data.status:
-                pool_data = self.data.status_value("", prefix="Pool")
-                if (
-                    pool_data
-                    and isinstance(pool_data, dict)
-                    and "timezone" in pool_data
-                ):
-                    try:
-                        import zoneinfo
+            configs["pool_config"] = await self.api.get_pool_config(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch pool config")
 
-                        timezone = zoneinfo.ZoneInfo(pool_data["timezone"])
-                    except (ImportError, zoneinfo.ZoneInfoNotFoundError):
-                        LOGGER.debug("Could not use timezone %s", pool_data["timezone"])
+        try:
+            configs["ph_config"] = await self.api.get_ph_config(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch pH config")
 
-            # If we couldn't get the timezone from pool data, use local timezone
-            if timezone is None:
-                from datetime import timezone as dt_timezone
-                from time import localtime
+        try:
+            configs["orp_config"] = await self.api.get_orp_config(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch ORP config")
 
-                utc_offset = -localtime().tm_gmtoff
-                timezone = dt_timezone(timedelta(seconds=utc_offset))
-
-            hour, minute, second = map(int, time_str.split(":"))
-            now = datetime.now(tz=timezone)
-            result = datetime(
-                year=now.year,
-                month=now.month,
-                day=now.day,
-                hour=hour,
-                minute=minute,
-                second=second,
-                tzinfo=timezone,
+        try:
+            configs["waterlevel_config"] = await self.api.get_waterlevel_config(
+                self.poolcop_id
             )
+        except Exception:
+            LOGGER.debug("Failed to fetch water level config")
 
-            # Handle case where the time is for tomorrow (e.g., if now is 23:00 and time is 01:00)
-            if result < now and hour < 12:
-                result = result + timedelta(days=1)
-        except (ValueError, TypeError) as err:
-            LOGGER.debug("Error parsing time string %s: %s", time_str, err)
-            return None
-        else:
-            return result
+        try:
+            configs["equipments"] = await self.api.get_equipments(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch equipments")
+
+        return configs
 
     async def _async_update_data(self) -> PoolCopData:
-        """Fetch data from PoolCop."""
+        """Fetch data from PoolCop cloud API."""
         try:
-            status = await self.poolcopilot.status()
+            # Always fetch state, alarms, auxiliaries
+            state = await self.api.get_state(self.poolcop_id)
+            alarms = await self.api.get_alarms(self.poolcop_id)
+            auxiliaries = await self.api.get_auxiliaries(self.poolcop_id)
 
-            # Check for alarm counts in the status data
-            alarm_data = None
+            # Fetch device info (contains nickname, connection status)
+            device = await self.api.get_poolcop(self.poolcop_id)
+
+            # Fetch pool info
+            pool = None
+            if device.pool_id:
+                try:
+                    pool = await self.api.get_pool(device.pool_id)
+                except Exception:
+                    LOGGER.debug("Failed to fetch pool info")
+
+            # Fetch configs less frequently
+            now = time.time()
+            configs: dict[str, Any] = {}
+            if now - self._last_config_fetch > CONFIG_UPDATE_INTERVAL:
+                configs = await self._async_fetch_configs()
+                self._last_config_fetch = now
+            elif hasattr(self, "data") and self.data is not None:
+                # Carry forward previous configs
+                configs = {
+                    "pump_config": self.data.pump_config,
+                    "filter_config": self.data.filter_config,
+                    "pool_config": self.data.pool_config,
+                    "ph_config": self.data.ph_config,
+                    "orp_config": self.data.orp_config,
+                    "waterlevel_config": self.data.waterlevel_config,
+                    "equipments": self.data.equipments,
+                }
+
+            data = PoolCopData(
+                device=device,
+                state=state,
+                alarms=alarms,
+                auxiliaries=auxiliaries,
+                pool=pool,
+                cycle_status=self._update_cycle_tracking(state),
+                **configs,
+            )
+
+            # Accumulate daily filtration volume
+            self._update_daily_volume()
+
+            # Save learned data periodically
             current_time = time.time()
-            alarm_count = status.get("PoolCop", {}).get("alarms", {}).get("count", 0)
-
-            # Only fetch alarm details when:
-            # 1. We haven't fetched alarms in the last 4 hours AND there are alarms, OR
-            # 2. The alarm count has changed since our last check
-            should_fetch_alarms = (
-                current_time - self._last_alarm_fetch > ALARM_FETCH_INTERVAL
-                and alarm_count > 0
-            ) or (alarm_count != self._previous_alarm_count)
-
-            if should_fetch_alarms:
-                LOGGER.debug(
-                    "Fetching alarm data: interval=%s, previous_count=%s, current_count=%s",
-                    current_time - self._last_alarm_fetch,
-                    self._previous_alarm_count,
-                    alarm_count,
-                )
-                # Fetch current alarms (only offsetting by 0 to get most recent)
-                alarm_data = await self.poolcopilot.alarm_history(0)
-
-                # Filter for active alarms
-                if alarm_data and "alarms" in alarm_data:
-                    # Get alarms that don't have a cleared timestamp
-                    self._active_alarms = [
-                        alarm
-                        for alarm in alarm_data.get("alarms", [])
-                        if not alarm.get("cleared")
-                    ]
-
-                self._last_alarm_fetch = current_time
-                self._previous_alarm_count = alarm_count
-
-            # Create a placeholder for the data
-            data = PoolCopData(
-                status=status,
-                alarms=alarm_data,
-                active_alarms=self._active_alarms,
-                cycle_status=self._update_cycle_tracking(status),
-            )
-
-            # Check for upcoming timer events
-            if hasattr(self, "data") and self.data:
-                # We need to create temporary data before checking timer events
-                # to ensure the status_value method works correctly
-                self.data = data
-
-            # Check for timer events now that we have data
-            next_timer_event = self._check_upcoming_timer_events()
-
-            # Create the final data object with the timer event
-            data = PoolCopData(
-                status=status,
-                alarms=alarm_data,
-                active_alarms=self._active_alarms,
-                cycle_status=self._update_cycle_tracking(status),
-                next_timer_event=next_timer_event,
-            )
-
-            # Dynamic update interval adjustment based on both cycle and timer events
-            interval = NORMAL_UPDATE_INTERVAL
-
-            # First check cycle-based timing
-            if (
-                data.cycle_status
-                and data.cycle_status.get("remaining_time") is not None
-                and 0
-                < data.cycle_status.get("remaining_time", 0)
-                < CYCLE_END_PREDICTION_WINDOW
-            ):
-                interval = TRANSITION_UPDATE_INTERVAL
-                LOGGER.debug(
-                    "Cycle approaching end (%.1f minutes remaining). Using faster update interval.",
-                    data.cycle_status["remaining_time"] / 60,
-                )
-
-            # Then check timer-based timing (takes precedence if closer)
-            if next_timer_event:
-                seconds_until = next_timer_event["seconds_until"]
-                if seconds_until < 300:  # 5 minutes
-                    # Use faster polling as we approach a timer event
-                    interval = TRANSITION_UPDATE_INTERVAL
-                    LOGGER.debug(
-                        "Timer event %s approaching (%.1f minutes remaining). Using faster update interval.",
-                        next_timer_event["type"],
-                        seconds_until / 60,
-                    )
-                elif interval == NORMAL_UPDATE_INTERVAL:
-                    # Don't wait longer than 5 minutes if there's an upcoming event
-                    # but don't override transition interval if it's already set
-                    interval = min(NORMAL_UPDATE_INTERVAL, int(seconds_until / 2))
-                    LOGGER.debug(
-                        "Upcoming timer event %s (%.1f minutes). Setting interval to %d seconds.",
-                        next_timer_event["type"],
-                        seconds_until / 60,
-                        interval,
-                    )
-
-            # Update the coordinator's update interval if needed
-            if self.update_interval.total_seconds() != interval:
-                self.update_interval = timedelta(seconds=interval)
-                LOGGER.debug("Adjusted update interval to %d seconds", interval)
-
-            # Save learned data periodically - every hour
             if (
                 not hasattr(self, "_last_save_time")
                 or current_time - getattr(self, "_last_save_time", 0) > 3600
             ):
                 self.hass.async_create_task(self.async_save_learned_data())
                 self._last_save_time = current_time
-        except PoolCopilotRateLimitError as err:
-            # Add specific handling for rate limit errors with exponential backoff
-            retry_after = getattr(err, "retry_after", None)
 
-            # Use retry_after if available, otherwise use exponential backoff
-            if retry_after and isinstance(retry_after, (int, float)):
-                backoff_time = retry_after
-            else:
-                # Calculate exponential backoff based on update interval
-                # Start with 2x normal interval, cap at 30 minutes
-                current_interval = self.update_interval.total_seconds()
-                backoff_time = min(current_interval * 2, 1800)  # Max 30 minutes
-
-            LOGGER.warning(
-                "PoolCopilot API rate limit reached. Backing off for %d seconds",
-                backoff_time,
-            )
-
-            # Update the coordinator's update interval temporarily
-            self.update_interval = timedelta(seconds=backoff_time)
-
-            # Propagate a more specific error
-            raise UpdateFailed(
-                "PoolCopilot API rate limit reached, backing off"
-            ) from err
-        except PoolCopilotConnectionError as err:
-            raise UpdateFailed("Error communicating with PoolCopilot API") from err
+        except PoolCopCloudAuthError as err:
+            raise ConfigEntryAuthFailed("OAuth2 token is invalid or expired") from err
+        except PoolCopCloudRateLimitError as err:
+            retry_after = err.retry_after or 60
+            self.update_interval = timedelta(seconds=retry_after)
+            LOGGER.warning("Cloud API rate limit hit, retrying in %ds", retry_after)
+            raise UpdateFailed("Cloud API rate limit exceeded") from err
+        except PoolCopCloudConnectionError as err:
+            raise UpdateFailed("Error communicating with PoolCop cloud API") from err
+        except Exception as err:
+            LOGGER.exception("Unexpected error processing PoolCop data: %s", err)
+            raise UpdateFailed(f"Unexpected error: {err}") from err
         else:
             return data
 
-    async def async_get_alarm_history(self, offset: int = 0) -> dict[str, Any]:
-        """Get alarm history from PoolCop."""
-        try:
-            return await self.poolcopilot.alarm_history(offset)
-        except PoolCopilotConnectionError as err:
-            LOGGER.error("Error fetching alarm history: %s", err)
-            raise
-
-    async def async_get_command_history(self, offset: int = 0) -> dict[str, Any]:
-        """Get command history from PoolCop."""
-        try:
-            return await self.poolcopilot.command_history(offset)
-        except PoolCopilotConnectionError as err:
-            LOGGER.error("Error fetching command history: %s", err)
-            raise
-
     async def async_save_learned_data(self) -> None:
         """Save learned data to storage."""
-        data = {
+        save_data = {
             "cycle_durations": self._cycle_durations,
             "flow_rates": self.flow_rates,
+            "daily_volume": self._daily_volume,
+            "daily_volume_date": self._daily_volume_date,
         }
-        await self._store.async_save(data)
-        LOGGER.debug("Saved learned data to persistent storage")
+        await self._store.async_save(save_data)
 
     async def async_load_learned_data(self) -> None:
         """Load learned data from storage."""
@@ -603,169 +400,60 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if stored_data:
             if "cycle_durations" in stored_data:
                 self._cycle_durations.update(stored_data["cycle_durations"])
-                LOGGER.debug("Loaded saved cycle durations: %s", self._cycle_durations)
 
             if "flow_rates" in stored_data:
                 self.flow_rates.update(stored_data["flow_rates"])
-                LOGGER.debug("Loaded saved flow rates: %s", self.flow_rates)
+
+            if "daily_volume" in stored_data and "daily_volume_date" in stored_data:
+                today = datetime.now().strftime("%Y-%m-%d")
+                if stored_data["daily_volume_date"] == today:
+                    self._daily_volume = float(stored_data["daily_volume"])
+                    self._daily_volume_date = today
 
     async def async_config_entry_first_refresh(self) -> None:
         """First refresh handling."""
-        # Load stored data before first refresh
         await self.async_load_learned_data()
+        # Force config fetch on first refresh
+        self._last_config_fetch = 0.0
         await super().async_config_entry_first_refresh()
 
-    async def set_pump_speed(self, speed: int) -> None:
-        """Set the pump speed using the PoolCopilot API.
-        
-        This method is used by both select entities and services.
-        After setting the pump speed, it updates the last_command_result in PoolCopData.
-        """
-        try:
-            result = await self.poolcopilot.set_pump_speed(speed)
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            LOGGER.debug("Set pump speed to %s, result: %s", speed, result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error setting pump speed: %s", err)
-            raise
+    # Command methods — direct on/off via cloud API
 
-    async def toggle_pump(self, turn_on: bool = None) -> None:
-        """Toggle the pump using the PoolCopilot API.
-        
-        This method is used by service calls to toggle the pump.
-        If turn_on is specified, it will check the current state and toggle only if needed.
-        After toggling the pump, it updates the last_command_result in PoolCopData.
-        """
-        try:
-            # If turn_on is specified, only toggle if the current state doesn't match
-            if turn_on is not None:
-                current_state = bool(self.data.status_value("status.pump"))
-                if current_state == turn_on:
-                    LOGGER.debug("Pump already in requested state (%s), no action needed", "on" if turn_on else "off")
-                    return None
-            
-            # Toggle the pump
-            result = await self.poolcopilot.toggle_pump()
-            
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            
-            LOGGER.debug("Toggled pump, result: %s", result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error toggling pump: %s", err)
-            raise
+    async def set_pump(self, on: bool) -> None:
+        """Turn pump on or off."""
+        await self.api.set_pump(self.poolcop_id, on=on)
+        LOGGER.debug("Set pump %s", "on" if on else "off")
 
-    async def set_valve_position(self, position: int) -> None:
-        """Set the valve position.
-        
-        After setting the valve position, it updates the last_command_result in PoolCopData.
-        """
-        try:
-            result = await self.poolcopilot.set_valve_position(position)
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            LOGGER.debug("Set valve position to %s, result: %s", position, result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error setting valve position: %s", err)
-            raise
+    async def set_pump_speed(self, speed: str) -> None:
+        """Set the pump speed."""
+        await self.api.set_pump_speed(self.poolcop_id, speed)
+        LOGGER.debug("Set pump speed to %s", speed)
 
-    async def clear_alarm(self) -> None:
-        """Clear active alarms.
-        
-        After clearing alarms, it updates the last_command_result in PoolCopData and resets the alarm fetch timer.
-        """
-        try:
-            result = await self.poolcopilot.clear_alarm()
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            # Reset the alarm fetch timer to force a refresh on next update
-            self._last_alarm_fetch = 0
-            self._active_alarms = []
-            
-            LOGGER.debug("Cleared alarms, result: %s", result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error clearing alarm: %s", err)
-            raise
+    async def set_valve_position(self, position: str) -> None:
+        """Set the valve position."""
+        await self.api.set_valve_position(self.poolcop_id, position)
+        LOGGER.debug("Set valve position to %s", position)
 
-    async def toggle_auxiliary(self, aux_id: int) -> None:
-        """Toggle an auxiliary output.
-        
-        After toggling the auxiliary output, it updates the last_command_result in PoolCopData.
-        """
-        try:
-            result = await self.poolcopilot.toggle_auxiliary(aux_id)
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            LOGGER.debug("Toggled auxiliary %s, result: %s", aux_id, result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
-            raise
+    async def clear_alarm(self, code: str) -> None:
+        """Clear a specific alarm by code."""
+        await self.api.clear_alarm(self.poolcop_id, code)
+        LOGGER.debug("Cleared alarm %s", code)
 
-    async def set_force_filtration_mode(self, mode: int) -> None:
-        """Set forced filtration mode.
-        
-        After setting the forced filtration mode, it updates the last_command_result in PoolCopData.
-        """
-        try:
-            result = await self.poolcopilot.set_force_filtration(mode)
-            # Create a new data object with the updated command result
-            self.data = PoolCopData(
-                status=self.data.status,
-                alarms=self.data.alarms,
-                commands=self.data.commands,
-                active_alarms=self.data.active_alarms,
-                cycle_status=self.data.cycle_status,
-                next_timer_event=self.data.next_timer_event,
-                last_command_result=result
-            )
-            LOGGER.debug("Set force filtration mode to %s, result: %s", mode, result)
-            return result
-        except Exception as err:
-            LOGGER.error("Error setting force filtration mode: %s", err)
-            raise
+    async def clear_all_alarms(self) -> None:
+        """Clear all active alarms."""
+        if not self.data:
+            return
+        for alarm in self.data.alarms:
+            if alarm.is_active and alarm.code:
+                await self.api.clear_alarm(self.poolcop_id, alarm.code)
+        LOGGER.debug("Cleared all active alarms")
+
+    async def set_auxiliary(self, module: str, aux: str, on: bool) -> None:
+        """Set an auxiliary output on or off."""
+        await self.api.set_auxiliary(self.poolcop_id, module, aux, on=on)
+        LOGGER.debug("Set auxiliary %s/%s %s", module, aux, "on" if on else "off")
+
+    async def set_forced_filtration(self, mode: str) -> None:
+        """Set forced filtration mode."""
+        await self.api.set_forced_filtration(self.poolcop_id, mode)
+        LOGGER.debug("Set forced filtration to %s", mode)

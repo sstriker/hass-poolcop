@@ -1,27 +1,47 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Device is already configured"
+            "already_configured": "Device is already configured",
+            "no_devices": "No PoolCop devices found on this account",
+            "cannot_connect": "Failed to connect to PoolCop cloud API",
+            "invalid_auth": "Invalid authentication",
+            "reauth_successful": "Re-authentication successful",
+            "missing_configuration": "The integration is not configured. Please follow the documentation to set it up."
         },
         "error": {
             "cannot_connect": "Failed to connect",
-            "invalid_auth": "Invalid API key",
+            "invalid_auth": "Invalid authentication",
             "unknown": "Unexpected error"
         },
         "step": {
+            "pick_implementation": {
+                "title": "Pick Authentication Method"
+            },
+            "device_select": {
+                "description": "Select the PoolCop device to set up.",
+                "data": {
+                    "poolcop_id": "PoolCop Device"
+                }
+            },
             "flow_rates": {
                 "data": {
                     "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
                     "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
                     "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
                 },
-                "description": "Your pool pump has {pump_speeds} speeds. Configure the flow rates for each speed.\n\nPool volume: {vol} m\u00b3\n\n{has_detected_flows:? The system detected a flow rate of **{flowrate} m\u00b3/h** from your PoolCop and has calculated default values based on this.:: Default values are shown, please adjust as needed based on your pump specifications.}"
-            },
-            "user": {
+                "description": "Configure the flow rates for each pump speed."
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume.",
                 "data": {
-                    "api_key": "API Key"
-                },
-                "description": "Enter your PoolCop API key from the PoolCopilot account"
+                    "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
+                    "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
+                    "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+                }
             }
         }
     }

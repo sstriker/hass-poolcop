@@ -4,203 +4,211 @@ from __future__ import annotations
 
 from typing import Any
 
-from poolcop import (
-    PoolCopilot,
-    PoolCopilotConnectionError,
-    PoolCopilotError,
-    PoolCopilotInvalidKeyError,
-)
 import voluptuous as vol
-
+from aiopoolcop import (
+    PoolCopCloudAPI,
+    PoolCopCloudAuthError,
+    PoolCopCloudConnectionError,
+)
 from homeassistant import config_entries
-from homeassistant.const import CONF_API_KEY, CONF_UNIQUE_ID
-from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.core import callback
+from homeassistant.helpers import config_entry_oauth2_flow
 
-from .const import CONF_FLOW_RATE_1, CONF_FLOW_RATE_2, CONF_FLOW_RATE_3, DOMAIN, LOGGER
-
-STEP_USER_DATA_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_API_KEY): str,
-    }
+from .const import (
+    CONF_FLOW_RATE_1,
+    CONF_FLOW_RATE_2,
+    CONF_FLOW_RATE_3,
+    CONF_POOLCOP_ID,
+    DOMAIN,
+    LOGGER,
 )
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for poolcop."""
+class ConfigFlow(
+    config_entry_oauth2_flow.AbstractOAuth2FlowHandler,
+    domain=DOMAIN,
+):
+    """Handle a config flow for PoolCop."""
 
-    VERSION = 1
+    DOMAIN = DOMAIN
+    VERSION = 3
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self._api_key: str | None = None
-        self._unique_id: str | None = None
-        self._pool_info: dict[str, Any] = {}
-        self._pump_nb_speeds: int = 3  # Default to 3 speeds if not found
-        self._pump_flowrate: float = 0  # Store detected pump flow rate, default to 0
+        super().__init__()
+        self._devices: list[dict[str, Any]] = []
+        self._selected_device: dict[str, Any] | None = None
+        self._pump_nb_speeds: int = 3
+        self._pump_flowrate: float = 0.0
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle the initial step."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="user", data_schema=STEP_USER_DATA_SCHEMA
-            )
+    @property
+    def logger(self):
+        """Return logger."""
+        return LOGGER
 
-        errors = {}
+    @property
+    def extra_authorize_data(self) -> dict[str, Any]:
+        """Extra data that needs to be appended to the authorize url."""
+        return {"scope": "profile pool.read pool.write"}
+
+    async def async_oauth_create_entry(self, data: dict[str, Any]) -> ConfigFlowResult:
+        """Create an entry for the flow after OAuth2 completes.
+
+        After OAuth2 is done, we need to select a device and configure flow rates.
+        """
+        self._async_abort_entries_match()
+
+        # Store the OAuth2 data for later
+        self._oauth_data = data
+
+        # Fetch available PoolCop devices
+        token = data["token"]["access_token"]
+        api = PoolCopCloudAPI(token=token)
 
         try:
-            info = await validate_input(self.hass, user_input)
+            devices = await api.get_poolcops()
+        except PoolCopCloudAuthError:
+            return self.async_abort(reason="invalid_auth")
+        except PoolCopCloudConnectionError:
+            return self.async_abort(reason="cannot_connect")
+        finally:
+            await api.close()
 
-            # Store API key and pool info for next steps
-            self._api_key = user_input[CONF_API_KEY]
-            self._unique_id = info.get(CONF_UNIQUE_ID)
-            self._pool_info = info.get("pool_info", {})
+        if not devices:
+            return self.async_abort(reason="no_devices")
 
-            # Get the number of pump speeds if available
-            settings = self._pool_info.get("settings", {})
-            pump_settings = settings.get("pump", {})
-            nb_speed = pump_settings.get("nb_speed")
+        self._devices = [
+            {"id": d.id, "nickname": d.nickname or f"PoolCop {d.id}", "uuid": d.uuid}
+            for d in devices
+        ]
 
-            if nb_speed is not None:
-                self._pump_nb_speeds = int(nb_speed)
-                LOGGER.debug("Detected pump with %s speeds", self._pump_nb_speeds)
-
-            # Get the pump flow rate if available
-            single_flowrate = pump_settings.get("flowrate")
-            if single_flowrate and isinstance(single_flowrate, (str, int, float)):
-                try:
-                    self._pump_flowrate = float(single_flowrate)
-                    LOGGER.debug(
-                        "Detected flow rate from API: %s m³/h", self._pump_flowrate
-                    )
-                except (ValueError, TypeError):
-                    LOGGER.warning(
-                        "Failed to convert flowrate value to float: %s", single_flowrate
-                    )
-
-            # Continue to the flow rate configuration step
+        if len(self._devices) == 1:
+            self._selected_device = self._devices[0]
             return await self.async_step_flow_rates()
-        except CannotConnect:
-            errors["base"] = "cannot_connect"
-        except InvalidAuth:
-            errors["base"] = "invalid_auth"
-        except (PoolCopilotError, ValueError, KeyError, AttributeError) as err:
-            LOGGER.exception("Error during configuration: %s", err)
-            errors["base"] = "unknown"
+
+        return await self.async_step_device_select()
+
+    async def async_step_device_select(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle device selection when multiple PoolCops are available."""
+        if user_input is not None:
+            device_id = user_input[CONF_POOLCOP_ID]
+            self._selected_device = next(
+                d for d in self._devices if str(d["id"]) == str(device_id)
+            )
+            return await self.async_step_flow_rates()
+
+        device_options = {str(d["id"]): d["nickname"] for d in self._devices}
 
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="device_select",
+            data_schema=vol.Schema(
+                {vol.Required(CONF_POOLCOP_ID): vol.In(device_options)}
+            ),
         )
 
     async def async_step_flow_rates(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the flow rates configuration step."""
         if user_input is None:
-            # Create a dynamic schema based on number of pump speeds
             schema_dict = {}
-
-            # Just use the single pump flowrate for all speeds
             flow_rate = self._pump_flowrate
 
-            # Add flow rate fields based on detected speeds (always include speed 1)
             schema_dict[vol.Required(CONF_FLOW_RATE_1, default=flow_rate)] = vol.Coerce(
                 float
             )
-
-            # Add speed 2 if pump has at least 2 speeds
             if self._pump_nb_speeds >= 2:
                 schema_dict[vol.Required(CONF_FLOW_RATE_2, default=flow_rate)] = (
                     vol.Coerce(float)
                 )
-
-            # Add speed 3 if pump has 3 speeds
             if self._pump_nb_speeds >= 3:
                 schema_dict[vol.Required(CONF_FLOW_RATE_3, default=flow_rate)] = (
                     vol.Coerce(float)
                 )
 
-            # Create schema with just the relevant flow rate fields
-            data_schema = vol.Schema(schema_dict)
-
-            # Display pump info in the form description
-            description_placeholders = {
-                "pump_speeds": self._pump_nb_speeds,
-                "vol": self._pool_info.get("settings", {})
-                .get("pool", {})
-                .get("volume", "Unknown"),
-                "flowrate": self._pump_flowrate,
-            }
-
             return self.async_show_form(
                 step_id="flow_rates",
-                data_schema=data_schema,
-                description_placeholders=description_placeholders,
+                data_schema=vol.Schema(schema_dict),
             )
 
-        # Now that we have both API key and flow rates, create the config entry
+        assert self._selected_device is not None
+        device = self._selected_device
+
+        # Set unique_id to prevent duplicate entries
+        await self.async_set_unique_id(str(device["id"]))
+        self._abort_if_unique_id_configured()
+
+        # Store device ID in data alongside OAuth2 data
         data = {
-            CONF_API_KEY: self._api_key,
+            **self._oauth_data,
+            CONF_POOLCOP_ID: device["id"],
+            "pump_speeds": self._pump_nb_speeds,
         }
 
-        # Only include configured flow rates
+        options: dict[str, Any] = {}
         if CONF_FLOW_RATE_1 in user_input:
-            data[CONF_FLOW_RATE_1] = user_input[CONF_FLOW_RATE_1]
-
+            options[CONF_FLOW_RATE_1] = user_input[CONF_FLOW_RATE_1]
         if CONF_FLOW_RATE_2 in user_input and self._pump_nb_speeds >= 2:
-            data[CONF_FLOW_RATE_2] = user_input[CONF_FLOW_RATE_2]
-
+            options[CONF_FLOW_RATE_2] = user_input[CONF_FLOW_RATE_2]
         if CONF_FLOW_RATE_3 in user_input and self._pump_nb_speeds >= 3:
-            data[CONF_FLOW_RATE_3] = user_input[CONF_FLOW_RATE_3]
-
-        # Include pump speeds information to help with sensor creation
-        data["pump_speeds"] = self._pump_nb_speeds
-
-        await self.async_set_unique_id(self._unique_id, raise_on_progress=False)
+            options[CONF_FLOW_RATE_3] = user_input[CONF_FLOW_RATE_3]
 
         return self.async_create_entry(
-            title="PoolCop",
+            title=device["nickname"],
             data=data,
+            options=options,
         )
 
-
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
-    """Validate the user input allows us to connect.
-
-    Data has the keys from STEP_USER_DATA_SCHEMA with values provided by the user.
-    """
-
-    poolcopilot = PoolCopilot(
-        session=async_get_clientsession(hass),
-        api_key=data[CONF_API_KEY],
-    )
-
-    try:
-        status = await poolcopilot.status()
-    except PoolCopilotConnectionError as exception:
-        raise CannotConnect from exception
-    except PoolCopilotInvalidKeyError as exception:
-        raise InvalidAuth from exception
-    except PoolCopilotError as exception:
-        raise CannotConnect from exception
-
-    # Return info that you want to store in the config entry.
-    return {
-        "title": "PoolCop",
-        CONF_UNIQUE_ID: poolcopilot.poolcop_id,
-        "pool_info": status.get(
-            "PoolCop", {}
-        ),  # Store full pool info for configuration
-    }
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> PoolCopOptionsFlow:
+        """Get the options flow handler."""
+        return PoolCopOptionsFlow(config_entry)
 
 
-class CannotConnect(HomeAssistantError):
-    """Error to indicate we cannot connect."""
+class PoolCopOptionsFlow(config_entries.OptionsFlow):
+    """Handle PoolCop options flow for reconfiguring flow rates."""
 
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize the options flow."""
+        self._config_entry = config_entry
 
-class InvalidAuth(HomeAssistantError):
-    """Error to indicate there is invalid auth."""
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle the options flow."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        current_options = self._config_entry.options
+        current_data = self._config_entry.data
+        pump_nb_speeds = current_data.get("pump_speeds", 3)
+
+        schema_dict = {}
+
+        fr1 = current_options.get(
+            CONF_FLOW_RATE_1, current_data.get(CONF_FLOW_RATE_1, 0)
+        )
+        schema_dict[vol.Required(CONF_FLOW_RATE_1, default=fr1)] = vol.Coerce(float)
+
+        if pump_nb_speeds >= 2:
+            fr2 = current_options.get(
+                CONF_FLOW_RATE_2, current_data.get(CONF_FLOW_RATE_2, 0)
+            )
+            schema_dict[vol.Required(CONF_FLOW_RATE_2, default=fr2)] = vol.Coerce(float)
+
+        if pump_nb_speeds >= 3:
+            fr3 = current_options.get(
+                CONF_FLOW_RATE_3, current_data.get(CONF_FLOW_RATE_3, 0)
+            )
+            schema_dict[vol.Required(CONF_FLOW_RATE_3, default=fr3)] = vol.Coerce(float)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(schema_dict),
+        )
