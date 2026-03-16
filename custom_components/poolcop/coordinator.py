@@ -71,6 +71,7 @@ class PoolCopData:
     orp_config: dict[str, Any] | None = None
     waterlevel_config: dict[str, Any] | None = None
     equipments: dict[str, Any] | None = None
+    history: dict[str, Any] | None = None
 
     # Computed (from coordinator)
     cycle_status: dict[str, Any] | None = None
@@ -308,6 +309,11 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         except Exception:
             LOGGER.debug("Failed to fetch equipments")
 
+        try:
+            configs["history"] = await self.api.get_history(self.poolcop_id)
+        except Exception:
+            LOGGER.debug("Failed to fetch history")
+
         return configs
 
     async def _async_update_data(self) -> PoolCopData:
@@ -345,6 +351,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     "orp_config": self.data.orp_config,
                     "waterlevel_config": self.data.waterlevel_config,
                     "equipments": self.data.equipments,
+                    "history": self.data.history,
                 }
 
             data = PoolCopData(

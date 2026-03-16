@@ -48,6 +48,16 @@ class PoolCopSensorEntityDescription(
     available_fn: Callable[[PoolCopData], bool] | None = None
 
 
+def _parse_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO datetime string from the cloud API."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+
+
 def _is_cycle_mode(data: PoolCopData) -> bool:
     """Return True if the current operating mode uses filtration cycles."""
     return data.state.status in CYCLE_ACTIVE_MODES
@@ -329,6 +339,283 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
             data.orp_config.get("disinfectantType") if data.orp_config else None
         ),
     ),
+    # Pump config — pressure thresholds and speeds
+    PoolCopSensorEntityDescription(
+        key="pump_pressure_low",
+        name="Pump Low Pressure Threshold",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.KPA,
+        icon="mdi:gauge-low",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("lowPressure") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pump_pressure_alarm",
+        name="Pump Alarm Pressure Threshold",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.KPA,
+        icon="mdi:gauge-full",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("alarmPressure") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pump_speed_cycle1",
+        name="Pump Speed Cycle 1",
+        icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("speedCycle1") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pump_speed_cycle2",
+        name="Pump Speed Cycle 2",
+        icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("speedCycle2") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pump_speed_backwash",
+        name="Pump Speed Backwash",
+        icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("speedBackwash") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pump_speed_cover",
+        name="Pump Speed Cover",
+        icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("speedCover") if data.pump_config else None
+        ),
+    ),
+    # Filter config — additional settings
+    PoolCopSensorEntityDescription(
+        key="filter_backwash_pressure",
+        name="Backwash Pressure Threshold",
+        device_class=SensorDeviceClass.PRESSURE,
+        native_unit_of_measurement=UnitOfPressure.KPA,
+        icon="mdi:gauge",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.filter_config.get("backwashPressure") if data.filter_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="filter_max_days_backwash",
+        name="Max Days Between Backwash",
+        icon="mdi:calendar-clock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.filter_config.get("maxIntervalBetweenBackwash")
+            if data.filter_config
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="filter_mode",
+        name="Filter Mode",
+        icon="mdi:filter-cog",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.filter_config.get("filtrationMode") if data.filter_config else None
+        ),
+    ),
+    # Pool config — additional settings
+    PoolCopSensorEntityDescription(
+        key="pool_type",
+        name="Pool Type",
+        icon="mdi:pool",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pool_config.get("type") if data.pool_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="pool_cover_reduction",
+        name="Cover Flow Reduction",
+        icon="mdi:percent",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement="%",
+        value_fn=lambda data: (
+            data.pool_config.get("coverFiltrationReduction")
+            if data.pool_config
+            else None
+        ),
+    ),
+    # ORP config — additional settings
+    PoolCopSensorEntityDescription(
+        key="orp_hyper_set_point",
+        name="ORP Hyper Chlorination Set Point",
+        icon="mdi:molecule",
+        native_unit_of_measurement="mV",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.orp_config.get("hyperchlorationSetPoint") if data.orp_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="orp_hyper_day",
+        name="ORP Hyper Chlorination Day",
+        icon="mdi:calendar",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.orp_config.get("hyperchlorationWeekday") if data.orp_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="orp_temperature_shutdown",
+        name="ORP Temperature Shutdown",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        icon="mdi:thermometer-off",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.orp_config.get("lowShutdownTemperature") if data.orp_config else None
+        ),
+    ),
+    # pH config — additional settings
+    PoolCopSensorEntityDescription(
+        key="ph_dosing_time",
+        name="pH Dosing Time",
+        icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.ph_config.get("maxDosingDuration") if data.ph_config else None
+        ),
+    ),
+    # Waterlevel config
+    PoolCopSensorEntityDescription(
+        key="waterlevel_max_duration",
+        name="Waterlevel Max Fill Duration",
+        icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.waterlevel_config.get("maxFillDuration")
+            if data.waterlevel_config
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="waterlevel_draining_duration",
+        name="Waterlevel Draining Duration",
+        icon="mdi:timer-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.waterlevel_config.get("drainingDuration")
+            if data.waterlevel_config
+            else None
+        ),
+    ),
+)
+
+# Timer sensors — read from pump config cycle timers
+TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
+    PoolCopSensorEntityDescription(
+        key="cycle1_start_time",
+        name="Cycle 1 Start Time",
+        icon="mdi:clock-start",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("timeOnCycle1") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="cycle1_stop_time",
+        name="Cycle 1 Stop Time",
+        icon="mdi:clock-end",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("timeOffCycle1") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="cycle2_start_time",
+        name="Cycle 2 Start Time",
+        icon="mdi:clock-start",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("timeOnCycle2") if data.pump_config else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="cycle2_stop_time",
+        name="Cycle 2 Stop Time",
+        icon="mdi:clock-end",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.pump_config.get("timeOffCycle2") if data.pump_config else None
+        ),
+    ),
+)
+
+# History sensors — read from history config endpoint
+HISTORY_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
+    PoolCopSensorEntityDescription(
+        key="last_backwash",
+        name="Last Backwash",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:update",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _parse_datetime(data.history.get("lastBackwashDate"))
+            if data.history
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="last_refill",
+        name="Last Refill",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:water-plus",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _parse_datetime(data.history.get("lastRefillDate"))
+            if data.history
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="last_ph_measure",
+        name="Last pH Measure",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:ph",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _parse_datetime(data.history.get("lastpHMeasureDate"))
+            if data.history
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="backwash_count",
+        name="Backwash Count",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:counter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.history.get("backwashesCount") if data.history else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="refill_count",
+        name="Refill Count",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        icon="mdi:counter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            data.history.get("refillsCount") if data.history else None
+        ),
+    ),
 )
 
 
@@ -357,6 +644,18 @@ async def async_setup_entry(
         PoolCopSensorEntity(coordinator=coordinator, description=description)
         for description in SETTINGS_SENSORS
         if PoolCopEntity.is_component_installed(coordinator, description.key)
+    )
+
+    # Add timer sensors
+    entities.extend(
+        PoolCopSensorEntity(coordinator=coordinator, description=description)
+        for description in TIMER_SENSORS
+    )
+
+    # Add history sensors
+    entities.extend(
+        PoolCopSensorEntity(coordinator=coordinator, description=description)
+        for description in HISTORY_SENSORS
     )
 
     async_add_entities(entities)

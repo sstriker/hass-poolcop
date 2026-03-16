@@ -253,6 +253,15 @@ def mock_cloud_api(
             return_value={"setPoint": 650, "disinfectantType": "Chlorine"}
         )
         api.get_waterlevel_config = AsyncMock(return_value={})
+        api.get_history = AsyncMock(
+            return_value={
+                "backwashesCount": 42,
+                "lastBackwashDate": "2026-03-15T14:30:00",
+                "refillsCount": 10,
+                "lastRefillDate": "2026-03-10T09:00:00",
+                "lastpHMeasureDate": "2026-03-16T08:00:00",
+            }
+        )
         api.get_equipments = AsyncMock(
             return_value={
                 "pH": True,

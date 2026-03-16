@@ -111,6 +111,7 @@ async def async_get_config_entry_diagnostics(
             "has_pump_config": data.pump_config is not None,
             "has_filter_config": data.filter_config is not None,
             "has_equipments": data.equipments is not None,
+            "has_history": data.history is not None,
         }
 
     return diagnostics_data
