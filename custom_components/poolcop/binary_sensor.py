@@ -107,6 +107,82 @@ BINARY_SENSORS = (
     ),
 )
 
+# Settings binary sensors — boolean values from config endpoints
+SETTINGS_BINARY_SENSORS = (
+    PoolCopBinarySensorEntityDescription(
+        key="freeze_protection",
+        name="Freeze Protection",
+        is_on_fn=lambda data: bool(
+            data.pool_config and data.pool_config.get("freezeProtection")
+        ),
+        on_off_icons=("mdi:snowflake-alert", "mdi:snowflake-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="pump_protection",
+        name="Pump Protection",
+        is_on_fn=lambda data: bool(
+            data.pump_config and data.pump_config.get("pumpProtection")
+        ),
+        on_off_icons=("mdi:shield-check", "mdi:shield-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waste_line_valve",
+        name="Waste Line Valve",
+        is_on_fn=lambda data: bool(
+            data.filter_config and data.filter_config.get("wasteLineValve")
+        ),
+        on_off_icons=("mdi:valve-open", "mdi:valve-closed"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="can_refill",
+        name="Auto Refill Enabled",
+        is_on_fn=lambda data: bool(
+            data.waterlevel_config and data.waterlevel_config.get("canRefill")
+        ),
+        on_off_icons=("mdi:water-plus", "mdi:water-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="can_reduce",
+        name="Auto Drain Enabled",
+        is_on_fn=lambda data: bool(
+            data.waterlevel_config and data.waterlevel_config.get("canReduce")
+        ),
+        on_off_icons=("mdi:water-minus", "mdi:water-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="continuous_fill",
+        name="Continuous Fill",
+        is_on_fn=lambda data: bool(
+            data.waterlevel_config and data.waterlevel_config.get("continuousFill")
+        ),
+        on_off_icons=("mdi:water-sync", "mdi:water-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="has_floculant_injection",
+        name="Floculant Injection",
+        is_on_fn=lambda data: bool(
+            data.filter_config and data.filter_config.get("hasFloculantInjection")
+        ),
+        on_off_icons=("mdi:flask", "mdi:flask-empty-off"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="valve_change_with_pump_on",
+        name="Valve Change With Pump On",
+        is_on_fn=lambda data: bool(
+            data.filter_config and data.filter_config.get("allowValveChangedWithPumpOn")
+        ),
+        on_off_icons=("mdi:valve", "mdi:valve-closed"),
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
@@ -119,6 +195,12 @@ async def async_setup_entry(
         for description in BINARY_SENSORS
         if PoolCopEntity.is_component_installed(coordinator, description.key)
     ]
+
+    # Add settings binary sensors
+    entities.extend(
+        PoolCopBinarySensorEntity(coordinator=coordinator, description=description)
+        for description in SETTINGS_BINARY_SENSORS
+    )
 
     # Dynamic aux binary sensors from auxiliaries list
     for aux in coordinator.data.auxiliaries:
