@@ -141,7 +141,13 @@ def _cycle_end_time_fn(data: PoolCopData) -> datetime | None:
         return None
     if data.cycle_status and data.cycle_status.get("predicted_end") is not None:
         timestamp = data.cycle_status["predicted_end"]
-        return datetime.fromtimestamp(timestamp)
+        # Use the pool's timezone so the predicted end time is correct locally
+        pool_tz = data.status_value("timezone", prefix="Pool") or "UTC"
+        try:
+            tz_info = zoneinfo.ZoneInfo(pool_tz)
+        except ValueError, zoneinfo.ZoneInfoNotFoundError:
+            tz_info = zoneinfo.ZoneInfo("UTC")
+        return datetime.fromtimestamp(timestamp, tz=tz_info)
     return None
 
 
