@@ -55,12 +55,12 @@ class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on."""
         await self.coordinator.toggle_pump(turn_on=True)
-        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off."""
         await self.coordinator.toggle_pump(turn_on=False)
-        self.async_write_ha_state()
+        await self.coordinator.async_request_refresh()
 
 
 class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
@@ -129,10 +129,10 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
         """Turn the aux output on."""
         if not self.is_on:
             await self.coordinator.toggle_auxiliary(self._aux_id)
-            self.async_write_ha_state()
+            await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the aux output off."""
         if self.is_on:
             await self.coordinator.toggle_auxiliary(self._aux_id)
-            self.async_write_ha_state()
+            await self.coordinator.async_request_refresh()
