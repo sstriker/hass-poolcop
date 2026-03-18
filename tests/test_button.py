@@ -28,7 +28,7 @@ async def test_clear_alarm_button_setup(
     """Button entity exists."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("button.test_pool_clear_alarm")
+    state = hass.states.get("button.poolcop_test_poolcop_id_clear_alarm")
     assert state is not None
 
 
@@ -41,7 +41,7 @@ async def test_clear_alarm_button_press(
     await hass.services.async_call(
         "button",
         "press",
-        {"entity_id": "button.test_pool_clear_alarm"},
+        {"entity_id": "button.poolcop_test_poolcop_id_clear_alarm"},
         blocking=True,
     )
     mock_poolcop.clear_alarm.assert_called()

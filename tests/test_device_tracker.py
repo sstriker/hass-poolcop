@@ -28,7 +28,7 @@ async def test_tracker_with_coords(
     """lat/lon → tracker entity."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is not None
     assert state.attributes.get("latitude") == 48.86
     assert state.attributes.get("longitude") == 2.35
@@ -41,7 +41,7 @@ async def test_tracker_no_coords(
     del mock_poolcop_data["Pool"]
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is None
 
 
@@ -51,7 +51,7 @@ async def test_tracker_properties(
     """source_type, icon, extra attrs."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is not None
     assert state.attributes.get("source_type") == "gps"
     assert state.attributes.get("icon") == "mdi:pool"
@@ -66,7 +66,7 @@ async def test_tracker_non_dict_pool_data(
     mock_poolcop_data["Pool"] = "not a dict"
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    assert hass.states.get("device_tracker.test_pool_pool") is None
+    assert hass.states.get("device_tracker.poolcop_test_poolcop_id_pool") is None
 
 
 async def test_tracker_invalid_coords(
@@ -76,7 +76,7 @@ async def test_tracker_invalid_coords(
     mock_poolcop_data["Pool"]["latitude"] = "not-a-number"
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    assert hass.states.get("device_tracker.test_pool_pool") is None
+    assert hass.states.get("device_tracker.poolcop_test_poolcop_id_pool") is None
 
 
 async def test_tracker_with_image(
@@ -86,7 +86,7 @@ async def test_tracker_with_image(
     mock_poolcop_data["Pool"]["image"] = "https://example.com/pool.jpg"
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is not None
     assert state.attributes.get("entity_picture") == "https://example.com/pool.jpg"
 
@@ -99,7 +99,7 @@ async def test_tracker_extra_state_attributes_non_dict(
         hass, mock_config_entry, mock_poolcop, mock_poolcop_data
     )
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is not None
 
     # Now change Pool data to non-dict and trigger an update
@@ -111,7 +111,7 @@ async def test_tracker_extra_state_attributes_non_dict(
     coordinator.async_set_updated_data(coordinator.data)
     await hass.async_block_till_done()
 
-    state = hass.states.get("device_tracker.test_pool_pool")
+    state = hass.states.get("device_tracker.poolcop_test_poolcop_id_pool")
     assert state is not None
     # timezone and nickname should not be present when pool data is non-dict
     assert "timezone" not in state.attributes

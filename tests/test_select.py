@@ -28,7 +28,7 @@ async def test_valve_position_setup(
     """Entity exists with correct options."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_valve_position")
+    state = hass.states.get("select.poolcop_test_poolcop_id_valve_position")
     assert state is not None
     assert "Filter" in state.attributes.get("options", [])
     assert "Backwash" in state.attributes.get("options", [])
@@ -41,7 +41,7 @@ async def test_valve_position_current(
     # mock_poolcop_data has valveposition=1
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_valve_position")
+    state = hass.states.get("select.poolcop_test_poolcop_id_valve_position")
     assert state is not None
     assert state.state == "Waste"
 
@@ -55,7 +55,7 @@ async def test_valve_position_set(
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": "select.test_pool_valve_position", "option": "Backwash"},
+        {"entity_id": "select.poolcop_test_poolcop_id_valve_position", "option": "Backwash"},
         blocking=True,
     )
     mock_poolcop.set_valve_position.assert_called_once_with(3)
@@ -67,7 +67,7 @@ async def test_pump_speed_options_3_speed(
     """nb_speed=3 → ['0','1','2','3']."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.attributes.get("options") == ["0", "1", "2", "3"]
 
@@ -78,7 +78,7 @@ async def test_pump_speed_current(
     """speed=2 → '2'."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.state == "2"
 
@@ -92,7 +92,7 @@ async def test_pump_speed_set(
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": "select.test_pool_pump_speed", "option": "3"},
+        {"entity_id": "select.poolcop_test_poolcop_id_pump_speed", "option": "3"},
         blocking=True,
     )
     mock_poolcop.set_pump_speed.assert_called_once_with(3)
@@ -119,7 +119,7 @@ async def test_pump_speed_non_int_pumpspeed(
     mock_poolcop_data["PoolCop"]["status"]["pumpspeed"] = "bad"
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.state == "unknown"
 
@@ -132,7 +132,7 @@ async def test_pump_speed_fallback_pump_type_3(
     mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 3
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.attributes.get("options") == ["0", "1", "2", "3"]
 
@@ -145,7 +145,7 @@ async def test_pump_speed_fallback_pump_type_2(
     mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 2
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.attributes.get("options") == ["0", "1", "2"]
 
@@ -158,7 +158,7 @@ async def test_pump_speed_fallback_pump_type_1(
     mock_poolcop_data["PoolCop"]["conf"]["pump_type"] = 1
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_pump_speed")
+    state = hass.states.get("select.poolcop_test_poolcop_id_pump_speed")
     assert state is not None
     assert state.attributes.get("options") == ["0", "1"]
 
@@ -170,6 +170,6 @@ async def test_valve_position_unknown_value(
     mock_poolcop_data["PoolCop"]["status"]["valveposition"] = 99
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("select.test_pool_valve_position")
+    state = hass.states.get("select.poolcop_test_poolcop_id_valve_position")
     assert state is not None
     assert state.state == "unknown"

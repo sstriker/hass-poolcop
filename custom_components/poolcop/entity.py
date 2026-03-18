@@ -65,10 +65,7 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         """Return device information about this PoolCop instance."""
         poolcop_id: str = cast(str, self.coordinator.config_entry.unique_id)
 
-        # Use Pool nickname if available, fall back to "PoolCop"
-        pool_data = self.coordinator.data.status_value("", prefix="Pool") or {}
-        nickname = pool_data.get("nickname") if isinstance(pool_data, dict) else None
-        name = nickname or "PoolCop"
+        name = f"PoolCop {poolcop_id}"
 
         info = DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
