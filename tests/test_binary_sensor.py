@@ -43,7 +43,7 @@ async def test_pump_sensor_on(
     """pump=1 → is_on True."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("binary_sensor.test_pool_pump")
+    state = hass.states.get("binary_sensor.poolcop_test_poolcop_id_pump")
     assert state is not None
     assert state.state == "on"
 
@@ -62,7 +62,7 @@ async def test_active_alarm_on(
     ]
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("binary_sensor.test_pool_active_alarm")
+    state = hass.states.get("binary_sensor.poolcop_test_poolcop_id_active_alarm")
     assert state is not None
     assert state.state == "on"
     assert state.attributes.get("alarm_count", 0) >= 1
@@ -74,7 +74,7 @@ async def test_active_alarm_off(
     """No alarms → is_on False."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("binary_sensor.test_pool_active_alarm")
+    state = hass.states.get("binary_sensor.poolcop_test_poolcop_id_active_alarm")
     assert state is not None
     assert state.state == "off"
 
@@ -126,7 +126,7 @@ async def test_icon_selection(
     """pump on → mdi:pump, off → mdi:pump-off."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("binary_sensor.test_pool_pump")
+    state = hass.states.get("binary_sensor.poolcop_test_poolcop_id_pump")
     assert state is not None
     # Pump is on (status.pump=1)
     assert state.attributes.get("icon") == "mdi:pump"
@@ -180,7 +180,7 @@ async def test_aux_binary_sensor_icon_with_label(
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
     # Entity name is derived from label: "Pool Light" → "pool_light"
-    state = hass.states.get("binary_sensor.test_pool_pool_light")
+    state = hass.states.get("binary_sensor.poolcop_test_poolcop_id_pool_light")
     assert state is not None
     # label_id=0 (Pool Light), status=1 → icons[0] = "mdi:lightbulb-on"
     assert state.attributes.get("icon") == "mdi:lightbulb-on"

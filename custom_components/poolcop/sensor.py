@@ -459,6 +459,13 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=_cycle_end_time_fn,
     ),
+    PoolCopSensorEntityDescription(
+        key="pool_nickname",
+        name="Pool Nickname",
+        icon="mdi:tag-text",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.status_value("nickname", prefix="Pool"),
+    ),
 )
 
 # Additional sensors for pool settings

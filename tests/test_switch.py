@@ -28,7 +28,7 @@ async def test_pump_switch_state_on(
     """status.pump=1 → state 'on'."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("switch.test_pool_pump")
+    state = hass.states.get("switch.poolcop_test_poolcop_id_pump")
     assert state is not None
     assert state.state == "on"
 
@@ -40,7 +40,7 @@ async def test_pump_switch_turn_off(
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
     await hass.services.async_call(
-        "switch", "turn_off", {"entity_id": "switch.test_pool_pump"}, blocking=True
+        "switch", "turn_off", {"entity_id": "switch.poolcop_test_poolcop_id_pump"}, blocking=True
     )
     mock_poolcop.toggle_pump.assert_called_once()
 
@@ -52,7 +52,7 @@ async def test_pump_switch_turn_on(
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
     await hass.services.async_call(
-        "switch", "turn_on", {"entity_id": "switch.test_pool_pump"}, blocking=True
+        "switch", "turn_on", {"entity_id": "switch.poolcop_test_poolcop_id_pump"}, blocking=True
     )
     # Pump is already on (status.pump==1), so toggle_pump should NOT be called
     mock_poolcop.toggle_pump.assert_not_called()
@@ -68,7 +68,7 @@ async def test_aux_switch_is_on(
             aux["status"] = 1
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("switch.test_pool_transfer_pump")
+    state = hass.states.get("switch.poolcop_test_poolcop_id_transfer_pump")
     assert state is not None
     assert state.state == "on"
 
@@ -85,7 +85,7 @@ async def test_aux_switch_turn_on_when_off(
     await hass.services.async_call(
         "switch",
         "turn_on",
-        {"entity_id": "switch.test_pool_transfer_pump"},
+        {"entity_id": "switch.poolcop_test_poolcop_id_transfer_pump"},
         blocking=True,
     )
     mock_poolcop.toggle_auxiliary.assert_called_once_with(4)
@@ -103,7 +103,7 @@ async def test_aux_switch_idempotent(
     await hass.services.async_call(
         "switch",
         "turn_on",
-        {"entity_id": "switch.test_pool_transfer_pump"},
+        {"entity_id": "switch.poolcop_test_poolcop_id_transfer_pump"},
         blocking=True,
     )
     mock_poolcop.toggle_auxiliary.assert_not_called()
@@ -132,7 +132,7 @@ async def test_aux_switch_is_on_returns_none_when_not_found(
     coordinator.async_set_updated_data(coordinator.data)
     await hass.async_block_till_done()
 
-    state = hass.states.get("switch.test_pool_transfer_pump")
+    state = hass.states.get("switch.poolcop_test_poolcop_id_transfer_pump")
     assert state is not None
     # When is_on returns None, HA shows state as unknown
     assert state.state == "unknown"
@@ -161,7 +161,7 @@ async def test_aux_switch_extra_state_attributes_not_found(
     coordinator.async_set_updated_data(coordinator.data)
     await hass.async_block_till_done()
 
-    state = hass.states.get("switch.test_pool_transfer_pump")
+    state = hass.states.get("switch.poolcop_test_poolcop_id_transfer_pump")
     assert state is not None
     # No label, slave, or days attributes when aux not found
     assert "label" not in state.attributes
@@ -180,7 +180,7 @@ async def test_aux_switch_icon_no_label_match(
             aux["switchable"] = True
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("switch.test_pool_available")
+    state = hass.states.get("switch.poolcop_test_poolcop_id_available")
     assert state is not None
     # label_id 15 is not in AUX_LABEL_ICONS, so icon should not be set
     assert "icon" not in state.attributes
@@ -198,7 +198,7 @@ async def test_aux_switch_turn_off_when_on(
     await hass.services.async_call(
         "switch",
         "turn_off",
-        {"entity_id": "switch.test_pool_transfer_pump"},
+        {"entity_id": "switch.poolcop_test_poolcop_id_transfer_pump"},
         blocking=True,
     )
     mock_poolcop.toggle_auxiliary.assert_called_once_with(4)
@@ -216,7 +216,7 @@ async def test_aux_switch_turn_off_when_already_off(
     await hass.services.async_call(
         "switch",
         "turn_off",
-        {"entity_id": "switch.test_pool_transfer_pump"},
+        {"entity_id": "switch.poolcop_test_poolcop_id_transfer_pump"},
         blocking=True,
     )
     mock_poolcop.toggle_auxiliary.assert_not_called()

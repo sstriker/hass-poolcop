@@ -50,7 +50,7 @@ async def test_water_temperature_value(
     """State == '26.5'."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("sensor.test_pool_water_temperature")
+    state = hass.states.get("sensor.poolcop_test_poolcop_id_water_temperature")
     assert state is not None
     assert state.state == "26.5"
 
@@ -68,7 +68,7 @@ async def test_sensor_extra_attrs(
     """valve_position sensor has description attr."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
 
-    state = hass.states.get("sensor.test_pool_valve_position")
+    state = hass.states.get("sensor.poolcop_test_poolcop_id_valve_position")
     if state is not None:
         assert "description" in state.attributes
 
@@ -171,7 +171,7 @@ async def test_planned_remaining_volume_value(
         hass, mock_config_entry, mock_poolcop, mock_poolcop_data
     )
 
-    state = hass.states.get("sensor.test_pool_planned_remaining_filter_volume")
+    state = hass.states.get("sensor.poolcop_test_poolcop_id_planned_remaining_filter_volume")
     assert state is not None
     # Value should match what coordinator returns (numeric string)
     expected = str(coordinator.planned_remaining_volume)
