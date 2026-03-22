@@ -68,13 +68,7 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         poolcop_id: str = cast(str, self.coordinator.config_entry.unique_id)
         data = self.coordinator.data
 
-        # Use device nickname or pool nickname
-        name = "PoolCop"
-        if data:
-            if data.device and data.device.nickname:
-                name = data.device.nickname
-            elif data.pool and data.pool.nickname:
-                name = data.pool.nickname
+        name = f"PoolCop {poolcop_id}"
 
         return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,

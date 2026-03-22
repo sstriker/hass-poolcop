@@ -222,6 +222,13 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:flask",
         value_fn=lambda data: data.state.free_available_chlorine or None,
     ),
+    PoolCopSensorEntityDescription(
+        key="pool_nickname",
+        name="Pool Nickname",
+        icon="mdi:tag-text",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.pool.nickname if data.pool else None,
+    ),
 )
 
 # Settings sensors — read from config endpoints

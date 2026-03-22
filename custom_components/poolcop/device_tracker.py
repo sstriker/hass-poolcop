@@ -26,7 +26,8 @@ async def async_setup_entry(
     if pool.latitude is None or pool.longitude is None:
         return
 
-    async_add_entities([PoolCopTracker(coordinator)])
+    nickname = pool.nickname
+    async_add_entities([PoolCopTracker(coordinator, nickname)])
 
 
 class PoolCopTracker(PoolCopEntity, TrackerEntity):  # type: ignore[misc]
@@ -37,12 +38,20 @@ class PoolCopTracker(PoolCopEntity, TrackerEntity):  # type: ignore[misc]
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
+        nickname: str | None = None,
     ) -> None:
         """Initialize the pool tracker."""
         super().__init__(
             coordinator=coordinator,
             description=EntityDescription(key="pool_location", name="Pool"),
         )
+        if nickname:
+            self._attr_name = nickname
+
+    @property
+    def suggested_object_id(self) -> str:
+        """Return a stable object id independent of the display name."""
+        return "pool"
 
     @property
     def latitude(self) -> float | None:
