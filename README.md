@@ -1,80 +1,95 @@
 # PoolCop Integration for Home Assistant
 
-This custom component adds support for the PoolCop pool automation system to Home Assistant.
+Custom component for the [PoolCop](https://www.poolcop.com/) pool automation system, using the PoolCop Cloud API.
 
-## Overview
-
-PoolCop is an advanced pool automation system that monitors and controls essential pool equipment and water parameters. This integration allows you to monitor and control your PoolCop system directly from Home Assistant.
+> **Status:** This branch (`aiopoolcop`) is a rewrite targeting the new Cloud API with OAuth2 authentication. It requires OAuth2 client credentials from PCFR, which are being arranged.
 
 ## Features
 
-- **Comprehensive Sensor Data:**
+- **Sensors:**
   - Water and air temperature
-  - pH and ORP (Oxidation-Reduction Potential) readings with setpoints
+  - pH and ORP (Oxidation-Reduction Potential) readings
   - Pressure readings
   - Water level status
-  - Pump status and speed
-  - Valve positions
-  - Filtration times and statistics
-  - System operation mode
-  - Running status
+  - Pump speed, valve position, and operation mode
   - Forced filtration status and remaining time
+  - Free available chlorine
+  - Daily filtration volume and turnovers (computed from pump runtime)
+  - Planned remaining filter volume and turnovers
+  - Cycle tracking: elapsed time, remaining time, predicted end
+  - Diagnostic sensors for pool, pump, filter, pH, ORP settings (from config endpoints)
+  - History sensors: last backwash, refill, pH measure dates
+  - Pool nickname
 
-- **Control Capabilities:**
-  - Toggle pump on/off
-  - Set pump speed (for variable speed pumps)
-  - Toggle auxiliary outputs (pool lights, water features, etc.)
-  - Set valve position
-  - Clear alarms
-  - Set forced filtration mode (24h, 48h, or 72h)
+- **Binary Sensors:**
+  - Pump running state
+  - Active alarms (with alarm details in attributes)
+  - Mains power lost
+  - Equipment installed flags (pH, ORP, water level, air temperature)
 
-- **Configuration Support:**
-  - Custom auxiliary names from PoolCop configuration are automatically used
-  - Installed equipment detection (pH control, ORP control, ionizer, etc.)
+- **Controls:**
+  - Pump on/off switch
+  - Auxiliary output switches (pool lights, water features, etc.)
+  - Valve position selector
+  - Pump speed selector
+  - Clear alarm button
+
+- **Device Tracker:**
+  - Pool location on the map (from GPS coordinates)
+  - Pool nickname shown on map hover
+
+- **Smart Polling:**
+  - Configurable update interval with automatic backoff on rate limits
+  - Configuration endpoints fetched less frequently (every 30 minutes)
+  - Cycle duration learning for better end-time predictions
 
 ## Installation
 
-### HACS Installation (Recommended)
+### HACS (Recommended)
 
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. Add this repository as a custom repository in HACS
 3. Install the "PoolCop" integration through HACS
 4. Restart Home Assistant
 
-### Manual Installation
+### Manual
 
 1. Download the latest release
-2. Extract the `custom_components/poolcop` directory to your Home Assistant's `custom_components` directory
+2. Extract `custom_components/poolcop` to your Home Assistant `custom_components` directory
 3. Restart Home Assistant
+
+## Prerequisites
+
+1. A PoolCop device linked to your [poolcopilot.com](https://poolcopilot.com) account
+2. OAuth2 client credentials (Client ID and Client Secret) — contact PCFR to obtain these
 
 ## Setup
 
-1. Go to **Settings** > **Devices & Services**
-2. Click **+ Add Integration** and search for "PoolCop"
-3. Enter your PoolCopilot API key (available from [poolcopilot.com/api](https://poolcopilot.com/api))
-4. Click **Submit**
-
-## API Key
-
-An API key is required to authenticate with the PoolCopilot API. You can obtain an API key by:
-
-1. Creating an account at [poolcopilot.com](https://poolcopilot.com)
-2. Linking your PoolCop device
-3. Requesting an API key from the API section
+1. Go to **Settings** > **Devices & Services** > **Application Credentials**
+2. Add credentials for "PoolCop" with the Client ID and Client Secret from PCFR
+3. Go to **Settings** > **Devices & Services** > **+ Add Integration** and search for "PoolCop"
+4. You will be redirected to poolcopilot.com to authorize access
+5. Select your PoolCop device (if you have multiple)
+6. Configure pump flow rates for each speed level (used for volume/turnover calculations)
 
 ## Services
 
-The integration provides several services to control your PoolCop system:
+- `poolcop.set_pump` — turn pump on/off
+- `poolcop.set_pump_speed` — set speed (Speed1, Speed2, Speed3)
+- `poolcop.set_auxiliary` — turn an auxiliary output on/off
+- `poolcop.set_valve_position` — set valve position (Filter, Waste, Backwash, etc.)
+- `poolcop.clear_alarm` — clear a specific alarm by code
 
-- `poolcop.toggle_pump`: Toggle the pump on/off
-- `poolcop.set_pump_speed`: Set the pump speed (1-3)
-- `poolcop.toggle_aux`: Toggle an auxiliary output (1-6)
-- `poolcop.set_valve_position`: Set the valve position (1-6)
-- `poolcop.clear_alarm`: Clear active alarms
-- `poolcop.set_force_filtration`: Set forced filtration mode (24, 48, or 72 hours)
+## Architecture
+
+This integration uses:
+
+- **[aiopoolcop](https://github.com/sstriker/python-aiopoolcop)** — async Python client for the PoolCop Cloud API (`cloud.api.poolcop.net`)
+- **OAuth2 Authorization Code flow** via `poolcopilot.com/oauth2/` for authentication
+- Home Assistant's built-in `application_credentials` platform for token management and automatic refresh
 
 ## Troubleshooting
 
-- If sensors show "unavailable," ensure your API key is correct and your PoolCop system is online
-- The integration refreshes data approximately every 12 seconds to respect API rate limits
+- If sensors show "unavailable," check that your OAuth2 credentials are valid and your PoolCop is online
+- The integration automatically refreshes OAuth2 tokens — if auth fails, re-authenticate via the integration page
 - Check Home Assistant logs for detailed error information
