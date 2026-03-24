@@ -19,7 +19,16 @@ from poolcop import (  # type: ignore[attr-defined]  # namespace collision with 
     PoolCopilotInvalidKeyError,
 )
 
-from .const import CONF_FLOW_RATE_1, CONF_FLOW_RATE_2, CONF_FLOW_RATE_3, DOMAIN, LOGGER
+from .const import (
+    CONF_FLOW_RATE_1,
+    CONF_FLOW_RATE_2,
+    CONF_FLOW_RATE_3,
+    CONF_MAP_MODE,
+    DOMAIN,
+    LOGGER,
+    MAP_MODE_ALWAYS,
+    MAP_MODE_ATTENTION,
+)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
@@ -219,7 +228,16 @@ class PoolCopOptionsFlow(config_entries.OptionsFlow):
 
         pump_nb_speeds = current_data.get("pump_speeds", 3)
 
-        schema_dict = {}
+        schema_dict: dict[vol.Required | vol.Optional, Any] = {}
+
+        # Map mode
+        current_map_mode = current_options.get(CONF_MAP_MODE, MAP_MODE_ALWAYS)
+        schema_dict[vol.Required(CONF_MAP_MODE, default=current_map_mode)] = vol.In(
+            {
+                MAP_MODE_ALWAYS: "Always visible",
+                MAP_MODE_ATTENTION: "Only when attention needed",
+            }
+        )
 
         # Current values: prefer options, fall back to data (pre-migration entries)
         fr1 = current_options.get(
