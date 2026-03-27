@@ -33,6 +33,11 @@ CONF_FLOW_RATE_3 = "flow_rate_3"  # High speed
 
 SCAN_INTERVAL = timedelta(seconds=UPDATE_INTERVAL)
 
+# Map mode
+CONF_MAP_MODE = "map_mode"
+MAP_MODE_ALWAYS = "always"
+MAP_MODE_ATTENTION = "attention"
+
 # Services
 SERVICE_SET_PUMP_SPEED = "set_pump_speed"
 SERVICE_TOGGLE_PUMP = "toggle_pump"

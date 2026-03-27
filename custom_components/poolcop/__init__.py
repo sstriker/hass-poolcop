@@ -20,7 +20,7 @@ from .service import async_setup_services, async_unload_services
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
-    Platform.DEVICE_TRACKER,
+    Platform.GEO_LOCATION,
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,

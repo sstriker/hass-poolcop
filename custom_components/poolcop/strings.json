@@ -75,6 +75,7 @@
       "init": {
         "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume.",
         "data": {
+          "map_mode": "Pool map visibility",
           "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
           "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
           "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
