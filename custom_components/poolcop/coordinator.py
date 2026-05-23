@@ -683,6 +683,13 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
     # ------------------------------------------------------------------
     # Command methods
+    #
+    # TODO: The client API enforces a 10s rate limit per entity (device ID).
+    # Verify with PCFR whether this applies between consecutive commands
+    # (e.g. set speed then immediately stop pump). If so, rapid command
+    # sequences may be rejected with HTTP 429, which is a safety concern
+    # for emergency stops. May need client-side queuing or a confirmation
+    # that interaction endpoints are exempt from the per-entity limit.
     # ------------------------------------------------------------------
 
     async def set_pump(self, on: bool) -> None:
