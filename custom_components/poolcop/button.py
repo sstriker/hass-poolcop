@@ -37,5 +37,5 @@ class PoolCopClearAlarmButton(PoolCopEntity, ButtonEntity):  # type: ignore[misc
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.coordinator.clear_alarm()
+        await self.coordinator.clear_all_alarms()
         await self.coordinator.async_refresh()

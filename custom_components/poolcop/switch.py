@@ -22,10 +22,9 @@ async def async_setup_entry(
 
     entities: list[SwitchEntity] = [PoolCopPumpSwitch(coordinator)]
 
-    # Dynamic aux switches from aux[] array where switchable and not slaved
-    aux_list = coordinator.data.status_value("aux") or []
-    for aux in aux_list:
-        if aux.get("switchable") and not aux.get("slave"):
+    # Dynamic aux switches: not reserved and not slaved
+    for aux in coordinator.data.device.settings.auxs:
+        if not aux.is_reserved and not aux.is_slave:
             entities.append(PoolCopAuxSwitch(coordinator, aux))
 
     async_add_entities(entities)
@@ -50,16 +49,19 @@ class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     @property
     def is_on(self) -> bool | None:
         """Return true if the pump is on."""
-        return bool(self.coordinator.data.status_value("status.pump"))
+        pumps = self.coordinator.data.device.state.pumps
+        if pumps:
+            return pumps[0].pump_state
+        return None
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the pump on."""
-        await self.coordinator.toggle_pump(turn_on=True)
+        await self.coordinator.set_pump(on=True)
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off."""
-        await self.coordinator.toggle_pump(turn_on=False)
+        await self.coordinator.set_pump(on=False)
         await self.coordinator.async_request_refresh()
 
 
@@ -72,20 +74,22 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
-        aux_data: dict,
+        aux: "AuxSettings",
     ) -> None:
         """Initialize the aux switch."""
         from homeassistant.helpers.entity import EntityDescription
 
-        self._aux_id: int = aux_data["id"]
-        api_label = aux_data.get("label", "")
-        label = aux_display_name(api_label, self._aux_id)
+        self._aux_channel: int = aux.aux_channel
+        self._module: str = aux.module
+        self._aux_id_str: str = f"Aux{aux.aux_channel}"
+        api_label = aux.label or ""
+        label = aux_display_name(api_label, aux.aux_channel)
         self._label_id = aux_label_id(api_label)
 
         super().__init__(
             coordinator=coordinator,
             description=EntityDescription(
-                key=f"aux_{self._aux_id}",
+                key=f"aux_{aux.aux_channel}",
                 name=label,
             ),
         )
@@ -93,25 +97,28 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     @property
     def is_on(self) -> bool | None:
         """Return true if the aux output is on."""
-        aux_list = self.coordinator.data.status_value("aux") or []
-        for aux in aux_list:
-            if aux.get("id") == self._aux_id:
-                return bool(aux.get("status"))
+        auxiliaries = self.coordinator.data.device.state.auxiliaries
+        module_ports = auxiliaries.get(self._module)
+        if module_ports is not None:
+            return module_ports.get(self._aux_id_str)
         return None
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
-        aux_list = self.coordinator.data.status_value("aux") or []
-        for aux in aux_list:
-            if aux.get("id") == self._aux_id:
-                attrs = {}
-                if "slave" in aux:
-                    attrs["slave"] = aux["slave"]
-                if "days" in aux:
-                    attrs["days"] = aux["days"]
-                if "label" in aux:
-                    attrs["label"] = aux["label"]
+        for aux in self.coordinator.data.device.settings.auxs:
+            if aux.aux_channel == self._aux_channel and aux.module == self._module:
+                attrs: dict[str, Any] = {}
+                if aux.is_slave:
+                    attrs["slave"] = aux.slaved_to
+                if aux.days_of_week:
+                    attrs["days"] = aux.days_of_week
+                if aux.label:
+                    attrs["label"] = aux.label
+                if aux.friendly_name:
+                    attrs["friendly_name"] = aux.friendly_name
+                if aux.mode:
+                    attrs["mode"] = aux.mode
                 return attrs
         return {}
 
@@ -128,11 +135,15 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the aux output on."""
         if not self.is_on:
-            await self.coordinator.toggle_auxiliary(self._aux_id)
+            await self.coordinator.set_auxiliary(
+                self._module, self._aux_channel, on=True
+            )
             await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the aux output off."""
         if self.is_on:
-            await self.coordinator.toggle_auxiliary(self._aux_id)
+            await self.coordinator.set_auxiliary(
+                self._module, self._aux_channel, on=False
+            )
             await self.coordinator.async_request_refresh()

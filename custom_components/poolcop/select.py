@@ -12,11 +12,19 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, LOGGER, VALVE_POSITIONS
-from .coordinator import PoolCopDataUpdateCoordinator
+from .const import DOMAIN, LOGGER
+from .coordinator import (
+    SPEED_NAME_TO_LEVEL,
+    VALVE_NAME_TO_ID,
+    PoolCopDataUpdateCoordinator,
+)
 from .entity import PoolCopEntity
 
-VALVE_POSITION_OPTIONS: Final = list(VALVE_POSITIONS.keys())
+# Valve position options are the string keys from the client API
+VALVE_POSITION_OPTIONS: Final = list(VALVE_NAME_TO_ID.keys())
+
+# Speed options are the string keys from the client API
+SPEED_OPTIONS: Final = list(SPEED_NAME_TO_LEVEL.keys())
 
 
 @dataclass(frozen=True)
@@ -37,73 +45,53 @@ class PoolCopSelectEntityDescription(
 async def _async_set_pump_speed(
     coordinator: PoolCopDataUpdateCoordinator, option: str
 ) -> None:
-    """Set pump speed."""
-    try:
-        speed = int(option)
-        await coordinator.set_pump_speed(speed)
-    except ValueError:
-        LOGGER.error("Invalid pump speed value: %s", option)
+    """Set pump speed using string value (None, Speed1-Speed8)."""
+    await coordinator.set_pump_speed(option)
 
 
 def _get_current_pump_speed(coordinator: PoolCopDataUpdateCoordinator) -> str | None:
-    """Get current pump speed."""
-    is_pump_on = bool(coordinator.data.status_value("status.pump"))
-    if not is_pump_on:
-        return "0"  # Off
-
-    # Get current pump speed
-    speed = coordinator.data.status_value("status.pumpspeed")
-    if speed is None or not isinstance(speed, int):
+    """Get current pump speed as a string (None, Speed1-Speed8)."""
+    pumps = coordinator.data.device.state.pumps
+    if not pumps:
         return None
-
-    return str(speed)
+    pump = pumps[0]
+    if not pump.pump_state:
+        return "None"
+    return pump.current_speed
 
 
 def _get_pump_speed_options(coordinator: PoolCopDataUpdateCoordinator) -> list[str]:
     """Get pump speed options based on number of speeds supported."""
-    # Get number of speeds from pump settings
-    nb_speed = coordinator.data.status_value("settings.pump.nb_speed")
+    pumps = coordinator.data.device.state.pumps
+    if not pumps:
+        return ["None", "Speed1"]
 
-    # Fallback to configuration if settings not available
-    if nb_speed is None or not isinstance(nb_speed, int) or nb_speed <= 0:
-        # Check pump speed in configuration
-        pump_type = coordinator.data.status_value("conf.pump_type")
-        if pump_type == 3:  # Three speed pump
-            nb_speed = 3
-        elif pump_type == 2:  # Two speed pump
-            nb_speed = 2
-        elif pump_type == 1:  # Single speed pump
-            nb_speed = 1
-        else:
-            nb_speed = 3  # Default to 3 speeds if unknown
+    # number_of_speeds is a string like "Speed1", "Speed3", etc.
+    nb_speeds_str = pumps[0].number_of_speeds
+    nb_level = SPEED_NAME_TO_LEVEL.get(nb_speeds_str, 1)
 
-    # Generate options: 0 (Off) through nb_speed
-    return [str(i) for i in range(nb_speed + 1)]
+    # Generate options: None (off) through Speed<N>
+    options = ["None"]
+    for i in range(1, nb_level + 1):
+        options.append(f"Speed{i}")
+    return options
 
 
 async def _async_set_valve_position(
     coordinator: PoolCopDataUpdateCoordinator, option: str
 ) -> None:
-    """Set valve position."""
-    position_value = VALVE_POSITIONS.get(option.lower())
-    if position_value is not None:
-        await coordinator.set_valve_position(position_value)
+    """Set valve position using string value (Filter, Waste, etc.)."""
+    await coordinator.set_valve_position(option)
 
 
 def _get_current_valve_position(
     coordinator: PoolCopDataUpdateCoordinator,
 ) -> str | None:
-    """Get current valve position."""
-    position_value = coordinator.data.status_value("status.valveposition")
-    if position_value is None:
+    """Get current valve position as a string."""
+    pumps = coordinator.data.device.state.pumps
+    if not pumps:
         return None
-
-    # Convert the numeric value back to the string name
-    for position_name, value in VALVE_POSITIONS.items():
-        if value == position_value:
-            return position_name.capitalize()
-
-    return None
+    return pumps[0].valve_position
 
 
 async def async_setup_entry(
@@ -112,7 +100,6 @@ async def async_setup_entry(
     """Set up PoolCop select entities based on a config entry."""
     coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    # Create list of entities to add
     entities = []
 
     # Add valve position entity
@@ -123,7 +110,7 @@ async def async_setup_entry(
                 key="valve_position",
                 name="Valve Position",
                 icon="mdi:valve",
-                options=[option.capitalize() for option in VALVE_POSITION_OPTIONS],
+                options=VALVE_POSITION_OPTIONS,
                 async_set_fn=_async_set_valve_position,
                 current_fn=_get_current_valve_position,
                 entity_category=EntityCategory.CONFIG,
