@@ -18,9 +18,8 @@ UPDATE_INTERVAL = 15
 MIN_UPDATE_INTERVAL = 10  # Floor: never poll faster than every 10s
 MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 
-# Quota reserve: stop polling this many calls before exhaustion so the
-# token window can expire and refresh without hitting a rate limit.
-QUOTA_RESERVE = 3
+# User-configurable polling interval (options flow)
+CONF_POLL_INTERVAL = "poll_interval"
 
 # Storage constants
 STORAGE_KEY = "poolcop_learned_data"

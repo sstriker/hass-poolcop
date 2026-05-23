@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from aiopoolcop import PoolCopClientAPI
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_FLOW_RATE_1,
@@ -52,19 +55,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     api_key: str = entry.data[CONF_API_KEY]
     if entry.unique_id is None:
         return False
-    poolcop_id: str = entry.unique_id
 
-    LOGGER.debug("PoolCop ID: %s", poolcop_id)
+    device_id = int(entry.unique_id)
+    LOGGER.debug("PoolCop device ID: %d", device_id)
+
+    api = PoolCopClientAPI(
+        api_key=api_key,
+        session=async_get_clientsession(hass),
+    )
 
     coordinator = PoolCopDataUpdateCoordinator(
         hass,
-        api_key,
+        api,
+        device_id,
         entry,
     )
     try:
         await coordinator.async_config_entry_first_refresh()
     except ConfigEntryNotReady:
-        await coordinator.poolcopilot.close()
+        await api.close()
         raise
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -87,7 +96,10 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     if unload_ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        hass.data[DOMAIN].pop(entry.entry_id)
+        coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN].pop(
+            entry.entry_id
+        )
+        await coordinator.api.close()
 
         if not hass.data[DOMAIN]:
             await async_unload_services(hass)
