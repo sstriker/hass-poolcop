@@ -193,6 +193,62 @@ def _pool_timezone(data: PoolCopData) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Slug mappings for translatable enum sensors
+# API returns PascalCase strings; HA translations expect snake_case keys
+# ---------------------------------------------------------------------------
+
+_RUNNING_STATUS_SLUG: dict[str, str] = {
+    "Stopped": "stopped",
+    "FreezeProtection": "freeze_protection",
+    "ForcedMode": "forced_mode",
+    "EcoPlusMode": "eco_plus_mode",
+    "TimerMode": "timer_mode",
+    "Manual": "manual",
+    "Paused": "paused",
+    "ExternalRequest": "external_request",
+    "WaterLevelManagement": "water_level_management",
+    "Mode24H": "mode_24h",
+}
+
+_FILTRATION_MODE_SLUG: dict[str, str] = {
+    "Stop": "stop",
+    "Timer": "timer",
+    "EcoPlus": "eco_plus",
+    "Volume": "volume",
+    "Continuous": "continuous",
+    "Force24H": "force_24h",
+    "Force48H": "force_48h",
+    "Force72H": "force_72h",
+    "AlwaysOn": "always_on",
+    "NoPump": "no_pump",
+}
+
+_VALVE_SLUG: dict[str, str] = {
+    "Filter": "filter",
+    "Waste": "waste",
+    "Closed": "closed",
+    "Backwash": "backwash",
+    "Bypass": "bypass",
+    "Rinse": "rinse",
+}
+
+_WATER_LEVEL_SLUG: dict[str, str] = {
+    "Faulty": "faulty",
+    "Low": "low",
+    "Normal": "normal",
+    "High": "high",
+    "VeryHigh": "very_high",
+}
+
+
+def _slugify_enum(value: str | None, mapping: dict[str, str]) -> str | None:
+    """Convert an API enum value to a translation slug."""
+    if value is None:
+        return None
+    return mapping.get(value, value.lower())
+
+
+# ---------------------------------------------------------------------------
 # Timer helpers for filtration timers
 # ---------------------------------------------------------------------------
 
@@ -377,24 +433,20 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Water level",
         icon="mdi:waves",
         device_class=SensorDeviceClass.ENUM,
-        options=["Faulty", "Low", "Normal", "High", "VeryHigh"],
-        value_fn=lambda data: data.device.state.water_level.state,
+        options=list(_WATER_LEVEL_SLUG.values()),
+        value_fn=lambda data: _slugify_enum(
+            data.device.state.water_level.state, _WATER_LEVEL_SLUG
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="valve_position",
         name="Valve position",
         icon="mdi:valve",
         device_class=SensorDeviceClass.ENUM,
-        options=[
-            "Filter",
-            "Waste",
-            "Closed",
-            "Backwash",
-            "Bypass",
-            "Rinse",
-        ],
-        value_fn=lambda data: (
-            _pump(data).valve_position if _pump(data) is not None else None
+        options=list(_VALVE_SLUG.values()),
+        value_fn=lambda data: _slugify_enum(
+            _pump(data).valve_position if _pump(data) is not None else None,
+            _VALVE_SLUG,
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -410,20 +462,10 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Running Status",
         icon="mdi:state-machine",
         device_class=SensorDeviceClass.ENUM,
-        options=[
-            "Stopped",
-            "FreezeProtection",
-            "Forced",
-            "Auto",
-            "Timer",
-            "Manual",
-            "Paused",
-            "External",
-            "WaterLevelManagement",
-            "Continuous",
-        ],
-        value_fn=lambda data: (
-            _pump(data).running_status if _pump(data) is not None else None
+        options=list(_RUNNING_STATUS_SLUG.values()),
+        value_fn=lambda data: _slugify_enum(
+            _pump(data).running_status if _pump(data) is not None else None,
+            _RUNNING_STATUS_SLUG,
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -431,17 +473,10 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Filtration Mode",
         icon="mdi:air-filter",
         device_class=SensorDeviceClass.ENUM,
-        options=[
-            "Timer",
-            "Eco",
-            "Volume",
-            "Continuous",
-            "Continuous24",
-            "Stop",
-            "NoPump",
-        ],
-        value_fn=lambda data: (
-            _pump(data).filtration_mode if _pump(data) is not None else None
+        options=list(_FILTRATION_MODE_SLUG.values()),
+        value_fn=lambda data: _slugify_enum(
+            _pump(data).filtration_mode if _pump(data) is not None else None,
+            _FILTRATION_MODE_SLUG,
         ),
     ),
     PoolCopSensorEntityDescription(

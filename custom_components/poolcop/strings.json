@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "description": "Enter your PoolCop API key from the PoolCopilot account",
+        "description": "Enter your PoolCop Client API key",
         "data": {
           "api_key": "API Key"
         }
@@ -16,7 +16,7 @@
         }
       },
       "reauth_confirm": {
-        "description": "Your PoolCopilot API key is no longer valid. Please enter a new API key.",
+        "description": "Your PoolCop API key is no longer valid. Please enter a new API key.",
         "data": {
           "api_key": "API Key"
         }
@@ -34,38 +34,55 @@
   },
   "entity": {
     "sensor": {
-      "poolcop": {
-        "name": "Operation Mode",
+      "running_status": {
+        "name": "Running Status",
         "state": {
-          "stop": "Stop",
-          "freeze": "Freeze",
-          "forced": "Forced",
-          "auto": "Auto",
-          "timer": "Timer",
+          "stopped": "Stopped",
+          "freeze_protection": "Freeze Protection",
+          "forced_mode": "Forced Filtration",
+          "eco_plus_mode": "Eco+",
+          "timer_mode": "Timer",
           "manual": "Manual",
           "paused": "Paused",
-          "external": "External",
-          "eco_": "Eco+",
-          "continuous": "Continuous"
-        },
-        "state_attributes": {
-          "description": {
-            "name": "Description"
-          }
+          "external_request": "External",
+          "water_level_management": "Water Level Management",
+          "mode_24h": "24/24"
         }
       },
-      "filter_timer_mode": {
-        "name": "Filter Timer Mode",
+      "filtration_mode": {
+        "name": "Filtration Mode",
         "state": {
-          "stop_disabled": "STOP - Disabled",
-          "timer_manual_schedule": "TIMER - Manual Schedule",
-          "eco_intelligent": "ECO+ - Intelligent",
-          "volume_pool_volume": "VOLUME - Pool Volume",
-          "continuous_23h_day": "CONTINUOUS - 23h/day",
-          "force_24h": "FORCE 24H",
-          "force_48h": "FORCE 48H",
-          "force_72h": "FORCE 72H",
-          "_24_24_always_on": "24/24 - Always On"
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continuous",
+          "force_24h": "Force 24H",
+          "force_48h": "Force 48H",
+          "force_72h": "Force 72H",
+          "always_on": "24/24 Always On",
+          "no_pump": "No Pump"
+        }
+      },
+      "valve_position": {
+        "name": "Valve Position",
+        "state": {
+          "filter": "Filter",
+          "waste": "Waste",
+          "closed": "Closed",
+          "backwash": "Backwash",
+          "bypass": "Bypass",
+          "rinse": "Rinse"
+        }
+      },
+      "water_level": {
+        "name": "Water Level",
+        "state": {
+          "faulty": "Faulty",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very High"
         }
       }
     }
@@ -73,8 +90,9 @@
   "options": {
     "step": {
       "init": {
-        "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume.",
+        "description": "Configure polling and flow rates for this PoolCop device.",
         "data": {
+          "poll_interval": "Poll interval (minutes, 0 = auto)",
           "map_mode": "Pool map visibility",
           "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
           "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
