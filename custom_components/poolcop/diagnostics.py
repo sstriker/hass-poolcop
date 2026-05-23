@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
@@ -13,24 +14,17 @@ from .const import DOMAIN
 from .coordinator import PoolCopDataUpdateCoordinator
 
 TO_REDACT = {CONF_API_KEY}
-COORDINATOR_FIELDS_TO_REDACT = {
-    "token",
-    "apikey",
-    "poolcop_api_id",
-    "poolcop_id",
-    "ip",
-    "remote",
-    "href",
-    "id",
+FIELDS_TO_REDACT = {
     "latitude",
     "longitude",
     "nickname",
-    "image",
-    "mac_address",
-    "dns",
-    "email",
     "uuid",
-    "apiname",
+    "mac",
+    "address1",
+    "address2",
+    "zip_code",
+    "city",
+    "country",
 }
 
 
@@ -38,7 +32,9 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, config_entry: ConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][
+        config_entry.entry_id
+    ]
 
     diagnostics_data: dict[str, Any] = {
         "config_entry": {
@@ -58,41 +54,18 @@ async def async_get_config_entry_diagnostics(
     }
 
     if coordinator.data:
-        data_copy = coordinator.data._asdict()
+        device_dict = asdict(coordinator.data.device)
+        device_dict = async_redact_data(device_dict, FIELDS_TO_REDACT)
 
-        if data_copy.get("status"):
-            status_copy = dict(data_copy["status"])
+        pool_dict = None
+        if coordinator.data.pool:
+            pool_dict = asdict(coordinator.data.pool)
+            pool_dict = async_redact_data(pool_dict, FIELDS_TO_REDACT)
 
-            if "api_token" in status_copy:
-                status_copy["api_token"] = async_redact_data(
-                    dict(status_copy["api_token"]), COORDINATOR_FIELDS_TO_REDACT
-                )
-
-            if "PoolCop" in status_copy and "network" in status_copy["PoolCop"]:
-                status_copy["PoolCop"]["network"] = async_redact_data(
-                    dict(status_copy["PoolCop"]["network"]),
-                    COORDINATOR_FIELDS_TO_REDACT,
-                )
-
-            if "PoolCop" in status_copy and "links" in status_copy["PoolCop"]:
-                links = status_copy["PoolCop"]["links"]
-                for link_key in links:
-                    if isinstance(links[link_key], dict) and "href" in links[link_key]:
-                        links[link_key] = async_redact_data(
-                            dict(links[link_key]), COORDINATOR_FIELDS_TO_REDACT
-                        )
-
-            if "Pool" in status_copy:
-                if isinstance(status_copy["Pool"], dict):
-                    status_copy["Pool"] = async_redact_data(
-                        dict(status_copy["Pool"]),
-                        COORDINATOR_FIELDS_TO_REDACT,
-                    )
-                else:
-                    status_copy["Pool"] = "**REDACTED**"
-
-            data_copy["status"] = status_copy
-
-        diagnostics_data["data"] = data_copy
+        diagnostics_data["data"] = {
+            "device": device_dict,
+            "pool": pool_dict,
+            "cycle_status": coordinator.data.cycle_status,
+        }
 
     return diagnostics_data

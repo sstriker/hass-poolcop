@@ -12,11 +12,11 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from poolcop import (  # type: ignore[attr-defined]  # namespace collision with integration dir
-    PoolCopilot,
-    PoolCopilotConnectionError,
-    PoolCopilotError,
-    PoolCopilotInvalidKeyError,
+from aiopoolcop import (
+    PoolCopClientAPI,
+    PoolCopClientAuthError,
+    PoolCopClientConnectionError,
+    PoolCopClientError,
 )
 
 from .const import (
@@ -93,7 +93,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors["base"] = "cannot_connect"
         except InvalidAuth:
             errors["base"] = "invalid_auth"
-        except (PoolCopilotError, ValueError, KeyError, AttributeError) as err:
+        except (PoolCopClientError, ValueError, KeyError, AttributeError) as err:
             LOGGER.exception("Error during configuration: %s", err)
             errors["base"] = "unknown"
 
@@ -178,7 +178,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "cannot_connect"
             except InvalidAuth:
                 errors["base"] = "invalid_auth"
-            except (PoolCopilotError, ValueError, KeyError, AttributeError) as err:
+            except (PoolCopClientError, ValueError, KeyError, AttributeError) as err:
                 LOGGER.exception("Error during reauth: %s", err)
                 errors["base"] = "unknown"
             else:
@@ -265,25 +265,57 @@ class PoolCopOptionsFlow(config_entries.OptionsFlow):
 
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
-    poolcopilot = PoolCopilot(
-        session=async_get_clientsession(hass),
+    api = PoolCopClientAPI(
         api_key=data[CONF_API_KEY],
+        session=async_get_clientsession(hass),
     )
 
     try:
-        status = await poolcopilot.status()
-    except PoolCopilotConnectionError as exception:
-        raise CannotConnect from exception
-    except PoolCopilotInvalidKeyError as exception:
+        pools = await api.get_pools()
+    except PoolCopClientAuthError as exception:
         raise InvalidAuth from exception
-    except PoolCopilotError as exception:
+    except PoolCopClientConnectionError as exception:
         raise CannotConnect from exception
+    except PoolCopClientError as exception:
+        raise CannotConnect from exception
+
+    if not pools or not pools[0].devices:
+        msg = "No devices found for this API key"
+        raise CannotConnect(msg)
+
+    # Use first device
+    device = pools[0].devices[0]
+    pool = pools[0]
+
+    # Fetch device details for pump config
+    device_full = await api.get_device(device.id)
+    filt = device_full.settings.filtrations[0] if device_full.settings.filtrations else None
 
     return {
         "title": "PoolCop",
-        CONF_UNIQUE_ID: poolcopilot.poolcop_id,
-        "pool_info": status.get("PoolCop", {}),
+        CONF_UNIQUE_ID: str(device.id),
+        "pool_info": {
+            "settings": {
+                "pump": {
+                    "nb_speed": _speed_to_int(filt.nb_speeds if filt else "Speed1"),
+                    "flowrate": device_full.settings.pool.estimated_flowrate,
+                },
+                "pool": {
+                    "volume": device_full.settings.pool.volume,
+                },
+            },
+        },
     }
+
+
+def _speed_to_int(speed_str: str) -> int:
+    """Convert Speed1/Speed2/Speed3 to int."""
+    if speed_str.startswith("Speed"):
+        try:
+            return int(speed_str[5:])
+        except ValueError:
+            pass
+    return 1
 
 
 class CannotConnect(HomeAssistantError):

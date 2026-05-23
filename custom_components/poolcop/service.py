@@ -13,25 +13,28 @@ from .const import (
     SERVICE_SET_VALVE_POSITION,
     SERVICE_TOGGLE_AUX,
     SERVICE_TOGGLE_PUMP,
-    VALVE_POSITIONS,
 )
 from .coordinator import PoolCopDataUpdateCoordinator
 
+VALVE_OPTIONS = ["Filter", "Waste", "Closed", "Backwash", "Bypass", "Rinse"]
+SPEED_OPTIONS = ["None", "Speed1", "Speed2", "Speed3", "Speed4", "Speed5", "Speed6", "Speed7", "Speed8"]
+
 SET_PUMP_SPEED_SCHEMA = vol.Schema(
     {
-        vol.Required("speed"): vol.All(vol.Coerce(int), vol.In([0, 1, 2, 3])),
+        vol.Required("speed"): vol.In(SPEED_OPTIONS),
     }
 )
 
 SET_VALVE_POSITION_SCHEMA = vol.Schema(
     {
-        vol.Required("position"): vol.In(list(VALVE_POSITIONS.keys())),
+        vol.Required("position"): vol.In(VALVE_OPTIONS),
     }
 )
 
 TOGGLE_AUX_SCHEMA = vol.Schema(
     {
-        vol.Required("aux_id"): vol.All(vol.Coerce(int), vol.Range(min=1, max=15)),
+        vol.Required("aux_id"): vol.All(vol.Coerce(int), vol.Range(min=1, max=6)),
+        vol.Optional("module", default="None"): str,
     }
 )
 
@@ -45,13 +48,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Set the pump speed."""
         speed = service_call.data["speed"]
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
-
-        for coordinator in coordinators:
+        for coordinator in _get_coordinators(hass):
             try:
                 await coordinator.set_pump_speed(speed)
                 await coordinator.async_refresh()
@@ -60,71 +57,49 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def async_toggle_pump(service_call: ServiceCall) -> None:
         """Toggle the pump state."""
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
-
-        for coordinator in coordinators:
+        for coordinator in _get_coordinators(hass):
             try:
-                # Get current pump state
-                pump_state = bool(coordinator.data.status_value("status.pump"))
-                # Toggle it by setting the opposite state
-                await coordinator.toggle_pump(not pump_state)
+                pump = coordinator.data.device.state.pumps[0] if coordinator.data.device.state.pumps else None
+                current_state = pump.pump_state if pump else False
+                await coordinator.set_pump(on=not current_state)
                 await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError, KeyError, TypeError) as err:
+            except (ConnectionError, TimeoutError) as err:
                 LOGGER.error("Error toggling pump: %s", err)
 
     async def async_toggle_aux(service_call: ServiceCall) -> None:
         """Toggle an auxiliary output."""
         aux_id = service_call.data["aux_id"]
+        module = service_call.data.get("module", "None")
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
-
-        for coordinator in coordinators:
+        for coordinator in _get_coordinators(hass):
             try:
-                await coordinator.toggle_auxiliary(aux_id)
+                # Get current state
+                aux_states = coordinator.data.device.state.auxiliaries.get(module, {})
+                current = aux_states.get(f"Aux{aux_id}", False)
+                await coordinator.set_auxiliary(module, aux_id, on=not current)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
                 LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
 
     async def async_set_valve_position(service_call: ServiceCall) -> None:
         """Set the valve position."""
-        position_name = service_call.data["position"]
-        position_value = VALVE_POSITIONS[position_name.lower()]
+        position = service_call.data["position"]
 
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
-
-        for coordinator in coordinators:
+        for coordinator in _get_coordinators(hass):
             try:
-                await coordinator.set_valve_position(position_value)
+                await coordinator.set_valve_position(position)
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
                 LOGGER.error("Error setting valve position: %s", err)
 
     async def async_clear_alarm(service_call: ServiceCall) -> None:
-        """Clear active alarms."""
-        coordinators = [
-            value
-            for value in hass.data[DOMAIN].values()
-            if isinstance(value, PoolCopDataUpdateCoordinator)
-        ]
-
-        for coordinator in coordinators:
+        """Clear all active alarms."""
+        for coordinator in _get_coordinators(hass):
             try:
-                await coordinator.clear_alarm()
+                await coordinator.clear_all_alarms()
                 await coordinator.async_refresh()
             except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error clearing alarm: %s", err)
+                LOGGER.error("Error clearing alarms: %s", err)
 
     hass.services.async_register(
         DOMAIN,
@@ -147,6 +122,15 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     )
 
     hass.services.async_register(DOMAIN, SERVICE_CLEAR_ALARM, async_clear_alarm)
+
+
+def _get_coordinators(hass: HomeAssistant) -> list[PoolCopDataUpdateCoordinator]:
+    """Get all PoolCop coordinators."""
+    return [
+        value
+        for value in hass.data[DOMAIN].values()
+        if isinstance(value, PoolCopDataUpdateCoordinator)
+    ]
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
