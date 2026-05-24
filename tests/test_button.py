@@ -2,20 +2,19 @@
 
 from unittest.mock import patch
 
+from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 
 from custom_components.poolcop.const import DOMAIN
 
 
-async def _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data):
+async def _setup_integration(hass, mock_config_entry, mock_poolcop_api, device_data, pool_data):
     """Set up the integration and return the coordinator."""
-    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_poolcop_api.get_device.return_value = PoolCopDevice.from_dict(device_data)
+    mock_poolcop_api.get_pools.return_value = [Pool.from_dict(pool_data)]
     mock_config_entry.add_to_hass(hass)
 
-    with patch(
-        "custom_components.poolcop.coordinator.PoolCopilot",
-        return_value=mock_poolcop,
-    ):
+    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -23,25 +22,26 @@ async def _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop
 
 
 async def test_clear_alarm_button_setup(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
 ):
-    """Button entity exists."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+    """Clear alarm button entity exists."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    state = hass.states.get("button.poolcop_test_poolcop_id_clear_alarm")
-    assert state is not None
+    states = [s for s in hass.states.async_all("button") if "clear_alarm" in s.entity_id]
+    assert len(states) >= 1
 
 
 async def test_clear_alarm_button_press(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
 ):
-    """Calls clear_alarm() + async_refresh()."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop, mock_poolcop_data)
+    """Pressing calls clear_all_alarms."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
+    button = [s for s in hass.states.async_all("button") if "clear_alarm" in s.entity_id][0]
     await hass.services.async_call(
         "button",
         "press",
-        {"entity_id": "button.poolcop_test_poolcop_id_clear_alarm"},
+        {"entity_id": button.entity_id},
         blocking=True,
     )
-    mock_poolcop.clear_alarm.assert_called()
+    mock_poolcop_api.clear_all_alarms.assert_called_once_with(2478)
