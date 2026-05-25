@@ -209,11 +209,22 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     # Flow rate / volume
     # ------------------------------------------------------------------
 
+    def _flow_meter_rate(self, device: PoolCopDevice) -> float | None:
+        """Return flow meter reading if a physical meter is installed and reporting."""
+        if not device.equipments_info.has_flow_meter:
+            return None
+        if device.state.flow_vis:
+            rate = device.state.flow_vis[0].flow_rate
+            if rate is not None and rate > 0:
+                return rate
+        return None
+
     def get_current_flow_rate(self) -> float:
         """Return the current effective flow rate in m3/h.
 
-        Returns 0.0 if pump is off or valve is not in a flowing position.
-        Uses configured flow rates based on pump speed level.
+        Prefers physical flow meter reading when available; falls back to
+        configured speed-based rates.  Returns 0.0 if pump is off or valve
+        is not in a flowing position.
         """
         if not hasattr(self, "data") or self.data is None:
             return 0.0
@@ -233,7 +244,12 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if valve_id is not None and valve_id not in (0, 4, 5):
             return 0.0
 
-        # Look up flow rate for current speed
+        # Prefer physical flow meter when installed
+        meter_rate = self._flow_meter_rate(device)
+        if meter_rate is not None:
+            return meter_rate
+
+        # Fall back to configured speed-based rates
         speed_level = self._speed_level(device)
         if speed_level is None or speed_level == 0:
             return 0.0
@@ -318,7 +334,14 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         return (stop_dt - now).total_seconds()
 
     def _get_flow_rate_for_speed(self, speed: int | None) -> float:
-        """Return flow rate for a given pump speed, with fallback."""
+        """Return flow rate for a given pump speed, with fallback.
+
+        Prefers physical flow meter when installed.
+        """
+        if self.data:
+            meter_rate = self._flow_meter_rate(self.data.device)
+            if meter_rate is not None:
+                return meter_rate
         if speed is not None:
             rate = self.flow_rates.get(speed, 0.0)
             if rate > 0:

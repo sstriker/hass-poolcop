@@ -1002,3 +1002,128 @@ async def test_async_update_data_pool_refresh_failure(mock_config_entry):
     assert result is not None
     assert result.device is not None
     # Pool refresh failed, but data was still returned
+
+
+# ------------------------------------------------------------------
+# Flow meter preference (_flow_meter_rate, get_current_flow_rate,
+# _get_flow_rate_for_speed with physical flow meter)
+# ------------------------------------------------------------------
+
+
+def _make_device_with_flow_meter(flow_rate: float = 12.5) -> PoolCopDevice:
+    """Build a device with hasFlowMeter=True and a flowVis entry."""
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    data["equipmentsInfo"]["hasFlowMeter"] = True
+    data["state"]["flowVis"] = [
+        {"installed": True, "pumpId": 0, "flowRate": flow_rate, "type": "FlowVis"}
+    ]
+    return PoolCopDevice.from_dict(data)
+
+
+async def test_flow_meter_rate_installed_and_reporting(mock_config_entry):
+    """_flow_meter_rate returns the reading when meter is installed and > 0."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device_with_flow_meter(12.5)
+    assert coord._flow_meter_rate(device) == 12.5
+
+
+async def test_flow_meter_rate_not_installed(mock_config_entry):
+    """_flow_meter_rate returns None when hasFlowMeter is False."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device()  # default: hasFlowMeter=False
+    assert coord._flow_meter_rate(device) is None
+
+
+async def test_flow_meter_rate_installed_empty_flowvis(mock_config_entry):
+    """_flow_meter_rate returns None when hasFlowMeter is True but flowVis is empty."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    data["equipmentsInfo"]["hasFlowMeter"] = True
+    data["state"]["flowVis"] = []
+    device = PoolCopDevice.from_dict(data)
+    assert coord._flow_meter_rate(device) is None
+
+
+async def test_flow_meter_rate_installed_zero_rate(mock_config_entry):
+    """_flow_meter_rate returns None when flow meter reads 0."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device_with_flow_meter(0.0)
+    assert coord._flow_meter_rate(device) is None
+
+
+async def test_flow_meter_rate_installed_none_rate(mock_config_entry):
+    """_flow_meter_rate returns None when flow_rate is None."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    data["equipmentsInfo"]["hasFlowMeter"] = True
+    data["state"]["flowVis"] = [
+        {"installed": True, "pumpId": 0, "flowRate": None, "type": "FlowVis"}
+    ]
+    device = PoolCopDevice.from_dict(data)
+    assert coord._flow_meter_rate(device) is None
+
+
+async def test_get_current_flow_rate_prefers_flow_meter(mock_config_entry):
+    """get_current_flow_rate returns flow meter reading over configured rate."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device_with_flow_meter(12.5)
+    coord.data = PoolCopData(device=device)
+    rate = coord.get_current_flow_rate()
+    assert rate == 12.5  # flow meter, not configured Speed1=10.0
+
+
+async def test_get_current_flow_rate_fallback_when_meter_empty(mock_config_entry):
+    """get_current_flow_rate falls back to configured rate when flowVis is empty."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    data["equipmentsInfo"]["hasFlowMeter"] = True
+    data["state"]["flowVis"] = []
+    coord.data = PoolCopData(device=PoolCopDevice.from_dict(data))
+    rate = coord.get_current_flow_rate()
+    assert rate == 10.0  # falls back to Speed1 configured rate
+
+
+async def test_get_current_flow_rate_fallback_when_meter_zero(mock_config_entry):
+    """get_current_flow_rate falls back to configured rate when meter reads 0."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device_with_flow_meter(0.0)
+    coord.data = PoolCopData(device=device)
+    rate = coord.get_current_flow_rate()
+    assert rate == 10.0  # falls back to Speed1 configured rate
+
+
+async def test_get_flow_rate_for_speed_prefers_flow_meter(mock_config_entry):
+    """_get_flow_rate_for_speed returns flow meter reading over speed-based rate."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    device = _make_device_with_flow_meter(12.5)
+    coord.data = PoolCopData(device=device)
+    rate = coord._get_flow_rate_for_speed(2)
+    assert rate == 12.5  # flow meter, not Speed2=15.0
+
+
+async def test_get_flow_rate_for_speed_fallback_no_meter(mock_config_entry):
+    """_get_flow_rate_for_speed uses speed-based rate when meter not installed."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    coord.data = PoolCopData(device=_make_device())
+    rate = coord._get_flow_rate_for_speed(2)
+    assert rate == 15.0  # Speed2 configured rate
