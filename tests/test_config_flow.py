@@ -20,7 +20,7 @@ from custom_components.poolcop.const import (
     DOMAIN,
 )
 
-from .conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
+from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 
 
 def _mock_api():

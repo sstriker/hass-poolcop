@@ -64,7 +64,7 @@ async def test_aux_switch_exists(
     """Aux4 (not reserved, not slave) should create a switch."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("switch") if "aux" in s.entity_id]
+    states = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id]
     assert len(states) >= 1
 
 
@@ -76,7 +76,7 @@ async def test_aux_switch_turn_on(
     mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = False
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    aux_switch = [s for s in hass.states.async_all("switch") if "aux" in s.entity_id][0]
+    aux_switch = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id][0]
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
     )
@@ -91,7 +91,7 @@ async def test_aux_switch_turn_off(
     mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    aux_switch = [s for s in hass.states.async_all("switch") if "aux" in s.entity_id][0]
+    aux_switch = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id][0]
     await hass.services.async_call(
         "switch", "turn_off", {"entity_id": aux_switch.entity_id}, blocking=True
     )
@@ -105,7 +105,7 @@ async def test_aux_switch_idempotent_on(
     mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    aux_switch = [s for s in hass.states.async_all("switch") if "aux" in s.entity_id][0]
+    aux_switch = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id][0]
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
     )

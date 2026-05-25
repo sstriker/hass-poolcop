@@ -2,6 +2,7 @@
 
 from unittest.mock import patch
 
+import pytest
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -42,8 +43,8 @@ async def test_geo_location_with_coords(
     assert len(poolcop_states) == 1
 
     state = poolcop_states[0]
-    assert state.attributes.get("latitude") == 52.165958
-    assert state.attributes.get("longitude") == 6.038603
+    assert state.attributes.get("latitude") == pytest.approx(52.165958, abs=1e-4)
+    assert state.attributes.get("longitude") == pytest.approx(6.038603, abs=1e-4)
     assert state.state is not None
 
 
@@ -129,5 +130,5 @@ async def test_geo_location_attention_mode_with_alarms(
     poolcop_states = [s for s in states if s.attributes.get("source") == "poolcop"]
     assert len(poolcop_states) == 1
     state = poolcop_states[0]
-    assert state.attributes.get("latitude") == 52.165958
-    assert state.attributes.get("longitude") == 6.038603
+    assert state.attributes.get("latitude") == pytest.approx(52.165958, abs=1e-4)
+    assert state.attributes.get("longitude") == pytest.approx(6.038603, abs=1e-4)

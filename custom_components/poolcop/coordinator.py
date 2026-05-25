@@ -46,14 +46,14 @@ from .const import (
 MODE_NAME_TO_ID: dict[str, int] = {
     "Stopped": 0,
     "FreezeProtection": 1,
-    "Forced": 2,
-    "Auto": 3,
-    "Timer": 4,
+    "ForcedMode": 2,
+    "EcoPlusMode": 3,
+    "TimerMode": 4,
     "Manual": 5,
     "Paused": 6,
-    "External": 7,
+    "ExternalRequest": 7,
     "WaterLevelManagement": 8,
-    "Continuous": 9,
+    "Mode24H": 9,
 }
 
 # Valve position name -> numeric ID mapping.

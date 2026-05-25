@@ -36,7 +36,7 @@ async def test_sensor_platform_setup(
 
     states = hass.states.async_all("sensor")
     sensor_keys = {s.entity_id for s in states}
-    assert any("temperature_water" in s for s in sensor_keys)
+    assert any("water_temperature" in s for s in sensor_keys)
     assert any("running_status" in s for s in sensor_keys)
 
 
@@ -46,7 +46,7 @@ async def test_water_temperature_value(
     """Water temperature should be 27.2."""
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("sensor") if "temperature_water" in s.entity_id]
+    states = [s for s in hass.states.async_all("sensor") if "water_temperature" in s.entity_id]
     assert len(states) >= 1
     assert states[0].state == "27.2"
 

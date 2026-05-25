@@ -61,14 +61,23 @@ class PoolCopSensorEntityDescription(
 # ---------------------------------------------------------------------------
 
 
-def _parse_datetime(value: str | None) -> datetime | None:
-    """Parse an ISO datetime string, guarding against epoch/reset timestamps."""
+def _parse_datetime(value: str | None, tz_name: str = "UTC") -> datetime | None:
+    """Parse an ISO datetime string, guarding against epoch/reset timestamps.
+
+    Naive datetimes are assumed to be in the given timezone (default UTC).
+    """
     if not value:
         return None
     try:
         parsed = datetime.fromisoformat(value)
         if parsed.year < 2000:
             return None
+        if parsed.tzinfo is None:
+            try:
+                tz = zoneinfo.ZoneInfo(tz_name)
+            except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+                tz = zoneinfo.ZoneInfo("UTC")
+            parsed = parsed.replace(tzinfo=tz)
         return parsed
     except (ValueError, TypeError):
         return None
@@ -492,7 +501,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Last backwash",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: _parse_datetime(
-            data.device.history.last_backwash_date
+            data.device.history.last_backwash_date, _pool_timezone(data)
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -500,7 +509,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Last refill",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: _parse_datetime(
-            data.device.history.last_refill_date
+            data.device.history.last_refill_date, _pool_timezone(data)
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -508,7 +517,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Last pH measure",
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: _parse_datetime(
-            data.device.history.last_ph_measure_date
+            data.device.history.last_ph_measure_date, _pool_timezone(data)
         ),
     ),
     # Cycle tracking sensors
