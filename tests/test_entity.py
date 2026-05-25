@@ -108,3 +108,50 @@ def test_is_component_installed_data_none():
     coord = FakeCoordinator(None)
     assert PoolCopEntity.is_component_installed(coord, "ph_control") is True
     assert PoolCopEntity.is_component_installed(coord, "pump_speed") is True
+
+
+def test_is_component_installed_pool_cover():
+    """Pool cover gating by hasPoolCover."""
+    data_on = _make_data({"hasPoolCover": True})
+    data_off = _make_data({"hasPoolCover": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "pool_cover_open") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "pool_cover_open") is False
+
+
+def test_is_component_installed_jet_stream():
+    """Jet stream gating by hasJetStream."""
+    data_on = _make_data({"hasJetStream": True})
+    data_off = _make_data({"hasJetStream": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "jet_stream_running") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "jet_stream_running") is False
+
+
+def test_is_component_installed_free_chlorine():
+    """Free chlorine gating by hasFCSensor."""
+    data_on = _make_data({"hasFCSensor": True})
+    data_off = _make_data({"hasFCSensor": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "free_chlorine") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "free_chlorine") is False
+
+
+def test_is_component_installed_total_chlorine():
+    """Total chlorine gating by hasTCSensor."""
+    data_on = _make_data({"hasTCSensor": True})
+    data_off = _make_data({"hasTCSensor": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "total_chlorine") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "total_chlorine") is False
+
+
+def test_is_component_installed_disinfection():
+    """Disinfection prefix gating by hasORPSensor."""
+    data_on = _make_data({"hasORPSensor": True})
+    data_off = _make_data({"hasORPSensor": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "disinfection_last_injection_duration") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "disinfection_last_injection_duration") is False
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "disinfection_dosing") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "disinfection_dosing") is False

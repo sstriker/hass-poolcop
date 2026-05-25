@@ -26,6 +26,19 @@ VALVE_POSITION_OPTIONS: Final = list(VALVE_NAME_TO_ID.keys())
 # Speed options are the string keys from the client API
 SPEED_OPTIONS: Final = list(SPEED_NAME_TO_LEVEL.keys())
 
+FORCED_FILTRATION_OPTIONS: Final = [
+    "NotForced",
+    "Forced24H",
+    "Forced48H",
+    "Forced72H",
+]
+
+_FILTRATION_TO_FORCED: dict[str, str] = {
+    "Force24H": "Forced24H",
+    "Force48H": "Forced48H",
+    "Force72H": "Forced72H",
+}
+
 
 @dataclass(frozen=True)
 class PoolCopSelectEntityDescriptionMixin:
@@ -94,6 +107,23 @@ def _get_current_valve_position(
     return pumps[0].valve_position
 
 
+async def _async_set_forced_filtration(
+    coordinator: PoolCopDataUpdateCoordinator, option: str
+) -> None:
+    """Set forced filtration mode."""
+    await coordinator.set_forced_filtration(option)
+
+
+def _get_current_forced_mode(
+    coordinator: PoolCopDataUpdateCoordinator,
+) -> str | None:
+    """Get current forced filtration mode from pump filtration mode."""
+    pumps = coordinator.data.device.state.pumps
+    if not pumps:
+        return None
+    return _FILTRATION_TO_FORCED.get(pumps[0].filtration_mode, "NotForced")
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
@@ -135,6 +165,22 @@ async def async_setup_entry(
                 ),
             )
         )
+
+    # Add forced filtration entity
+    entities.append(
+        PoolCopSelectEntity(
+            coordinator=coordinator,
+            description=PoolCopSelectEntityDescription(
+                key="forced_filtration",
+                name="Forced Filtration",
+                icon="mdi:pump",
+                options=FORCED_FILTRATION_OPTIONS,
+                async_set_fn=_async_set_forced_filtration,
+                current_fn=_get_current_forced_mode,
+                entity_category=EntityCategory.CONFIG,
+            ),
+        )
+    )
 
     async_add_entities(entities)
 

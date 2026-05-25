@@ -211,6 +211,41 @@ BINARY_SENSORS = (
         is_on_fn=lambda data: data.device.settings.water_level.can_reduce,
         on_off_icons=("mdi:water-minus", "mdi:water-off"),
     ),
+    # Pool cover state
+    PoolCopBinarySensorEntityDescription(
+        key="pool_cover_open",
+        name="Pool Cover",
+        device_class=BinarySensorDeviceClass.OPENING,
+        is_on_fn=lambda data: data.device.state.pool_cover.is_open,
+        on_off_icons=("mdi:window-shutter-open", "mdi:window-shutter"),
+        extra_attrs_fn=lambda data: {
+            "is_closing": data.device.state.pool_cover.is_closing,
+            "is_opening": data.device.state.pool_cover.is_opening,
+            "is_stopped": data.device.state.pool_cover.is_stopped,
+            "controllable": data.device.state.pool_cover.controllable,
+        },
+    ),
+    # Jet stream state
+    PoolCopBinarySensorEntityDescription(
+        key="jet_stream_running",
+        name="Jet Stream",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        is_on_fn=lambda data: data.device.state.jet_stream.is_running,
+        on_off_icons=("mdi:waves-arrow-right", "mdi:waves-arrow-right"),
+    ),
+    # Digital inputs
+    PoolCopBinarySensorEntityDescription(
+        key="input_1",
+        name="Input 1",
+        is_on_fn=lambda data: data.device.state.inputs.get("Input1", False),
+        on_off_icons=("mdi:electric-switch-closed", "mdi:electric-switch"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="input_2",
+        name="Input 2",
+        is_on_fn=lambda data: data.device.state.inputs.get("Input2", False),
+        on_off_icons=("mdi:electric-switch-closed", "mdi:electric-switch"),
+    ),
 )
 
 

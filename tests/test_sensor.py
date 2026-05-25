@@ -18,6 +18,7 @@ from custom_components.poolcop.sensor import (
     _filtration_timer_time_fn,
     _is_cycle_mode,
     _parse_datetime,
+    _parse_duration_seconds,
     _pool_timezone,
     _slugify_enum,
     _time_str_to_time_today,
@@ -589,3 +590,141 @@ async def test_aux_timer_time_tz_error():
     ):
         result = fn(data)
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _parse_duration_seconds unit tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_duration_seconds_valid():
+    """Valid HH:MM:SS -> seconds."""
+    assert _parse_duration_seconds("00:05:30") == 330
+    assert _parse_duration_seconds("01:00:00") == 3600
+    assert _parse_duration_seconds("00:00:01") == 1
+
+
+def test_parse_duration_seconds_none():
+    """None -> None."""
+    assert _parse_duration_seconds(None) is None
+
+
+def test_parse_duration_seconds_zero():
+    """Zero value -> None."""
+    assert _parse_duration_seconds("00:00:00") is None
+
+
+def test_parse_duration_seconds_empty():
+    """Empty string -> None."""
+    assert _parse_duration_seconds("") is None
+
+
+def test_parse_duration_seconds_invalid():
+    """Invalid string -> None."""
+    assert _parse_duration_seconds("not-a-time") is None
+    assert _parse_duration_seconds("ab:cd:ef") is None
+
+
+# ---------------------------------------------------------------------------
+# Free/total chlorine sensor tests
+# ---------------------------------------------------------------------------
+
+
+async def test_free_chlorine_sensor_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Free chlorine sensor exists when hasFCSensor=True."""
+    mock_device_data["equipmentsInfo"]["hasFCSensor"] = True
+    mock_device_data["state"]["freeChlorine"] = 1.5
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "free_chlorine" in s.entity_id and "available" not in s.entity_id]
+    assert len(states) >= 1
+    assert float(states[0].state) == 1.5
+
+
+async def test_free_chlorine_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Free chlorine not shown when hasFCSensor=False."""
+    # Default mock: hasFCSensor = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_free_chlorine")]
+    assert len(states) == 0
+
+
+async def test_total_chlorine_sensor_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Total chlorine sensor exists when hasTCSensor=True."""
+    mock_device_data["equipmentsInfo"]["hasTCSensor"] = True
+    mock_device_data["state"]["totalChlorine"] = 2.0
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "total_chlorine" in s.entity_id]
+    assert len(states) >= 1
+    assert float(states[0].state) == 2.0
+
+
+async def test_total_chlorine_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Total chlorine not shown when hasTCSensor=False."""
+    # Default mock: hasTCSensor = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_total_chlorine")]
+    assert len(states) == 0
+
+
+# ---------------------------------------------------------------------------
+# Injection duration sensor tests
+# ---------------------------------------------------------------------------
+
+
+async def test_ph_injection_duration_with_value(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH injection duration shows seconds when value present."""
+    mock_device_data["history"]["pHLastInjectionDuration"] = "00:05:30"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id]
+    assert len(states) >= 1
+    assert int(states[0].state) == 330
+
+
+async def test_ph_injection_duration_none(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH injection duration None -> unknown state."""
+    # Default mock: pHLastInjectionDuration = None
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
+
+
+async def test_disinfection_injection_duration_with_value(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Disinfection injection duration shows seconds."""
+    mock_device_data["history"]["disinfectionLastInjectionDuration"] = "00:03:00"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "disinfection_last_injection" in s.entity_id]
+    assert len(states) >= 1
+    assert int(states[0].state) == 180
+
+
+async def test_disinfection_injection_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Disinfection injection not shown when hasORPSensor=False."""
+    mock_device_data["equipmentsInfo"]["hasORPSensor"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "disinfection_last_injection" in s.entity_id]
+    assert len(states) == 0

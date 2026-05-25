@@ -298,3 +298,94 @@ async def test_extra_state_attributes_none_for_non_alarm(
     assert len(states) >= 1
     # Pump binary sensor has no extra_attrs_fn, so alarm_count should not be present
     assert "alarm_count" not in states[0].attributes
+
+
+async def test_pool_cover_binary_sensor_off(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pool cover closed (isOpen=False) -> off state."""
+    # Default mock: hasPoolCover=True, isOpen=False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "off"
+    assert states[0].attributes.get("device_class") == "opening"
+    assert states[0].attributes.get("icon") == "mdi:window-shutter"
+
+
+async def test_pool_cover_binary_sensor_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pool cover open (isOpen=True) -> on state with extra attrs."""
+    mock_device_data["state"]["poolCover"]["isOpen"] = True
+    mock_device_data["state"]["poolCover"]["isOpening"] = True
+    mock_device_data["state"]["poolCover"]["isStopped"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "on"
+    assert states[0].attributes.get("icon") == "mdi:window-shutter-open"
+    assert states[0].attributes["is_opening"] is True
+    assert states[0].attributes["is_stopped"] is False
+    assert states[0].attributes["controllable"] is False
+
+
+async def test_pool_cover_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pool cover not installed -> no entity."""
+    mock_device_data["equipmentsInfo"]["hasPoolCover"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    assert len(states) == 0
+
+
+async def test_jet_stream_binary_sensor(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Jet stream running when installed."""
+    mock_device_data["equipmentsInfo"]["hasJetStream"] = True
+    mock_device_data["state"]["jetStream"]["isRunning"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "jet_stream" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "on"
+
+
+async def test_jet_stream_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Jet stream not installed -> no entity."""
+    # Default mock: hasJetStream=False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "jet_stream" in s.entity_id]
+    assert len(states) == 0
+
+
+async def test_input_1_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Input 1 is True in mock -> on state."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "input_1" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "on"
+    assert states[0].attributes.get("icon") == "mdi:electric-switch-closed"
+
+
+async def test_input_2_off(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Input 2 is False in mock -> off state."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "input_2" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "off"
+    assert states[0].attributes.get("icon") == "mdi:electric-switch"

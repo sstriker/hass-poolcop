@@ -45,7 +45,7 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         if key == "ph_control" or key.startswith("ph_") or key == "pH":
             return equip.has_ph_sensor
 
-        if key == "orp_control" or key.startswith("orp_"):
+        if key == "orp_control" or key.startswith("orp_") or key.startswith("disinfection_"):
             return equip.has_orp_sensor
 
         if key in {"ioniser", "ioniser_control"} or key.startswith("ioniser_"):
@@ -59,6 +59,18 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
 
         if key == "temperature_air":
             return equip.has_air_temperature_sensor
+
+        if key.startswith("pool_cover"):
+            return equip.has_pool_cover
+
+        if key.startswith("jet_stream"):
+            return equip.has_jet_stream
+
+        if key == "free_chlorine":
+            return equip.has_fc_sensor
+
+        if key == "total_chlorine":
+            return equip.has_tc_sensor
 
         return True
 

@@ -81,6 +81,17 @@ def _parse_datetime(value: str | None, tz_name: str = "UTC") -> datetime | None:
         return None
 
 
+def _parse_duration_seconds(value: str | None) -> int | None:
+    """Parse a TimeSpan string (HH:MM:SS) to total seconds, None if empty."""
+    if not value or value == "00:00:00":
+        return None
+    try:
+        parts = value.split(":")
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+    except (ValueError, IndexError):
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Helper: safe pump accessor
 # ---------------------------------------------------------------------------
@@ -436,6 +447,22 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=lambda data: data.device.state.free_available_chlorine,
     ),
     PoolCopSensorEntityDescription(
+        key="free_chlorine",
+        name="Free Chlorine",
+        icon="mdi:flask",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="mg/L",
+        value_fn=lambda data: data.device.state.free_chlorine,
+    ),
+    PoolCopSensorEntityDescription(
+        key="total_chlorine",
+        name="Total Chlorine",
+        icon="mdi:flask",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="mg/L",
+        value_fn=lambda data: data.device.state.total_chlorine,
+    ),
+    PoolCopSensorEntityDescription(
         key="waterlevel",
         name="Water level",
         icon="mdi:waves",
@@ -516,6 +543,26 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.TIMESTAMP,
         value_fn=lambda data: _parse_datetime(
             data.device.history.last_ph_measure_date, _pool_timezone(data)
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="ph_last_injection_duration",
+        name="pH Last Injection Duration",
+        icon="mdi:timer-outline",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _parse_duration_seconds(
+            data.device.history.ph_last_injection_duration
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="disinfection_last_injection_duration",
+        name="Disinfection Last Injection Duration",
+        icon="mdi:timer-outline",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _parse_duration_seconds(
+            data.device.history.disinfection_last_injection_duration
         ),
     ),
     # Cycle tracking sensors

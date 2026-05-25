@@ -133,3 +133,67 @@ async def test_valve_position_no_pumps(
     states = [s for s in hass.states.async_all("select") if "valve_position" in s.entity_id]
     assert len(states) >= 1
     assert states[0].state == "unknown"
+
+
+async def test_forced_filtration_exists(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Forced filtration select entity exists with correct options."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "forced_filtration" in s.entity_id]
+    assert len(states) >= 1
+    options = states[0].attributes.get("options", [])
+    assert options == ["NotForced", "Forced24H", "Forced48H", "Forced72H"]
+
+
+async def test_forced_filtration_not_forced(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Timer filtration mode -> NotForced."""
+    # Default mock: filtrationMode = "Timer"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "forced_filtration" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "NotForced"
+
+
+async def test_forced_filtration_forced_24h(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Force24H filtration mode -> Forced24H."""
+    mock_device_data["state"]["pumpsInfo"][0]["filtrationMode"] = "Force24H"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "forced_filtration" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "Forced24H"
+
+
+async def test_forced_filtration_set(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Setting forced filtration calls set_pump_forced."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    entity = [s for s in hass.states.async_all("select") if "forced_filtration" in s.entity_id][0]
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity.entity_id, "option": "Forced48H"},
+        blocking=True,
+    )
+    mock_poolcop_api.set_pump_forced.assert_called_once_with(2478, "Forced48H")
+
+
+async def test_forced_filtration_no_pumps(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """No pumps -> forced filtration unknown."""
+    mock_device_data["state"]["pumpsInfo"] = []
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "forced_filtration" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
