@@ -728,3 +728,153 @@ async def test_disinfection_injection_not_installed(
 
     states = [s for s in hass.states.async_all("sensor") if "disinfection_last_injection" in s.entity_id]
     assert len(states) == 0
+
+
+# ---------------------------------------------------------------------------
+# pH threshold sensor tests
+# ---------------------------------------------------------------------------
+
+
+async def test_ph_low_threshold(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH low threshold shows value from settings."""
+    # Default mock: lowValue = 6.8
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id]
+    assert len(states) >= 1
+    assert float(states[0].state) == 6.8
+
+
+async def test_ph_high_threshold(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH high threshold shows value from settings."""
+    # Default mock: highValue = 8.2
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id]
+    assert len(states) >= 1
+    assert float(states[0].state) == 8.2
+
+
+async def test_ph_thresholds_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH thresholds gated by hasPHSensor."""
+    mock_device_data["equipmentsInfo"]["hasPHSensor"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id]
+    assert len(states) == 0
+    states = [s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id]
+    assert len(states) == 0
+
+
+# ---------------------------------------------------------------------------
+# Water level set point, backwash, filter type, speed 24H tests
+# ---------------------------------------------------------------------------
+
+
+async def test_waterlevel_set_point(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Water level set point from settings."""
+    # Default mock: setPoint = "High"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "waterlevel_set_point" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "High"
+
+
+async def test_backwash_mode(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Backwash mode from filtration settings."""
+    # Default mock: backwashMode = "Automatic"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "backwash_mode" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "Automatic"
+
+
+async def test_backwash_time(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Backwash time from filtration settings."""
+    # Default mock: backwashTime = "11:00:00"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "backwash_time" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "11:00:00"
+
+
+async def test_filter_type(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Filter type from filtration settings."""
+    # Default mock: filterType = "Pressure"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_filter_type")]
+    assert len(states) >= 1
+    assert states[0].state == "Pressure"
+
+
+async def test_pump_speed_24h(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Speed 24H from filtration settings."""
+    # Default mock: speed24 = "Speed1"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "speed_24h" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "Speed1"
+
+
+# ---------------------------------------------------------------------------
+# Flow meter sensor tests
+# ---------------------------------------------------------------------------
+
+
+async def test_flow_meter_rate_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Flow meter rate shown when hasFlowMeter=True and flowVis populated."""
+    mock_device_data["equipmentsInfo"]["hasFlowMeter"] = True
+    mock_device_data["state"]["flowVis"] = [
+        {"installed": True, "pumpId": 0, "flowRate": 12.5, "type": "Paddle"}
+    ]
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    assert len(states) >= 1
+    assert float(states[0].state) == 12.5
+
+
+async def test_flow_meter_rate_empty_flowvis(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Flow meter rate with empty flowVis -> unknown."""
+    mock_device_data["equipmentsInfo"]["hasFlowMeter"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
+
+
+async def test_flow_meter_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Flow meter not shown when hasFlowMeter=False."""
+    # Default mock: hasFlowMeter = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    assert len(states) == 0

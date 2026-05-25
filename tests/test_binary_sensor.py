@@ -307,7 +307,7 @@ async def test_pool_cover_binary_sensor_off(
     # Default mock: hasPoolCover=True, isOpen=False
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    states = [s for s in hass.states.async_all("binary_sensor") if s.entity_id.endswith("_pool_cover")]
     assert len(states) >= 1
     assert states[0].state == "off"
     assert states[0].attributes.get("device_class") == "opening"
@@ -323,7 +323,7 @@ async def test_pool_cover_binary_sensor_on(
     mock_device_data["state"]["poolCover"]["isStopped"] = False
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    states = [s for s in hass.states.async_all("binary_sensor") if s.entity_id.endswith("_pool_cover")]
     assert len(states) >= 1
     assert states[0].state == "on"
     assert states[0].attributes.get("icon") == "mdi:window-shutter-open"
@@ -335,11 +335,11 @@ async def test_pool_cover_binary_sensor_on(
 async def test_pool_cover_not_installed(
     hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
 ):
-    """Pool cover not installed -> no entity."""
+    """Pool cover not installed -> no state entity (equip flag still exists)."""
     mock_device_data["equipmentsInfo"]["hasPoolCover"] = False
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("binary_sensor") if "pool_cover" in s.entity_id]
+    states = [s for s in hass.states.async_all("binary_sensor") if s.entity_id.endswith("_pool_cover")]
     assert len(states) == 0
 
 
@@ -351,7 +351,7 @@ async def test_jet_stream_binary_sensor(
     mock_device_data["state"]["jetStream"]["isRunning"] = True
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("binary_sensor") if "jet_stream" in s.entity_id]
+    states = [s for s in hass.states.async_all("binary_sensor") if s.entity_id.endswith("_jet_stream")]
     assert len(states) >= 1
     assert states[0].state == "on"
 
@@ -359,11 +359,11 @@ async def test_jet_stream_binary_sensor(
 async def test_jet_stream_not_installed(
     hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
 ):
-    """Jet stream not installed -> no entity."""
+    """Jet stream not installed -> no state entity (equip flag still exists)."""
     # Default mock: hasJetStream=False
     await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
 
-    states = [s for s in hass.states.async_all("binary_sensor") if "jet_stream" in s.entity_id]
+    states = [s for s in hass.states.async_all("binary_sensor") if s.entity_id.endswith("_jet_stream")]
     assert len(states) == 0
 
 
@@ -389,3 +389,74 @@ async def test_input_2_off(
     assert len(states) >= 1
     assert states[0].state == "off"
     assert states[0].attributes.get("icon") == "mdi:electric-switch"
+
+
+async def test_ph_auto_adjust_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH auto-adjust enabled -> on state."""
+    # Default mock: autoAdjust = True, hasPHSensor = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "ph_auto_adjust" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "on"
+
+
+async def test_ph_auto_adjust_off(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH auto-adjust disabled -> off state."""
+    mock_device_data["settings"]["pH"]["autoAdjust"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "ph_auto_adjust" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "off"
+
+
+async def test_ph_auto_adjust_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """pH auto-adjust gated by hasPHSensor."""
+    mock_device_data["equipmentsInfo"]["hasPHSensor"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("binary_sensor") if "ph_auto_adjust" in s.entity_id]
+    assert len(states) == 0
+
+
+async def test_equipment_flags_always_created(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Equipment inventory flags are always created regardless of equipment state."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("binary_sensor")
+    entity_ids = {s.entity_id for s in states}
+
+    assert any("fac_sensor_installed" in e for e in entity_ids)
+    assert any("salt_sensor_installed" in e for e in entity_ids)
+    assert any("flow_meter_installed" in e for e in entity_ids)
+    assert any("energy_meter_installed" in e for e in entity_ids)
+    assert any("pool_cover_installed" in e for e in entity_ids)
+    assert any("jet_stream_installed" in e for e in entity_ids)
+
+
+async def test_equipment_flags_values(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Equipment flags reflect actual equipment state."""
+    # Default mock: hasPoolCover=True, hasJetStream=False, etc.
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("binary_sensor")
+
+    pool_cover = [s for s in states if "pool_cover_installed" in s.entity_id][0]
+    assert pool_cover.state == "on"
+
+    jet_stream = [s for s in states if "jet_stream_installed" in s.entity_id][0]
+    assert jet_stream.state == "off"
+
+    fac = [s for s in states if "fac_sensor_installed" in s.entity_id][0]
+    assert fac.state == "off"

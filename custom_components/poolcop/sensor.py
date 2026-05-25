@@ -522,6 +522,19 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         ),
     ),
     PoolCopSensorEntityDescription(
+        key="flow_meter_rate",
+        name="Flow Meter Rate",
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
+        icon="mdi:water-pump",
+        value_fn=lambda data: (
+            data.device.state.flow_vis[0].flow_rate
+            if data.device.state.flow_vis
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
         key="last_backwash",
         name="Last backwash",
         device_class=SensorDeviceClass.TIMESTAMP,
@@ -723,6 +736,39 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
             else None
         ),
     ),
+    PoolCopSensorEntityDescription(
+        key="filter_backwash_mode",
+        name="Backwash Mode",
+        icon="mdi:cog",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _filtration(data).backwash_mode
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="filter_backwash_time",
+        name="Backwash Time",
+        icon="mdi:clock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _filtration(data).backwash_time
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="filter_type",
+        name="Filter Type",
+        icon="mdi:air-filter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _filtration(data).filter_type
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
     # Pump settings
     PoolCopSensorEntityDescription(
         key="pump_nb_speeds",
@@ -815,6 +861,17 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         ),
     ),
     PoolCopSensorEntityDescription(
+        key="pump_speed_24h",
+        name="Pump Speed 24H",
+        icon="mdi:speedometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: (
+            _filtration(data).speed_24
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
         key="pump_speed_cover",
         name="Pump Speed Cover",
         icon="mdi:speedometer",
@@ -848,6 +905,24 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.device.settings.ph.max_dosing_duration,
+    ),
+    PoolCopSensorEntityDescription(
+        key="ph_low_threshold",
+        name="pH Low Threshold",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="pH",
+        icon="mdi:ph",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.device.settings.ph.low_value,
+    ),
+    PoolCopSensorEntityDescription(
+        key="ph_high_threshold",
+        name="pH High Threshold",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement="pH",
+        icon="mdi:ph",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.device.settings.ph.high_value,
     ),
     # ORP / Disinfection settings
     PoolCopSensorEntityDescription(
@@ -894,6 +969,13 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         value_fn=lambda data: (
             data.device.settings.water_level.draining_duration
         ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="waterlevel_set_point",
+        name="Waterlevel Set Point",
+        icon="mdi:waves-arrow-up",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.device.settings.water_level.set_point,
     ),
 )
 

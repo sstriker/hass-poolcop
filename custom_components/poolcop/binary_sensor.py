@@ -246,6 +246,64 @@ BINARY_SENSORS = (
         is_on_fn=lambda data: data.device.state.inputs.get("Input2", False),
         on_off_icons=("mdi:electric-switch-closed", "mdi:electric-switch"),
     ),
+    # pH auto-adjust setting
+    PoolCopBinarySensorEntityDescription(
+        key="ph_auto_adjust",
+        name="pH Auto Adjust",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        is_on_fn=lambda data: data.device.settings.ph.auto_adjust,
+        on_off_icons=("mdi:ph", "mdi:ph"),
+    ),
+    # Equipment inventory flags (always visible for diagnostics)
+    PoolCopBinarySensorEntityDescription(
+        key="equip_fac_sensor",
+        name="FAC sensor installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_fac_sensor,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="equip_salt_sensor",
+        name="Salt sensor installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_salt_sensor,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="equip_flow_meter",
+        name="Flow meter installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_flow_meter,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="equip_energy_meter",
+        name="Energy meter installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_energy_meter,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="equip_pool_cover",
+        name="Pool cover installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_pool_cover,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="equip_jet_stream",
+        name="Jet stream installed",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        is_on_fn=lambda data: data.device.equipments_info.has_jet_stream,
+        on_off_icons=INSTALLED_ICONS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 )
 
 

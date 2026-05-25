@@ -72,6 +72,9 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         if key == "total_chlorine":
             return equip.has_tc_sensor
 
+        if key.startswith("flow_meter"):
+            return equip.has_flow_meter
+
         return True
 
     @property

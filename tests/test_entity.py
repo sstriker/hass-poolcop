@@ -155,3 +155,12 @@ def test_is_component_installed_disinfection():
     assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "disinfection_last_injection_duration") is False
     assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "disinfection_dosing") is True
     assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "disinfection_dosing") is False
+
+
+def test_is_component_installed_flow_meter():
+    """Flow meter gating by hasFlowMeter."""
+    data_on = _make_data({"hasFlowMeter": True})
+    data_off = _make_data({"hasFlowMeter": False})
+
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_on), "flow_meter_rate") is True
+    assert PoolCopEntity.is_component_installed(FakeCoordinator(data_off), "flow_meter_rate") is False
