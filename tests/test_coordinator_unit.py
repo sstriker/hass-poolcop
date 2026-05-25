@@ -865,3 +865,140 @@ async def test_set_forced_filtration(mock_config_entry):
     coord = _make_coordinator(hass, mock_config_entry, api)
     await coord.set_forced_filtration("Forced24H")
     api.set_pump_forced.assert_called_once_with(2478, "Forced24H")
+
+
+# ------------------------------------------------------------------
+# Time-dependent _get_remaining_cycle_seconds (lines 314-318)
+# ------------------------------------------------------------------
+
+
+async def test_get_remaining_cycle_seconds_now_after_stop(mock_config_entry):
+    """now >= stop_dt returns 0 (cycle already ended)."""
+    from datetime import datetime as dt
+    from unittest.mock import patch as _patch
+
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    # Timer 2: timeOn=08:00, timeOff=21:59 — set "now" to after stop
+    coord.data = PoolCopData(device=PoolCopDevice.from_dict(data))
+    coord._pool = _make_pool()
+
+    fake_now = dt(2026, 5, 25, 23, 0, 0, tzinfo=coord._pool_timezone())
+    with _patch("custom_components.poolcop.coordinator.datetime") as mock_dt:
+        mock_dt.now.return_value = fake_now
+        mock_dt.side_effect = lambda *a, **kw: dt(*a, **kw)
+        result = coord._get_remaining_cycle_seconds(1)
+    assert result == 0.0
+
+
+async def test_get_remaining_cycle_seconds_now_before_start(mock_config_entry):
+    """now <= start_dt returns full cycle duration."""
+    from datetime import datetime as dt
+    from unittest.mock import patch as _patch
+
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    data = deepcopy(MOCK_DEVICE_RESPONSE)
+    coord.data = PoolCopData(device=PoolCopDevice.from_dict(data))
+    coord._pool = _make_pool()
+
+    # Timer 2: timeOn=08:00:00, timeOff=21:59:00. Set now to 06:00 (before start)
+    fake_now = dt(2026, 5, 25, 6, 0, 0, tzinfo=coord._pool_timezone())
+    with _patch("custom_components.poolcop.coordinator.datetime") as mock_dt:
+        mock_dt.now.return_value = fake_now
+        mock_dt.side_effect = lambda *a, **kw: dt(*a, **kw)
+        result = coord._get_remaining_cycle_seconds(1)
+    # Full duration: 21:59 - 08:00 = 13h59m = 50340 seconds
+    assert result == 50340.0
+
+
+# ------------------------------------------------------------------
+# planned_remaining_volume final fallback (line 406)
+# ------------------------------------------------------------------
+
+
+async def test_planned_remaining_volume_unmapped_mode(mock_config_entry):
+    """A mode_id that passes all checks still returns 0.0 from final fallback."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    coord.data = PoolCopData(device=_make_device())
+    coord._pool = _make_pool()
+
+    # Patch _mode_id to return a mode not handled by any branch (e.g. 99)
+    with patch.object(coord, "_mode_id", return_value=99):
+        result = coord.planned_remaining_volume
+    assert result == 0.0
+
+
+# ------------------------------------------------------------------
+# _remaining_hours_volume exception handler (lines 419-420)
+# ------------------------------------------------------------------
+
+
+async def test_remaining_hours_volume_exception(mock_config_entry):
+    """Exception in datetime calculation returns 0.0."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    coord.data = PoolCopData(device=_make_device())
+
+    with patch("custom_components.poolcop.coordinator.datetime") as mock_dt:
+        mock_dt.now.side_effect = OverflowError("boom")
+        result = coord._remaining_hours_volume()
+    assert result == 0.0
+
+
+# ------------------------------------------------------------------
+# _update_cycle_tracking exception handler (lines 538-540)
+# ------------------------------------------------------------------
+
+
+async def test_update_cycle_tracking_key_error(mock_config_entry):
+    """KeyError during cycle tracking is caught silently."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    coord._last_operation_mode = 4
+    coord._current_cycle_start = time.time() - 60
+
+    device = _make_device()
+    # Remove a cycle duration key to trigger KeyError
+    del coord._cycle_durations[4]
+
+    result = coord._update_cycle_tracking(device)
+    # Should not crash, returns cycle_status dict
+    assert "predicted_end" in result
+
+
+# ------------------------------------------------------------------
+# Pool refresh failure (lines 595-597)
+# ------------------------------------------------------------------
+
+
+async def test_async_update_data_pool_refresh_failure(mock_config_entry):
+    """Pool refresh failure is logged but doesn't fail the update."""
+    hass = MagicMock()
+    hass.data = {}
+    hass.async_create_task = MagicMock()
+    api = AsyncMock()
+    api.get_device.return_value = _make_device()
+    api.get_pools.side_effect = ConnectionError("pool fetch failed")
+
+    coord = _make_coordinator(hass, mock_config_entry, api)
+    coord._pool_last_fetch = 0  # Force refresh
+    coord.data = PoolCopData(device=_make_device())
+
+    async def mock_save(data):
+        pass
+
+    coord._store = MagicMock()
+    coord._store.async_save = mock_save
+
+    result = await coord._async_update_data()
+    assert result is not None
+    assert result.device is not None
+    # Pool refresh failed, but data was still returned

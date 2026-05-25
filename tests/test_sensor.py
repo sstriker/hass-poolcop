@@ -544,3 +544,48 @@ async def test_aux_no_timers_no_sensors(
     states = hass.states.async_all("sensor")
     aux_timer = [s for s in states if "transferpump" in s.entity_id and "start_time" in s.entity_id]
     assert len(aux_timer) == 0
+
+
+# ------------------------------------------------------------------
+# Exception handlers in timer time functions (sensor.py lines 298-300, 346-354)
+# ------------------------------------------------------------------
+
+
+async def test_filtration_timer_time_tz_error():
+    """AttributeError in _time_str_to_time_today is caught, returns None."""
+    from conftest import MOCK_DEVICE_RESPONSE
+    from copy import deepcopy
+    from unittest.mock import patch as _patch
+
+    device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
+    data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
+    fn = _filtration_timer_time_fn(0, "time_on")
+
+    with _patch(
+        "custom_components.poolcop.sensor._time_str_to_time_today",
+        side_effect=AttributeError("tz error"),
+    ):
+        result = fn(data)
+    assert result is None
+
+
+async def test_aux_timer_time_tz_error():
+    """AttributeError in _time_str_to_time_today for aux timer is caught."""
+    from conftest import MOCK_DEVICE_RESPONSE
+    from copy import deepcopy
+    from unittest.mock import patch as _patch
+
+    device_data = deepcopy(MOCK_DEVICE_RESPONSE)
+    device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
+        {"id": 1, "timeOn": "14:00:00", "timeOff": "18:00:00"}
+    ]
+    device = PoolCopDevice.from_dict(device_data)
+    data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
+    fn = _aux_timer_time_fn("Aux4", 0, "time_on")
+
+    with _patch(
+        "custom_components.poolcop.sensor._time_str_to_time_today",
+        side_effect=KeyError("tz error"),
+    ):
+        result = fn(data)
+    assert result is None
