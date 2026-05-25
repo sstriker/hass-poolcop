@@ -101,3 +101,10 @@ def test_is_component_installed_always_true():
     assert PoolCopEntity.is_component_installed(coord, "pressure") is True
     assert PoolCopEntity.is_component_installed(coord, "temperature_water") is True
     assert PoolCopEntity.is_component_installed(coord, "pump_speed") is True
+
+
+def test_is_component_installed_data_none():
+    """When coordinator.data is None, all components are considered installed."""
+    coord = FakeCoordinator(None)
+    assert PoolCopEntity.is_component_installed(coord, "ph_control") is True
+    assert PoolCopEntity.is_component_installed(coord, "pump_speed") is True

@@ -106,6 +106,62 @@ async def test_geo_location_attention_mode_no_alarms(
     assert state.attributes.get("longitude") is None
 
 
+async def test_geo_location_null_coords(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pool with null coords -> no geo_location entity."""
+    mock_pool_data["latitude"] = None
+    mock_pool_data["longitude"] = None
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("geo_location")
+    poolcop_states = [s for s in states if s.attributes.get("source") == "poolcop"]
+    assert len(poolcop_states) == 0
+
+
+async def test_geo_location_invalid_coords(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pool with non-numeric coords -> no geo_location entity."""
+    mock_pool_data["latitude"] = "not_a_number"
+    mock_pool_data["longitude"] = "also_bad"
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("geo_location")
+    poolcop_states = [s for s in states if s.attributes.get("source") == "poolcop"]
+    assert len(poolcop_states) == 0
+
+
+async def test_geo_location_distance(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Distance from home zone is calculated."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("geo_location")
+    poolcop_states = [s for s in states if s.attributes.get("source") == "poolcop"]
+    assert len(poolcop_states) == 1
+    # The state value should be a float representing distance
+    state = poolcop_states[0]
+    assert state.state is not None
+
+
+async def test_geo_location_no_home_zone(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """No home zone coords -> distance is None."""
+    hass.config.latitude = None
+    hass.config.longitude = None
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = hass.states.async_all("geo_location")
+    poolcop_states = [s for s in states if s.attributes.get("source") == "poolcop"]
+    assert len(poolcop_states) == 1
+    # With no home zone, state (distance) should be None → "unknown"
+    state = poolcop_states[0]
+    assert state.state == "unknown"
+
+
 async def test_geo_location_attention_mode_with_alarms(
     hass: HomeAssistant, mock_poolcop_api, mock_device_data, mock_pool_data
 ):

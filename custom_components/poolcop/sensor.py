@@ -52,8 +52,6 @@ class PoolCopSensorEntityDescription(
 ):
     """Describes PoolCop sensor entity."""
 
-    extra_attrs_fn: Callable[[PoolCopData], dict[str, Any]] | None = None
-    available_fn: Callable[[PoolCopData], bool] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -1004,25 +1002,9 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
         super().__init__(coordinator=coordinator, description=description)
 
     @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        if self.entity_description.available_fn is not None:
-            return super().available and self.entity_description.available_fn(
-                self.coordinator.data
-            )
-        return super().available
-
-    @property
     def native_value(self) -> str | int | float | datetime | None:
         """Return the state of the sensor."""
         return self.entity_description.value_fn(self.coordinator.data)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any] | None:
-        """Return extra state attributes."""
-        if self.entity_description.extra_attrs_fn:
-            return self.entity_description.extra_attrs_fn(self.coordinator.data)
-        return None
 
 
 class FlowRateSensor(PoolCopSensorEntity):

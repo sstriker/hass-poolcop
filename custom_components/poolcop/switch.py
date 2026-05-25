@@ -109,8 +109,6 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
         for aux in self.coordinator.data.device.settings.auxs:
             if aux.aux_channel == self._aux_channel and aux.module == self._module:
                 attrs: dict[str, Any] = {}
-                if aux.is_slave:
-                    attrs["slave"] = aux.slaved_to
                 if aux.days_of_week:
                     attrs["days"] = aux.days_of_week
                 if aux.label:

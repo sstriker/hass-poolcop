@@ -1,5 +1,6 @@
 """Test PoolCop config flow."""
 
+from copy import deepcopy
 from unittest.mock import AsyncMock, patch
 
 from aiopoolcop import (
@@ -246,6 +247,93 @@ async def test_reauth_invalid_auth(hass: HomeAssistant, mock_config_entry):
 
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "invalid_auth"
+
+
+async def test_reauth_unknown_error(hass: HomeAssistant, mock_config_entry):
+    """Unknown error during reauth shows unknown."""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": "reauth", "entry_id": mock_config_entry.entry_id},
+        data=mock_config_entry.data,
+    )
+
+    mock_api = AsyncMock()
+    mock_api.get_pools.side_effect = ValueError("unexpected")
+
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopClientAPI",
+        return_value=mock_api,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "key"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "unknown"
+
+
+async def test_no_devices_found(hass: HomeAssistant):
+    """No devices for API key raises CannotConnect."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+
+    mock_api = AsyncMock()
+    pool_data = deepcopy(MOCK_POOL_RESPONSE)
+    pool_data["devices"] = []
+    mock_api.get_pools.return_value = [Pool.from_dict(pool_data)]
+
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopClientAPI",
+        return_value=mock_api,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "key"},
+        )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "cannot_connect"
+
+
+async def test_speed_to_int_fallback():
+    """_speed_to_int with non-Speed prefix returns 1."""
+    from custom_components.poolcop.config_flow import _speed_to_int
+
+    assert _speed_to_int("Speed3") == 3
+    assert _speed_to_int("Speed1") == 1
+    assert _speed_to_int("BadValue") == 1
+    assert _speed_to_int("Speed") == 1
+    assert _speed_to_int("SpeedABC") == 1
+
+
+async def test_flowrate_parse_error(hass: HomeAssistant):
+    """Non-numeric flowrate is handled gracefully."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+
+    mock_api = AsyncMock()
+    device_data = deepcopy(MOCK_DEVICE_RESPONSE)
+    device_data["settings"]["pool"]["estimatedFlowrate"] = "not_a_number"
+    mock_api.get_pools.return_value = [Pool.from_dict(MOCK_POOL_RESPONSE)]
+    mock_api.get_device.return_value = PoolCopDevice.from_dict(device_data)
+
+    with patch(
+        "custom_components.poolcop.config_flow.PoolCopClientAPI",
+        return_value=mock_api,
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {CONF_API_KEY: "key"},
+        )
+
+    # Should still reach flow_rates step
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "flow_rates"
 
 
 async def test_options_flow(

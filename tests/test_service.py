@@ -116,3 +116,47 @@ async def test_service_unload_not_registered(hass: HomeAssistant):
 
     await async_unload_services(hass)
     assert not hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED)
+
+
+async def test_service_toggle_pump_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """ConnectionError in toggle_pump is logged, not raised."""
+    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    mock_poolcop_api.set_pump.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True)
+
+
+async def test_service_toggle_aux_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """ConnectionError in toggle_aux is logged, not raised."""
+    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    mock_poolcop_api.set_auxiliary.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_TOGGLE_AUX, {"aux_id": 1}, blocking=True
+    )
+
+
+async def test_service_set_valve_position_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """ConnectionError in set_valve_position is logged, not raised."""
+    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    mock_poolcop_api.set_valve_position.side_effect = TimeoutError("timeout")
+
+    await hass.services.async_call(
+        DOMAIN, SERVICE_SET_VALVE_POSITION, {"position": "Filter"}, blocking=True
+    )
+
+
+async def test_service_clear_alarm_error(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """ConnectionError in clear_alarm is logged, not raised."""
+    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    mock_poolcop_api.clear_all_alarms.side_effect = ConnectionError("offline")
+
+    await hass.services.async_call(DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True)

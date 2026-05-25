@@ -110,3 +110,91 @@ async def test_aux_switch_idempotent_on(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
     )
     mock_poolcop_api.set_auxiliary.assert_not_called()
+
+
+async def test_pump_switch_no_pumps(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pump switch with no pumps info -> state None."""
+    mock_device_data["state"]["pumpsInfo"] = []
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "pump" in s.entity_id and "aux" not in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
+
+
+async def test_aux_switch_no_module_returns_none(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Aux switch with missing module in state returns None."""
+    mock_device_data["state"]["auxiliaries"] = {}
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
+
+
+async def test_aux_switch_extra_attrs_days(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Aux switch with days_of_week shows days attr."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["daysOfWeek"] = ["Monday", "Friday"]
+    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].attributes.get("days") == ["Monday", "Friday"]
+    assert states[0].attributes.get("label") == "TransferPump"
+    assert states[0].attributes.get("friendly_name") is not None
+    assert states[0].attributes.get("mode") == "Manual"
+
+
+async def test_aux_switch_icon_with_known_label(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Aux switch with known label_aux_0 (Pool Light) shows light icon."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_0"
+    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "pool_light" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].attributes.get("icon") == "mdi:lightbulb-on"
+
+
+async def test_aux_switch_icon_off_state(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Aux switch off with known label shows off icon."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_0"
+    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "pool_light" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].attributes.get("icon") == "mdi:lightbulb-off"
+
+
+async def test_aux_switch_empty_attrs_fallback(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Aux switch whose settings no longer match returns empty attrs."""
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    # Remove the aux from settings after setup so extra_state_attributes misses
+    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    coordinator.data.device.settings.auxs.clear()
+
+    # Force the entity to re-write its state
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+
+    states = [s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id]
+    assert len(states) >= 1
+    # Extra attrs should not have days/label/mode from the aux
+    attrs = states[0].attributes
+    assert "days" not in attrs
+    assert "label" not in attrs

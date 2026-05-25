@@ -97,3 +97,39 @@ async def test_pump_speed_set(
         blocking=True,
     )
     mock_poolcop_api.set_pump_speed.assert_called_once_with(2478, "Speed3")
+
+
+async def test_pump_speed_no_pumps(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """No pumps -> speed options fall back to ['None', 'Speed1']."""
+    mock_device_data["state"]["pumpsInfo"] = []
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "pump_speed" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].attributes.get("options") == ["None", "Speed1"]
+
+
+async def test_pump_speed_pump_off_shows_none(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Pump off -> current option is 'None'."""
+    mock_device_data["state"]["pumpsInfo"][0]["pumpState"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "pump_speed" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "None"
+
+
+async def test_valve_position_no_pumps(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """No pumps -> valve position returns None."""
+    mock_device_data["state"]["pumpsInfo"] = []
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("select") if "valve_position" in s.entity_id]
+    assert len(states) >= 1
+    assert states[0].state == "unknown"
