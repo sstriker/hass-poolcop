@@ -139,6 +139,77 @@ async def test_coordinator_toggle_pump_idempotent(
         mock_poolcop.toggle_pump.assert_called_once()
 
 
+async def test_toggle_pump_tolerates_http_408(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """HTTP 408 from upstream API is logged but does not raise.
+
+    The PoolCop cloud forwards commands to the hardware; HTTP 408 means
+    the hardware ack timed out but the command was sent. Surfacing it as
+    an HA error popup is misleading, so the coordinator should swallow
+    it and rely on the next status poll to reconcile state.
+    """
+    from aiohttp.client import ClientResponseError
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    # Build a 408 wrapped exactly like the poolcop library does
+    inner = ClientResponseError(
+        request_info=None, history=(), status=408, message="Request Time-out"
+    )
+    err = PoolCopilotConnectionError("API returned HTTP 408: Request Time-out")
+    err.__cause__ = inner
+    mock_poolcop.toggle_pump.side_effect = err
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass,
+            api_key="test-api-key",
+            config_entry=mock_config_entry,
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+        # Pump is on, requesting turn_off triggers the API call; 408
+        # should not propagate as an exception.
+        await coordinator.toggle_pump(turn_on=False)
+        mock_poolcop.toggle_pump.assert_called_once()
+
+
+async def test_toggle_pump_propagates_other_errors(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
+):
+    """Non-408 connection errors still propagate."""
+    from aiohttp.client import ClientResponseError
+
+    mock_poolcop.status.return_value = mock_poolcop_data
+    mock_config_entry.add_to_hass(hass)
+
+    inner = ClientResponseError(
+        request_info=None, history=(), status=500, message="Server Error"
+    )
+    err = PoolCopilotConnectionError("API returned HTTP 500: Server Error")
+    err.__cause__ = inner
+    mock_poolcop.toggle_pump.side_effect = err
+
+    with patch(
+        "custom_components.poolcop.coordinator.PoolCopilot",
+        return_value=mock_poolcop,
+    ):
+        coordinator = PoolCopDataUpdateCoordinator(
+            hass=hass,
+            api_key="test-api-key",
+            config_entry=mock_config_entry,
+        )
+        coordinator.data = await coordinator._async_update_data()
+
+        with pytest.raises(PoolCopilotConnectionError):
+            await coordinator.toggle_pump(turn_on=False)
+
+
 async def test_update_command_result(
     hass: HomeAssistant, mock_config_entry, mock_poolcop, mock_poolcop_data
 ):
