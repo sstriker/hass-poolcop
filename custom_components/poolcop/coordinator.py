@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from typing import Any, NamedTuple
 
@@ -154,7 +155,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         try:
             speed_level = int(speed_level)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return 0.0
 
         return self.flow_rates.get(speed_level, 0.0)
@@ -214,7 +215,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     import zoneinfo
 
                     tz = zoneinfo.ZoneInfo(pool_data["timezone"])
-                except ImportError, zoneinfo.ZoneInfoNotFoundError:
+                except (ImportError, zoneinfo.ZoneInfoNotFoundError):
                     pass
 
             now = datetime.now(tz=tz)
@@ -224,7 +225,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
             start_dt = now.replace(hour=sh, minute=sm, second=ss, microsecond=0)
             stop_dt = now.replace(hour=eh, minute=em, second=es, microsecond=0)
-        except ValueError, TypeError:
+        except (ValueError, TypeError):
             return 0.0
 
         # Ensure stop is after start (same-day cycle)
@@ -250,7 +251,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if current_speed is not None:
             try:
                 return self.flow_rates.get(int(current_speed), 0.0)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 pass
         # Last fallback: speed 1
         return self.flow_rates.get(1, 0.0)
@@ -298,7 +299,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if current_speed is not None:
                     try:
                         current_speed = int(current_speed)
-                    except ValueError, TypeError:
+                    except (ValueError, TypeError):
                         current_speed = None
                 flow = self._get_flow_rate_for_speed(current_speed)
                 return round(flow * remaining_hours, 3)
@@ -317,7 +318,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     if speed is not None:
                         try:
                             speed = int(speed)
-                        except ValueError, TypeError:
+                        except (ValueError, TypeError):
                             speed = None
                     flow = self._get_flow_rate_for_speed(speed)
                     total += flow * (remaining_secs / 3600.0)
@@ -341,7 +342,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                         import zoneinfo
 
                         tz = zoneinfo.ZoneInfo(pool_data["timezone"])
-                    except ImportError, zoneinfo.ZoneInfoNotFoundError:
+                    except (ImportError, zoneinfo.ZoneInfoNotFoundError):
                         pass
 
             now = datetime.now(tz=tz) if tz else datetime.now()
@@ -360,7 +361,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if current_speed is not None:
             try:
                 current_speed = int(current_speed)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 current_speed = None
         flow = self._get_flow_rate_for_speed(current_speed)
         return round(flow * remaining_hours, 3)
@@ -470,7 +471,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     cycle_status["remaining_time"] = remaining_time
                     cycle_status["predicted_end"] = now + remaining_time
 
-        except KeyError, TypeError:
+        except (KeyError, TypeError):
             # Don't crash cycle tracking on data parsing errors
             pass
 
@@ -619,11 +620,40 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Update data with a command result, preserving all other fields."""
         self.data = self.data._replace(last_command_result=result)
 
+    async def _run_command(
+        self,
+        description: str,
+        call: Callable[[], Awaitable[dict[str, Any]]],
+    ) -> None:
+        """Run a write command, tolerating upstream HTTP 408 timeouts.
+
+        The PoolCop cloud forwards commands to the physical hardware and
+        returns HTTP 408 if the hardware does not ack within its window.
+        The command is typically still received and executed, so surface
+        a warning instead of an error popup and let the next status poll
+        reconcile actual state.
+        """
+        try:
+            result = await call()
+        except PoolCopilotConnectionError as err:
+            status = getattr(err.__cause__, "status", None)
+            if status == 408:
+                LOGGER.warning(
+                    "%s: API returned HTTP 408 (hardware ack timed out); "
+                    "command was sent, state will reconcile on next poll",
+                    description,
+                )
+                return
+            raise
+        self._update_command_result(result)
+        LOGGER.debug("%s, result: %s", description, result)
+
     async def set_pump_speed(self, speed: int) -> None:
         """Set the pump speed."""
-        result = await self.poolcopilot.set_pump_speed(speed)
-        self._update_command_result(result)
-        LOGGER.debug("Set pump speed to %s, result: %s", speed, result)
+        await self._run_command(
+            f"Set pump speed to {speed}",
+            lambda: self.poolcopilot.set_pump_speed(speed),
+        )
 
     async def toggle_pump(self, turn_on: bool | None = None) -> None:
         """Toggle the pump. If turn_on is specified, only toggle if state differs."""
@@ -635,30 +665,29 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     "on" if turn_on else "off",
                 )
                 return
-        result = await self.poolcopilot.toggle_pump()
-        self._update_command_result(result)
-        LOGGER.debug("Toggled pump, result: %s", result)
+        await self._run_command("Toggled pump", self.poolcopilot.toggle_pump)
 
     async def set_valve_position(self, position: int) -> None:
         """Set the valve position."""
-        result = await self.poolcopilot.set_valve_position(position)
-        self._update_command_result(result)
-        LOGGER.debug("Set valve position to %s, result: %s", position, result)
+        await self._run_command(
+            f"Set valve position to {position}",
+            lambda: self.poolcopilot.set_valve_position(position),
+        )
 
     async def clear_alarm(self) -> None:
         """Clear active alarms."""
-        result = await self.poolcopilot.clear_alarm()
-        self._update_command_result(result)
-        LOGGER.debug("Cleared alarms, result: %s", result)
+        await self._run_command("Cleared alarms", self.poolcopilot.clear_alarm)
 
     async def toggle_auxiliary(self, aux_id: int) -> None:
         """Toggle an auxiliary output."""
-        result = await self.poolcopilot.toggle_auxiliary(aux_id)
-        self._update_command_result(result)
-        LOGGER.debug("Toggled auxiliary %s, result: %s", aux_id, result)
+        await self._run_command(
+            f"Toggled auxiliary {aux_id}",
+            lambda: self.poolcopilot.toggle_auxiliary(aux_id),
+        )
 
     async def set_force_filtration_mode(self, mode: int) -> None:
         """Set forced filtration mode."""
-        result = await self.poolcopilot.set_force_filtration(mode)
-        self._update_command_result(result)
-        LOGGER.debug("Set force filtration mode to %s, result: %s", mode, result)
+        await self._run_command(
+            f"Set force filtration mode to {mode}",
+            lambda: self.poolcopilot.set_force_filtration(mode),
+        )

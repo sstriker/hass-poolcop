@@ -34,7 +34,7 @@ async def async_setup_entry(
     try:
         float(lat)
         float(lon)
-    except ValueError, TypeError:
+    except (ValueError, TypeError):
         return
 
     async_add_entities([PoolCopGeoLocation(coordinator, pool_data)])
