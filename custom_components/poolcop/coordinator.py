@@ -155,7 +155,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         try:
             speed_level = int(speed_level)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return 0.0
 
         return self.flow_rates.get(speed_level, 0.0)
@@ -215,7 +215,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     import zoneinfo
 
                     tz = zoneinfo.ZoneInfo(pool_data["timezone"])
-                except (ImportError, zoneinfo.ZoneInfoNotFoundError):
+                except ImportError, zoneinfo.ZoneInfoNotFoundError:
                     pass
 
             now = datetime.now(tz=tz)
@@ -225,7 +225,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
             start_dt = now.replace(hour=sh, minute=sm, second=ss, microsecond=0)
             stop_dt = now.replace(hour=eh, minute=em, second=es, microsecond=0)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return 0.0
 
         # Ensure stop is after start (same-day cycle)
@@ -251,7 +251,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if current_speed is not None:
             try:
                 return self.flow_rates.get(int(current_speed), 0.0)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 pass
         # Last fallback: speed 1
         return self.flow_rates.get(1, 0.0)
@@ -299,7 +299,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if current_speed is not None:
                     try:
                         current_speed = int(current_speed)
-                    except (ValueError, TypeError):
+                    except ValueError, TypeError:
                         current_speed = None
                 flow = self._get_flow_rate_for_speed(current_speed)
                 return round(flow * remaining_hours, 3)
@@ -318,7 +318,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     if speed is not None:
                         try:
                             speed = int(speed)
-                        except (ValueError, TypeError):
+                        except ValueError, TypeError:
                             speed = None
                     flow = self._get_flow_rate_for_speed(speed)
                     total += flow * (remaining_secs / 3600.0)
@@ -342,7 +342,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                         import zoneinfo
 
                         tz = zoneinfo.ZoneInfo(pool_data["timezone"])
-                    except (ImportError, zoneinfo.ZoneInfoNotFoundError):
+                    except ImportError, zoneinfo.ZoneInfoNotFoundError:
                         pass
 
             now = datetime.now(tz=tz) if tz else datetime.now()
@@ -361,7 +361,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if current_speed is not None:
             try:
                 current_speed = int(current_speed)
-            except (ValueError, TypeError):
+            except ValueError, TypeError:
                 current_speed = None
         flow = self._get_flow_rate_for_speed(current_speed)
         return round(flow * remaining_hours, 3)
@@ -471,7 +471,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     cycle_status["remaining_time"] = remaining_time
                     cycle_status["predicted_end"] = now + remaining_time
 
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             # Don't crash cycle tracking on data parsing errors
             pass
 
