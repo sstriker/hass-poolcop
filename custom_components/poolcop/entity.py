@@ -66,6 +66,9 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         if key.startswith("jet_stream"):
             return equip.has_jet_stream
 
+        if key == "free_available_chlorine":
+            return equip.has_fac_sensor
+
         if key == "free_chlorine":
             return equip.has_fc_sensor
 

@@ -751,3 +751,17 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Set forced filtration mode (NotForced, Forced24H, Forced48H, Forced72H)."""
         await self.api.set_pump_forced(self.device_id, mode)
         LOGGER.debug("Set forced filtration mode to %s", mode)
+
+    async def set_heating_setpoint(
+        self, setpoint: float, aux_id: int, module: str = "None"
+    ) -> None:
+        """Set the heating setpoint for an auxiliary."""
+        await self.api.set_heating_setpoint(
+            self.device_id, setpoint, aux_id, module
+        )
+        LOGGER.debug("Set heating setpoint to %.1f for aux %d", setpoint, aux_id)
+
+    async def set_jet_stream(self, on: bool) -> None:
+        """Turn the jet stream on or off."""
+        await self.api.set_jet_stream(self.device_id, on=on)
+        LOGGER.debug("Set jet stream %s", "on" if on else "off")

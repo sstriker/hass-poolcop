@@ -178,6 +178,63 @@ async def test_aux_switch_icon_off_state(
     assert states[0].attributes.get("icon") == "mdi:lightbulb-off"
 
 
+async def test_jet_stream_switch_hidden_when_not_installed(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Jet stream switch should not be created when not installed."""
+    mock_device_data["equipmentsInfo"]["hasJetStream"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "jet_stream" in s.entity_id]
+    assert len(states) == 0
+
+
+async def test_jet_stream_switch_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Jet stream switch on when installed and running."""
+    mock_device_data["equipmentsInfo"]["hasJetStream"] = True
+    mock_device_data["state"]["jetStream"]["installed"] = True
+    mock_device_data["state"]["jetStream"]["isRunning"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    states = [s for s in hass.states.async_all("switch") if "jet_stream" in s.entity_id]
+    assert len(states) == 1
+    assert states[0].state == "on"
+
+
+async def test_jet_stream_switch_turn_on(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Turning jet stream on calls set_jet_stream."""
+    mock_device_data["equipmentsInfo"]["hasJetStream"] = True
+    mock_device_data["state"]["jetStream"]["installed"] = True
+    mock_device_data["state"]["jetStream"]["isRunning"] = False
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    js_switch = [s for s in hass.states.async_all("switch") if "jet_stream" in s.entity_id][0]
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": js_switch.entity_id}, blocking=True
+    )
+    mock_poolcop_api.set_jet_stream.assert_called_once_with(2478, on=True)
+
+
+async def test_jet_stream_switch_turn_off(
+    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+):
+    """Turning jet stream off calls set_jet_stream."""
+    mock_device_data["equipmentsInfo"]["hasJetStream"] = True
+    mock_device_data["state"]["jetStream"]["installed"] = True
+    mock_device_data["state"]["jetStream"]["isRunning"] = True
+    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+
+    js_switch = [s for s in hass.states.async_all("switch") if "jet_stream" in s.entity_id][0]
+    await hass.services.async_call(
+        "switch", "turn_off", {"entity_id": js_switch.entity_id}, blocking=True
+    )
+    mock_poolcop_api.set_jet_stream.assert_called_once_with(2478, on=False)
+
+
 async def test_aux_switch_empty_attrs_fallback(
     hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
 ):

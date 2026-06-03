@@ -617,6 +617,31 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.pool.nickname if data.pool else None,
     ),
+    # API-provided cycle elapsed/remaining time (from filtration settings)
+    PoolCopSensorEntityDescription(
+        key="api_cycle_elapsed_time",
+        name="Cycle Elapsed Time (API)",
+        icon="mdi:timer",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _parse_duration_seconds(
+            _filtration(data).current_cycle_elapsed_time
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
+    PoolCopSensorEntityDescription(
+        key="api_cycle_remaining_time",
+        name="Cycle Remaining Time (API)",
+        icon="mdi:timer-sand",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _parse_duration_seconds(
+            _filtration(data).current_cycle_remaining_time
+            if _filtration(data) is not None
+            else None
+        ),
+    ),
     # Diagnostic: firmware and model
     PoolCopSensorEntityDescription(
         key="firmware_version",
@@ -631,6 +656,13 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:information-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.device.version_info.model or None,
+    ),
+    PoolCopSensorEntityDescription(
+        key="os_version",
+        name="OS Version",
+        icon="mdi:chip",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.device.version_info.os_version or None,
     ),
 )
 

@@ -1127,3 +1127,21 @@ async def test_get_flow_rate_for_speed_fallback_no_meter(mock_config_entry):
     coord.data = PoolCopData(device=_make_device())
     rate = coord._get_flow_rate_for_speed(2)
     assert rate == 15.0  # Speed2 configured rate
+
+
+async def test_set_heating_setpoint(mock_config_entry):
+    """set_heating_setpoint delegates to API."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    await coord.set_heating_setpoint(28.5, 4, "None")
+    coord.api.set_heating_setpoint.assert_called_once_with(2478, 28.5, 4, "None")
+
+
+async def test_set_jet_stream(mock_config_entry):
+    """set_jet_stream delegates to API."""
+    hass = MagicMock()
+    hass.data = {}
+    coord = _make_coordinator(hass, mock_config_entry)
+    await coord.set_jet_stream(on=True)
+    coord.api.set_jet_stream.assert_called_once_with(2478, on=True)

@@ -211,6 +211,33 @@ BINARY_SENSORS = (
         is_on_fn=lambda data: data.device.settings.water_level.can_reduce,
         on_off_icons=("mdi:water-minus", "mdi:water-off"),
     ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_on_target",
+        name="Water Level On Target",
+        is_on_fn=lambda data: data.device.state.water_level.is_on_target,
+        on_off_icons=("mdi:check-circle", "mdi:close-circle"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_on_error",
+        name="Water Level Error",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        is_on_fn=lambda data: data.device.state.water_level.is_on_error,
+        on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_refilling",
+        name="Water Level Refilling",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        is_on_fn=lambda data: data.device.state.water_level.is_refilling,
+        on_off_icons=("mdi:water-plus", "mdi:water-off"),
+    ),
+    PoolCopBinarySensorEntityDescription(
+        key="waterlevel_measuring",
+        name="Water Level Measuring",
+        device_class=BinarySensorDeviceClass.RUNNING,
+        is_on_fn=lambda data: data.device.state.water_level.is_measuring,
+        on_off_icons=("mdi:ruler", "mdi:ruler"),
+    ),
     # Pool cover state
     PoolCopBinarySensorEntityDescription(
         key="pool_cover_open",

@@ -22,6 +22,9 @@ async def async_setup_entry(
 
     entities: list[SwitchEntity] = [PoolCopPumpSwitch(coordinator)]
 
+    if coordinator.data.device.equipments_info.has_jet_stream:
+        entities.append(PoolCopJetStreamSwitch(coordinator))
+
     # Dynamic aux switches: not reserved and not slaved
     for aux in coordinator.data.device.settings.auxs:
         if not aux.is_reserved and not aux.is_slave:
@@ -62,6 +65,38 @@ class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the pump off."""
         await self.coordinator.set_pump(on=False)
+        await self.coordinator.async_request_refresh()
+
+
+class PoolCopJetStreamSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
+    """Representation of the PoolCop jet stream switch."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = SwitchDeviceClass.SWITCH
+    _attr_icon = "mdi:waves-arrow-right"
+
+    def __init__(self, coordinator: PoolCopDataUpdateCoordinator) -> None:
+        """Initialize the jet stream switch."""
+        from homeassistant.helpers.entity import EntityDescription
+
+        super().__init__(
+            coordinator=coordinator,
+            description=EntityDescription(key="jet_stream_switch", name="Jet Stream"),
+        )
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if the jet stream is running."""
+        return self.coordinator.data.device.state.jet_stream.is_running
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Turn the jet stream on."""
+        await self.coordinator.set_jet_stream(on=True)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Turn the jet stream off."""
+        await self.coordinator.set_jet_stream(on=False)
         await self.coordinator.async_request_refresh()
 
 
