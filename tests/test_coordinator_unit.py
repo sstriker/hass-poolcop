@@ -988,7 +988,7 @@ async def test_async_update_data_pool_refresh_failure(mock_config_entry):
     api.get_pools.side_effect = ConnectionError("pool fetch failed")
 
     coord = _make_coordinator(hass, mock_config_entry, api)
-    coord._pool_last_fetch = 0  # Force refresh
+    coord._pool_last_fetch = None  # Force refresh
     coord.data = PoolCopData(device=_make_device())
 
     async def mock_save(data):
@@ -1001,6 +1001,57 @@ async def test_async_update_data_pool_refresh_failure(mock_config_entry):
     assert result is not None
     assert result.device is not None
     # Pool refresh failed, but data was still returned
+
+
+# ------------------------------------------------------------------
+# Pool refresh timing: time.monotonic() counts from boot, so the first
+# refresh must not depend on host uptime.
+# ------------------------------------------------------------------
+
+
+def _pool_refresh_coordinator(mock_config_entry):
+    hass = MagicMock()
+    hass.data = {}
+    hass.async_create_task = MagicMock()
+    api = AsyncMock()
+    api.get_device.return_value = _make_device()
+    api.get_pools.return_value = [_make_pool()]
+    coord = _make_coordinator(hass, mock_config_entry, api)
+    coord.data = PoolCopData(device=_make_device())
+    coord._store = MagicMock()
+    coord._store.async_save = AsyncMock()
+    return coord, api
+
+
+async def test_pool_fetched_on_first_update_shortly_after_boot(mock_config_entry):
+    """The pool is fetched on the first update even if the host just booted."""
+    coord, api = _pool_refresh_coordinator(mock_config_entry)
+    fake_time = MagicMock(wraps=time)
+    fake_time.monotonic.return_value = 120.0  # host up for two minutes
+
+    with patch("custom_components.poolcop.coordinator.time", fake_time):
+        result = await coord._async_update_data()
+
+    api.get_pools.assert_awaited_once()
+    assert result.pool is not None
+    assert result.pool.id == _make_pool().id
+
+
+async def test_pool_refresh_respects_interval(mock_config_entry):
+    """After the first fetch, the pool is only refetched once the interval passes."""
+    coord, api = _pool_refresh_coordinator(mock_config_entry)
+    fake_time = MagicMock(wraps=time)
+
+    with patch("custom_components.poolcop.coordinator.time", fake_time):
+        fake_time.monotonic.return_value = 120.0
+        await coord._async_update_data()
+        fake_time.monotonic.return_value = 120.0 + 60
+        await coord._async_update_data()
+        assert api.get_pools.await_count == 1
+
+        fake_time.monotonic.return_value = 120.0 + 1800
+        await coord._async_update_data()
+        assert api.get_pools.await_count == 2
 
 
 # ------------------------------------------------------------------

@@ -158,7 +158,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         # Pool info cache
         self._pool: Pool | None = None
-        self._pool_last_fetch: float = 0.0
+        # None until the first successful fetch; monotonic() counts from boot, so
+        # a 0.0 sentinel would skip the first fetch on hosts up < 30 minutes.
+        self._pool_last_fetch: float | None = None
 
     # ------------------------------------------------------------------
     # Helpers to extract numeric values from typed models
@@ -598,7 +600,10 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
             # Refresh pool info periodically (lat/lon/timezone)
             now_mono = time.monotonic()
-            if now_mono - self._pool_last_fetch >= _POOL_REFRESH_INTERVAL:
+            if (
+                self._pool_last_fetch is None
+                or now_mono - self._pool_last_fetch >= _POOL_REFRESH_INTERVAL
+            ):
                 try:
                     pools = await self.api.get_pools()
                     # Find the pool that contains our device
