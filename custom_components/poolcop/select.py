@@ -12,7 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN
 from .coordinator import (
     SPEED_NAME_TO_LEVEL,
     VALVE_NAME_TO_ID,

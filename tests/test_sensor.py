@@ -25,13 +25,17 @@ from custom_components.poolcop.sensor import (
 )
 
 
-async def _setup_integration(hass, mock_config_entry, mock_poolcop_api, device_data, pool_data):
+async def _setup_integration(
+    hass, mock_config_entry, mock_poolcop_api, device_data, pool_data
+):
     """Set up the integration and return the coordinator."""
     mock_poolcop_api.get_device.return_value = PoolCopDevice.from_dict(device_data)
     mock_poolcop_api.get_pools.return_value = [Pool.from_dict(pool_data)]
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
+    with patch(
+        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+    ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -39,10 +43,16 @@ async def _setup_integration(hass, mock_config_entry, mock_poolcop_api, device_d
 
 
 async def test_sensor_platform_setup(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Key sensors exist after setup."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = hass.states.async_all("sensor")
     sensor_keys = {s.entity_id for s in states}
@@ -51,21 +61,35 @@ async def test_sensor_platform_setup(
 
 
 async def test_water_temperature_value(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Water temperature should be 27.2."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "water_temperature" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "water_temperature" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "27.2"
 
 
 async def test_ph_value(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH should be 7.5."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_ph")]
     assert len(states) >= 1
@@ -73,32 +97,56 @@ async def test_ph_value(
 
 
 async def test_running_status_value(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Running status should be timer_mode slug."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "running_status" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "running_status" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "timer_mode"
 
 
 async def test_valve_position_sensor(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Valve position should be 'filter' slug."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "valve_position" in s.entity_id and "select" not in s.entity_id]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if "valve_position" in s.entity_id and "select" not in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "filter"
 
 
 async def test_planned_remaining_sensors_exist(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Planned remaining volume and turnovers sensors are created."""
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = hass.states.async_all("sensor")
     sensor_keys = {s.entity_id for s in states}
@@ -107,54 +155,70 @@ async def test_planned_remaining_sensors_exist(
 
 async def test_cycle_time_remaining_fn_no_cycle_mode():
     """Returns None when not in cycle mode."""
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {
-            "pumpsInfo": [{"runningStatus": "Stopped", "pumpState": False}],
-        },
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {
+                "pumpsInfo": [{"runningStatus": "Stopped", "pumpState": False}],
+            },
+        }
+    )
     data = PoolCopData(device=device, cycle_status={"remaining_time": 120})
     assert _cycle_time_remaining_fn(data) is None
 
 
 async def test_cycle_time_remaining_fn_in_cycle():
     """Returns remaining time when in cycle mode."""
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {
-            "pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}],
-        },
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {
+                "pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}],
+            },
+        }
+    )
     data = PoolCopData(
         device=device,
-        cycle_status={"remaining_time": 120.5, "elapsed_time": 300, "predicted_end": None},
+        cycle_status={
+            "remaining_time": 120.5,
+            "elapsed_time": 300,
+            "predicted_end": None,
+        },
     )
     assert _cycle_time_remaining_fn(data) == 120.5
 
 
 async def test_cycle_elapsed_time_fn():
     """Returns None when not in cycle, value when in cycle."""
-    device_stopped = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "Stopped"}]},
-    })
-    data_stopped = PoolCopData(device=device_stopped, cycle_status={"elapsed_time": 120})
+    device_stopped = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "Stopped"}]},
+        }
+    )
+    data_stopped = PoolCopData(
+        device=device_stopped, cycle_status={"elapsed_time": 120}
+    )
     assert _cycle_elapsed_time_fn(data_stopped) is None
 
-    device_timer = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "TimerMode"}]},
-    })
+    device_timer = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "TimerMode"}]},
+        }
+    )
     data_timer = PoolCopData(device=device_timer, cycle_status={"elapsed_time": 300})
     assert _cycle_elapsed_time_fn(data_timer) == 300
 
 
 async def test_cycle_end_time_fn_not_in_cycle():
     """Returns None when not in cycle mode."""
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "Stopped"}]},
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "Stopped"}]},
+        }
+    )
     data = PoolCopData(device=device, cycle_status={"predicted_end": 9999999999})
     assert _cycle_end_time_fn(data) is None
 
@@ -229,10 +293,12 @@ async def test_slugify_enum_none():
 
 async def test_is_cycle_mode_unknown_status():
     """Unknown running status returns False."""
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "BrandNewMode"}]},
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "BrandNewMode"}]},
+        }
+    )
     data = PoolCopData(device=device, cycle_status={})
     assert _is_cycle_mode(data) is False
 
@@ -249,13 +315,16 @@ async def test_cycle_end_time_fn_in_cycle():
     import time
 
     ts = time.time() + 3600
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
+        }
+    )
     pool = Pool.from_dict({"id": 1, "timezone": "UTC"})
     data = PoolCopData(
-        device=device, pool=pool,
+        device=device,
+        pool=pool,
         cycle_status={"predicted_end": ts, "elapsed_time": 100, "remaining_time": 3600},
     )
     result = _cycle_end_time_fn(data)
@@ -268,13 +337,16 @@ async def test_cycle_end_time_fn_invalid_tz():
     import time
 
     ts = time.time() + 3600
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
+        }
+    )
     pool = Pool.from_dict({"id": 1, "timezone": "Invalid/Zone"})
     data = PoolCopData(
-        device=device, pool=pool,
+        device=device,
+        pool=pool,
         cycle_status={"predicted_end": ts, "elapsed_time": 100, "remaining_time": 3600},
     )
     result = _cycle_end_time_fn(data)
@@ -287,12 +359,15 @@ async def test_cycle_end_time_fn_no_pool():
     import time
 
     ts = time.time() + 3600
-    device = PoolCopDevice.from_dict({
-        "id": 1,
-        "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
-    })
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "TimerMode", "pumpState": True}]},
+        }
+    )
     data = PoolCopData(
-        device=device, pool=None,
+        device=device,
+        pool=None,
         cycle_status={"predicted_end": ts, "elapsed_time": 100, "remaining_time": 3600},
     )
     result = _cycle_end_time_fn(data)
@@ -321,8 +396,9 @@ async def test_filtration_timer_enabled_no_filtrations():
 
 async def test_filtration_timer_enabled_out_of_range():
     """Timer index out of range returns 'Disabled'."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
@@ -340,8 +416,9 @@ async def test_filtration_timer_time_no_filtrations():
 
 async def test_filtration_timer_time_out_of_range():
     """Timer index out of range returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -351,8 +428,9 @@ async def test_filtration_timer_time_out_of_range():
 
 async def test_filtration_timer_time_disabled():
     """Disabled timer returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device_data = deepcopy(MOCK_DEVICE_RESPONSE)
     device_data["settings"]["filtrations"][0]["timers"][0]["enabled"] = False
@@ -364,8 +442,9 @@ async def test_filtration_timer_time_disabled():
 
 async def test_filtration_timer_time_empty_string():
     """Empty time string returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device_data = deepcopy(MOCK_DEVICE_RESPONSE)
     device_data["settings"]["filtrations"][0]["timers"][0]["timeOn"] = ""
@@ -377,8 +456,9 @@ async def test_filtration_timer_time_empty_string():
 
 async def test_filtration_timer_time_valid():
     """Valid timer time returns datetime."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -396,8 +476,9 @@ async def test_filtration_timer_time_valid():
 
 async def test_aux_timer_enabled_active():
     """Aux with active timer returns 'Enabled'."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device_data = deepcopy(MOCK_DEVICE_RESPONSE)
     device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
@@ -411,8 +492,9 @@ async def test_aux_timer_enabled_active():
 
 async def test_aux_timer_enabled_inactive():
     """Aux with 00:00:00 timer returns 'Disabled'."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
@@ -422,8 +504,9 @@ async def test_aux_timer_enabled_inactive():
 
 async def test_aux_timer_enabled_not_found():
     """Aux ID not found returns 'Disabled'."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
@@ -433,8 +516,9 @@ async def test_aux_timer_enabled_not_found():
 
 async def test_aux_timer_time_valid():
     """Aux with valid timer returns datetime."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device_data = deepcopy(MOCK_DEVICE_RESPONSE)
     device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
@@ -450,8 +534,9 @@ async def test_aux_timer_time_valid():
 
 async def test_aux_timer_time_zero():
     """Aux with 00:00:00 timer returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -461,8 +546,9 @@ async def test_aux_timer_time_zero():
 
 async def test_aux_timer_time_out_of_range():
     """Timer index out of range returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -472,8 +558,9 @@ async def test_aux_timer_time_out_of_range():
 
 async def test_aux_timer_time_not_found():
     """Aux ID not found returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -489,13 +576,17 @@ async def test_aux_timer_time_not_found():
 async def test_pool_timezone_with_pool():
     """Pool with timezone returns it."""
     pool = Pool.from_dict({"id": 1, "timezone": "America/New_York"})
-    data = PoolCopData(device=PoolCopDevice.from_dict({"id": 1, "state": {}}), pool=pool)
+    data = PoolCopData(
+        device=PoolCopDevice.from_dict({"id": 1, "state": {}}), pool=pool
+    )
     assert _pool_timezone(data) == "America/New_York"
 
 
 async def test_pool_timezone_no_pool():
     """No pool returns 'UTC'."""
-    data = PoolCopData(device=PoolCopDevice.from_dict({"id": 1, "state": {}}), pool=None)
+    data = PoolCopData(
+        device=PoolCopDevice.from_dict({"id": 1, "state": {}}), pool=None
+    )
     assert _pool_timezone(data) == "UTC"
 
 
@@ -505,45 +596,75 @@ async def test_pool_timezone_no_pool():
 
 
 async def test_aux_timer_sensors_created(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Aux with timers creates timer sensors (skip fixed-function labels)."""
     mock_device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
         {"id": 1, "timeOn": "08:00:00", "timeOff": "20:00:00"}
     ]
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = hass.states.async_all("sensor")
     # Aux timer sensors have entity IDs like poolcop_2478_transferpump_start_time
-    aux_timer = [s for s in states if "transferpump" in s.entity_id and "start_time" in s.entity_id]
+    aux_timer = [
+        s
+        for s in states
+        if "transferpump" in s.entity_id and "start_time" in s.entity_id
+    ]
     assert len(aux_timer) >= 1
 
 
 async def test_aux_timer_sensors_skip_fixed_function(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Fixed-function aux (label_aux_16 = Waste Valve) timers are skipped."""
     mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_16"
     mock_device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
         {"id": 1, "timeOn": "08:00:00", "timeOff": "20:00:00"}
     ]
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = hass.states.async_all("sensor")
     # Fixed-function label_aux_16 (Waste Valve) sensors should not exist
-    aux_timer = [s for s in states if "waste_valve" in s.entity_id and "start_time" in s.entity_id]
+    aux_timer = [
+        s
+        for s in states
+        if "waste_valve" in s.entity_id and "start_time" in s.entity_id
+    ]
     assert len(aux_timer) == 0
 
 
 async def test_aux_no_timers_no_sensors(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Aux with empty timers creates no timer sensors."""
     mock_device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = []
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = hass.states.async_all("sensor")
-    aux_timer = [s for s in states if "transferpump" in s.entity_id and "start_time" in s.entity_id]
+    aux_timer = [
+        s
+        for s in states
+        if "transferpump" in s.entity_id and "start_time" in s.entity_id
+    ]
     assert len(aux_timer) == 0
 
 
@@ -554,9 +675,10 @@ async def test_aux_no_timers_no_sensors(
 
 async def test_filtration_timer_time_tz_error():
     """AttributeError in _time_str_to_time_today is caught, returns None."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
     from unittest.mock import patch as _patch
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device, pool=Pool.from_dict({"id": 1, "timezone": "UTC"}))
@@ -572,9 +694,10 @@ async def test_filtration_timer_time_tz_error():
 
 async def test_aux_timer_time_tz_error():
     """AttributeError in _time_str_to_time_today for aux timer is caught."""
-    from conftest import MOCK_DEVICE_RESPONSE
     from copy import deepcopy
     from unittest.mock import patch as _patch
+
+    from conftest import MOCK_DEVICE_RESPONSE
 
     device_data = deepcopy(MOCK_DEVICE_RESPONSE)
     device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
@@ -631,50 +754,88 @@ def test_parse_duration_seconds_invalid():
 
 
 async def test_free_chlorine_sensor_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Free chlorine sensor exists when hasFCSensor=True."""
     mock_device_data["equipmentsInfo"]["hasFCSensor"] = True
     mock_device_data["state"]["freeChlorine"] = 1.5
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "free_chlorine" in s.entity_id and "available" not in s.entity_id]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if "free_chlorine" in s.entity_id and "available" not in s.entity_id
+    ]
     assert len(states) >= 1
     assert float(states[0].state) == 1.5
 
 
 async def test_free_chlorine_not_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Free chlorine not shown when hasFCSensor=False."""
     # Default mock: hasFCSensor = False
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_free_chlorine")]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if s.entity_id.endswith("_free_chlorine")
+    ]
     assert len(states) == 0
 
 
 async def test_total_chlorine_sensor_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Total chlorine sensor exists when hasTCSensor=True."""
     mock_device_data["equipmentsInfo"]["hasTCSensor"] = True
     mock_device_data["state"]["totalChlorine"] = 2.0
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "total_chlorine" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "total_chlorine" in s.entity_id
+    ]
     assert len(states) >= 1
     assert float(states[0].state) == 2.0
 
 
 async def test_total_chlorine_not_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Total chlorine not shown when hasTCSensor=False."""
     # Default mock: hasTCSensor = False
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_total_chlorine")]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if s.entity_id.endswith("_total_chlorine")
+    ]
     assert len(states) == 0
 
 
@@ -684,49 +845,85 @@ async def test_total_chlorine_not_installed(
 
 
 async def test_ph_injection_duration_with_value(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH injection duration shows seconds when value present."""
     mock_device_data["history"]["pHLastInjectionDuration"] = "00:05:30"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id
+    ]
     assert len(states) >= 1
     assert int(states[0].state) == 330
 
 
 async def test_ph_injection_duration_none(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH injection duration None -> unknown state."""
     # Default mock: pHLastInjectionDuration = None
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_last_injection" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "unknown"
 
 
 async def test_disinfection_injection_duration_with_value(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Disinfection injection duration shows seconds."""
     mock_device_data["history"]["disinfectionLastInjectionDuration"] = "00:03:00"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "disinfection_last_injection" in s.entity_id]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if "disinfection_last_injection" in s.entity_id
+    ]
     assert len(states) >= 1
     assert int(states[0].state) == 180
 
 
 async def test_disinfection_injection_not_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Disinfection injection not shown when hasORPSensor=False."""
     mock_device_data["equipmentsInfo"]["hasORPSensor"] = False
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "disinfection_last_injection" in s.entity_id]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if "disinfection_last_injection" in s.entity_id
+    ]
     assert len(states) == 0
 
 
@@ -736,39 +933,65 @@ async def test_disinfection_injection_not_installed(
 
 
 async def test_ph_low_threshold(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH low threshold shows value from settings."""
     # Default mock: lowValue = 6.8
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id
+    ]
     assert len(states) >= 1
     assert float(states[0].state) == 6.8
 
 
 async def test_ph_high_threshold(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH high threshold shows value from settings."""
     # Default mock: highValue = 8.2
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id
+    ]
     assert len(states) >= 1
     assert float(states[0].state) == 8.2
 
 
 async def test_ph_thresholds_not_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """pH thresholds gated by hasPHSensor."""
     mock_device_data["equipmentsInfo"]["hasPHSensor"] = False
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_low_threshold" in s.entity_id
+    ]
     assert len(states) == 0
-    states = [s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "ph_high_threshold" in s.entity_id
+    ]
     assert len(states) == 0
 
 
@@ -778,59 +1001,101 @@ async def test_ph_thresholds_not_installed(
 
 
 async def test_waterlevel_set_point(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Water level set point from settings."""
     # Default mock: setPoint = "High"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "waterlevel_set_point" in s.entity_id]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if "waterlevel_set_point" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "High"
 
 
 async def test_backwash_mode(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Backwash mode from filtration settings."""
     # Default mock: backwashMode = "Automatic"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "backwash_mode" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "backwash_mode" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "Automatic"
 
 
 async def test_backwash_time(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Backwash time from filtration settings."""
     # Default mock: backwashTime = "11:00:00"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "backwash_time" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "backwash_time" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "11:00:00"
 
 
 async def test_filter_type(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Filter type from filtration settings."""
     # Default mock: filterType = "Pressure"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if s.entity_id.endswith("_filter_type")]
+    states = [
+        s
+        for s in hass.states.async_all("sensor")
+        if s.entity_id.endswith("_filter_type")
+    ]
     assert len(states) >= 1
     assert states[0].state == "Pressure"
 
 
 async def test_pump_speed_24h(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Speed 24H from filtration settings."""
     # Default mock: speed24 = "Speed1"
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     states = [s for s in hass.states.async_all("sensor") if "speed_24h" in s.entity_id]
     assert len(states) >= 1
@@ -843,38 +1108,62 @@ async def test_pump_speed_24h(
 
 
 async def test_flow_meter_rate_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Flow meter rate shown when hasFlowMeter=True and flowVis populated."""
     mock_device_data["equipmentsInfo"]["hasFlowMeter"] = True
     mock_device_data["state"]["flowVis"] = [
         {"installed": True, "pumpId": 0, "flowRate": 12.5, "type": "Paddle"}
     ]
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id
+    ]
     assert len(states) >= 1
     assert float(states[0].state) == 12.5
 
 
 async def test_flow_meter_rate_empty_flowvis(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Flow meter rate with empty flowVis -> unknown."""
     mock_device_data["equipmentsInfo"]["hasFlowMeter"] = True
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id
+    ]
     assert len(states) >= 1
     assert states[0].state == "unknown"
 
 
 async def test_flow_meter_not_installed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Flow meter not shown when hasFlowMeter=False."""
     # Default mock: hasFlowMeter = False
-    await _setup_integration(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
-    states = [s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id]
+    states = [
+        s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id
+    ]
     assert len(states) == 0

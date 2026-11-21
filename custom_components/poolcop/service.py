@@ -17,7 +17,17 @@ from .const import (
 from .coordinator import PoolCopDataUpdateCoordinator
 
 VALVE_OPTIONS = ["Filter", "Waste", "Closed", "Backwash", "Bypass", "Rinse"]
-SPEED_OPTIONS = ["None", "Speed1", "Speed2", "Speed3", "Speed4", "Speed5", "Speed6", "Speed7", "Speed8"]
+SPEED_OPTIONS = [
+    "None",
+    "Speed1",
+    "Speed2",
+    "Speed3",
+    "Speed4",
+    "Speed5",
+    "Speed6",
+    "Speed7",
+    "Speed8",
+]
 
 SET_PUMP_SPEED_SCHEMA = vol.Schema(
     {
@@ -59,7 +69,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         """Toggle the pump state."""
         for coordinator in _get_coordinators(hass):
             try:
-                pump = coordinator.data.device.state.pumps[0] if coordinator.data.device.state.pumps else None
+                pump = (
+                    coordinator.data.device.state.pumps[0]
+                    if coordinator.data.device.state.pumps
+                    else None
+                )
                 current_state = pump.pump_state if pump else False
                 await coordinator.set_pump(on=not current_state)
                 await coordinator.async_refresh()

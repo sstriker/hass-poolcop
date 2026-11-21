@@ -1,7 +1,7 @@
 """Common fixtures for the PoolCop tests."""
 
 from copy import deepcopy
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.const import CONF_API_KEY
@@ -219,9 +219,7 @@ MOCK_DEVICE_RESPONSE = {
                     "pulseDuration": "00:00:00",
                     "moduleChannel": 0,
                     "daysOfWeek": [],
-                    "timers": [
-                        {"id": 1, "timeOn": "00:00:00", "timeOff": "00:00:00"}
-                    ],
+                    "timers": [{"id": 1, "timeOn": "00:00:00", "timeOff": "00:00:00"}],
                 }
             }
         },

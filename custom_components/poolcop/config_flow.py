@@ -5,19 +5,18 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant import config_entries
-from homeassistant.config_entries import ConfigFlowResult
-from homeassistant.const import CONF_API_KEY, CONF_UNIQUE_ID
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
 from aiopoolcop import (
     PoolCopClientAPI,
     PoolCopClientAuthError,
     PoolCopClientConnectionError,
     PoolCopClientError,
 )
+from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlowResult
+from homeassistant.const import CONF_API_KEY, CONF_UNIQUE_ID
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
     CONF_FLOW_RATE_1,
@@ -83,7 +82,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     LOGGER.debug(
                         "Detected flow rate from API: %s m³/h", self._pump_flowrate
                     )
-                except (ValueError, TypeError):
+                except ValueError, TypeError:
                     LOGGER.warning(
                         "Failed to convert flowrate value to float: %s", single_flowrate
                     )
@@ -285,11 +284,14 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
     # Use first device
     device = pools[0].devices[0]
-    pool = pools[0]
 
     # Fetch device details for pump config
     device_full = await api.get_device(device.id)
-    filt = device_full.settings.filtrations[0] if device_full.settings.filtrations else None
+    filt = (
+        device_full.settings.filtrations[0]
+        if device_full.settings.filtrations
+        else None
+    )
 
     return {
         "title": "PoolCop",

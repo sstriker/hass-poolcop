@@ -56,7 +56,9 @@ async def test_async_unload_entry(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
     )
 
-    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
+    with patch(
+        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+    ):
         assert await hass.config_entries.async_unload(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
@@ -80,7 +82,9 @@ async def test_async_setup_entry_no_unique_id(
     )
     entry.add_to_hass(hass)
 
-    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
+    with patch(
+        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+    ):
         result = await hass.config_entries.async_setup(entry.entry_id)
 
     assert result is False

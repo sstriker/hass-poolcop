@@ -21,16 +21,24 @@ async def _setup(hass, mock_config_entry, mock_poolcop_api, device_data, pool_da
     mock_poolcop_api.get_pools.return_value = [Pool.from_dict(pool_data)]
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
+    with patch(
+        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+    ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
 
 async def test_service_toggle_pump(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Toggle pump service calls set_pump."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await hass.services.async_call(DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True)
     # Pump is on (pumpState=True), so toggle should set on=False
@@ -38,10 +46,16 @@ async def test_service_toggle_pump(
 
 
 async def test_service_set_pump_speed(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Set pump speed service calls set_pump_speed."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await hass.services.async_call(
         DOMAIN, SERVICE_SET_PUMP_SPEED, {"speed": "Speed2"}, blocking=True
@@ -50,11 +64,17 @@ async def test_service_set_pump_speed(
 
 
 async def test_service_toggle_aux(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Toggle aux service calls set_auxiliary."""
     # Aux1 is True in mock data, so toggle should set on=False
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await hass.services.async_call(
         DOMAIN, SERVICE_TOGGLE_AUX, {"aux_id": 1}, blocking=True
@@ -63,10 +83,16 @@ async def test_service_toggle_aux(
 
 
 async def test_service_set_valve_position(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Set valve position service calls set_valve_position."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await hass.services.async_call(
         DOMAIN, SERVICE_SET_VALVE_POSITION, {"position": "Filter"}, blocking=True
@@ -75,20 +101,32 @@ async def test_service_set_valve_position(
 
 
 async def test_service_clear_alarm(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Clear alarm service calls clear_all_alarms."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await hass.services.async_call(DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True)
     mock_poolcop_api.clear_all_alarms.assert_called_once_with(2478)
 
 
 async def test_service_error_handling(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """ConnectionError is logged, not raised."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     mock_poolcop_api.set_pump_speed.side_effect = ConnectionError("offline")
 
@@ -99,12 +137,18 @@ async def test_service_error_handling(
 
 
 async def test_service_registration_idempotent(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Double register does not crash."""
     from custom_components.poolcop.service import async_setup_services
 
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
 
     await async_setup_services(hass)
     assert hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED)
@@ -119,20 +163,32 @@ async def test_service_unload_not_registered(hass: HomeAssistant):
 
 
 async def test_service_toggle_pump_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """ConnectionError in toggle_pump is logged, not raised."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
     mock_poolcop_api.set_pump.side_effect = ConnectionError("offline")
 
     await hass.services.async_call(DOMAIN, SERVICE_TOGGLE_PUMP, {}, blocking=True)
 
 
 async def test_service_toggle_aux_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """ConnectionError in toggle_aux is logged, not raised."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
     mock_poolcop_api.set_auxiliary.side_effect = ConnectionError("offline")
 
     await hass.services.async_call(
@@ -141,10 +197,16 @@ async def test_service_toggle_aux_error(
 
 
 async def test_service_set_valve_position_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """ConnectionError in set_valve_position is logged, not raised."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
     mock_poolcop_api.set_valve_position.side_effect = TimeoutError("timeout")
 
     await hass.services.async_call(
@@ -153,10 +215,16 @@ async def test_service_set_valve_position_error(
 
 
 async def test_service_clear_alarm_error(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """ConnectionError in clear_alarm is logged, not raised."""
-    await _setup(hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data)
+    await _setup(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
     mock_poolcop_api.clear_all_alarms.side_effect = ConnectionError("offline")
 
     await hass.services.async_call(DOMAIN, SERVICE_CLEAR_ALARM, {}, blocking=True)

@@ -22,9 +22,7 @@ from custom_components.poolcop.coordinator import (
 
 def _make_coordinator(hass, api, config_entry):
     """Create a coordinator with mocked storage."""
-    coordinator = PoolCopDataUpdateCoordinator(
-        hass, api, 2478, config_entry
-    )
+    coordinator = PoolCopDataUpdateCoordinator(hass, api, 2478, config_entry)
     coordinator._store.async_save = AsyncMock()
     coordinator._store.async_load = AsyncMock(return_value=None)
     return coordinator
@@ -55,7 +53,9 @@ async def test_coordinator_connection_error(
     hass: HomeAssistant, mock_config_entry, mock_poolcop_api
 ):
     """Test error handling on connection failure."""
-    mock_poolcop_api.get_device.side_effect = PoolCopClientConnectionError("Connection error")
+    mock_poolcop_api.get_device.side_effect = PoolCopClientConnectionError(
+        "Connection error"
+    )
     mock_config_entry.add_to_hass(hass)
 
     coordinator = _make_coordinator(hass, mock_poolcop_api, mock_config_entry)

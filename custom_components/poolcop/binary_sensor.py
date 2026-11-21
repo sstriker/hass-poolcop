@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from aiopoolcop import AuxSettings
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -80,9 +81,7 @@ BINARY_SENSORS = (
         name="Pump",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: (
-            data.device.state.pumps[0].pump_state
-            if data.device.state.pumps
-            else False
+            data.device.state.pumps[0].pump_state if data.device.state.pumps else False
         ),
         on_off_icons=PUMP_ICONS,
     ),
@@ -396,10 +395,9 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
-        aux: "AuxSettings",
+        aux: AuxSettings,
     ) -> None:
         """Initialize the aux binary sensor."""
-        from aiopoolcop import AuxSettings as _AuxSettings  # noqa: F401
         from homeassistant.helpers.entity import EntityDescription
 
         self._aux_channel: int = aux.aux_channel

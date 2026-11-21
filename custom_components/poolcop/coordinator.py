@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -15,7 +15,6 @@ from aiopoolcop import (
     PoolCopClientRateLimitError,
     PoolCopDevice,
 )
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
@@ -142,9 +141,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self.flow_rates[speed] = value
 
         # Setup storage for persisting learned data
-        self._store: Store = Store(
-            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{device_id}"
-        )
+        self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{device_id}")
 
         # Daily filtration volume tracking
         self._daily_volume: float = 0.0  # m3 filtered today
@@ -201,7 +198,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 import zoneinfo
 
                 return zoneinfo.ZoneInfo(self._pool.timezone)
-            except (ImportError, KeyError):
+            except ImportError, KeyError:
                 pass
         return None
 
@@ -320,7 +317,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
             start_dt = now.replace(hour=sh, minute=sm, second=ss, microsecond=0)
             stop_dt = now.replace(hour=eh, minute=em, second=es, microsecond=0)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             return 0.0
 
         # Ensure stop is after start (same-day cycle)
@@ -373,9 +370,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         # Check the configured filter timer mode for modes that the
         # operating mode alone cannot distinguish.
         filtration = (
-            device.settings.filtrations[0]
-            if device.settings.filtrations
-            else None
+            device.settings.filtrations[0] if device.settings.filtrations else None
         )
         filter_timer_name = filtration.filtration_mode if filtration else None
 
@@ -399,7 +394,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     remaining_hours = (
                         int(parts[0]) + int(parts[1]) / 60.0 + int(parts[2]) / 3600.0
                     )
-                except (ValueError, IndexError):
+                except ValueError, IndexError:
                     remaining_hours = 0.0
                 if remaining_hours > 0:
                     speed = self._speed_level(device)
@@ -558,7 +553,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                     cycle_status["remaining_time"] = remaining_time
                     cycle_status["predicted_end"] = now + remaining_time
 
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             # Don't crash cycle tracking on data parsing errors
             pass
 
@@ -581,7 +576,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             try:
                 parts = time_str.split(":")
                 seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-            except (ValueError, IndexError):
+            except ValueError, IndexError:
                 continue
             if (
                 seconds > 0
@@ -651,9 +646,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             )
             raise UpdateFailed("PoolCop Client API rate limit exceeded") from err
         except PoolCopClientConnectionError as err:
-            raise UpdateFailed(
-                "Error communicating with PoolCop Client API"
-            ) from err
+            raise UpdateFailed("Error communicating with PoolCop Client API") from err
         except Exception as err:
             LOGGER.exception("Unexpected error processing PoolCop data: %s", err)
             raise UpdateFailed(f"Unexpected error: {err}") from err
@@ -743,9 +736,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     async def set_auxiliary(self, module: str, aux_id: int, *, on: bool) -> None:
         """Set an auxiliary output on or off."""
         await self.api.set_auxiliary(self.device_id, module, aux_id, on=on)
-        LOGGER.debug(
-            "Set auxiliary %s/%d %s", module, aux_id, "on" if on else "off"
-        )
+        LOGGER.debug("Set auxiliary %s/%d %s", module, aux_id, "on" if on else "off")
 
     async def set_forced_filtration(self, mode: str) -> None:
         """Set forced filtration mode (NotForced, Forced24H, Forced48H, Forced72H)."""
@@ -756,9 +747,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         self, setpoint: float, aux_id: int, module: str = "None"
     ) -> None:
         """Set the heating setpoint for an auxiliary."""
-        await self.api.set_heating_setpoint(
-            self.device_id, setpoint, aux_id, module
-        )
+        await self.api.set_heating_setpoint(self.device_id, setpoint, aux_id, module)
         LOGGER.debug("Set heating setpoint to %.1f for aux %d", setpoint, aux_id)
 
     async def set_jet_stream(self, on: bool) -> None:

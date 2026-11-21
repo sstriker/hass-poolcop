@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from aiopoolcop import AuxSettings
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -109,7 +110,7 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
-        aux: "AuxSettings",
+        aux: AuxSettings,
     ) -> None:
         """Initialize the aux switch."""
         from homeassistant.helpers.entity import EntityDescription

@@ -10,6 +10,7 @@ from aiopoolcop import (
     PoolCopClientError,
     PoolCopDevice,
 )
+from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
@@ -20,8 +21,6 @@ from custom_components.poolcop.const import (
     CONF_FLOW_RATE_3,
     DOMAIN,
 )
-
-from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 
 
 def _mock_api():
@@ -160,7 +159,11 @@ async def test_user_flow_generic_poolcop_error(hass: HomeAssistant):
 
 
 async def test_reauth_flow(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Test the reauth flow."""
     mock_config_entry.add_to_hass(hass)
@@ -337,14 +340,20 @@ async def test_flowrate_parse_error(hass: HomeAssistant):
 
 
 async def test_options_flow(
-    hass: HomeAssistant, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
 ):
     """Test the options flow for reconfiguring flow rates."""
     mock_poolcop_api.get_device.return_value = PoolCopDevice.from_dict(mock_device_data)
     mock_poolcop_api.get_pools.return_value = [Pool.from_dict(mock_pool_data)]
     mock_config_entry.add_to_hass(hass)
 
-    with patch("custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api):
+    with patch(
+        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+    ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 

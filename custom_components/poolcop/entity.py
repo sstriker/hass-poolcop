@@ -45,7 +45,11 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
         if key == "ph_control" or key.startswith("ph_") or key == "pH":
             return equip.has_ph_sensor
 
-        if key == "orp_control" or key.startswith("orp_") or key.startswith("disinfection_"):
+        if (
+            key == "orp_control"
+            or key.startswith("orp_")
+            or key.startswith("disinfection_")
+        ):
             return equip.has_orp_sensor
 
         if key in {"ioniser", "ioniser_control"} or key.startswith("ioniser_"):

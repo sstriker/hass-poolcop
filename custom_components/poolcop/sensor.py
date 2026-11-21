@@ -53,7 +53,6 @@ class PoolCopSensorEntityDescription(
     """Describes PoolCop sensor entity."""
 
 
-
 # ---------------------------------------------------------------------------
 # Helper: parse ISO datetime strings from history fields
 # ---------------------------------------------------------------------------
@@ -73,11 +72,11 @@ def _parse_datetime(value: str | None, tz_name: str = "UTC") -> datetime | None:
         if parsed.tzinfo is None:
             try:
                 tz = zoneinfo.ZoneInfo(tz_name)
-            except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+            except ValueError, zoneinfo.ZoneInfoNotFoundError:
                 tz = zoneinfo.ZoneInfo("UTC")
             parsed = parsed.replace(tzinfo=tz)
         return parsed
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
 
 
@@ -88,7 +87,7 @@ def _parse_duration_seconds(value: str | None) -> int | None:
     try:
         parts = value.split(":")
         return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-    except (ValueError, IndexError):
+    except ValueError, IndexError:
         return None
 
 
@@ -147,7 +146,7 @@ def _cycle_end_time_fn(data: PoolCopData) -> datetime | None:
         tz_name = pool_tz_name or "UTC"
         try:
             tz_info = zoneinfo.ZoneInfo(tz_name)
-        except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+        except ValueError, zoneinfo.ZoneInfoNotFoundError:
             tz_info = zoneinfo.ZoneInfo("UTC")
         return datetime.fromtimestamp(timestamp, tz=tz_info)
     return None
@@ -178,7 +177,7 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         tz_info: tzinfo
         try:
             tz_info = zoneinfo.ZoneInfo(timezone)
-        except (ValueError, zoneinfo.ZoneInfoNotFoundError):
+        except ValueError, zoneinfo.ZoneInfoNotFoundError:
             from datetime import timezone as dt_timezone
             from time import localtime
 
@@ -199,7 +198,7 @@ def _time_str_to_time_today(time_str: str, timezone: str) -> datetime | None:
         # Handle case where the time is for tomorrow
         if result < now and hour < 12:
             result = result + timedelta(days=1)
-    except (ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError):
+    except ValueError, TypeError, zoneinfo.ZoneInfoNotFoundError:
         return None
     else:
         return result
@@ -359,9 +358,7 @@ def _aux_timer_time_fn(
                     AttributeError,
                     zoneinfo.ZoneInfoNotFoundError,
                 ) as err:
-                    LOGGER.debug(
-                        "Error creating aux timer time with timezone: %s", err
-                    )
+                    LOGGER.debug("Error creating aux timer time with timezone: %s", err)
                 return None
         return None
 
@@ -395,9 +392,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.PRESSURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPressure.KPA,
-        value_fn=lambda data: (
-            _pump(data).pressure if _pump(data) is not None else None
-        ),
+        value_fn=lambda data: _pump(data).pressure if _pump(data) is not None else None,
     ),
     PoolCopSensorEntityDescription(
         key="pH",
@@ -741,9 +736,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).rinse_duration
-            if _filtration(data) is not None
-            else None
+            _filtration(data).rinse_duration if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -763,9 +756,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:timer-cog",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).filtration_mode
-            if _filtration(data) is not None
-            else None
+            _filtration(data).filtration_mode if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -774,9 +765,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:cog",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).backwash_mode
-            if _filtration(data) is not None
-            else None
+            _filtration(data).backwash_mode if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -785,9 +774,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:clock-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).backwash_time
-            if _filtration(data) is not None
-            else None
+            _filtration(data).backwash_time if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -796,9 +783,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:air-filter",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).filter_type
-            if _filtration(data) is not None
-            else None
+            _filtration(data).filter_type if _filtration(data) is not None else None
         ),
     ),
     # Pump settings
@@ -808,9 +793,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:speedometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).nb_speeds
-            if _filtration(data) is not None
-            else None
+            _filtration(data).nb_speeds if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -821,9 +804,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfPressure.KPA,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).low_pressure
-            if _filtration(data) is not None
-            else None
+            _filtration(data).low_pressure if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -834,9 +815,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfPressure.KPA,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).alarm_pressure
-            if _filtration(data) is not None
-            else None
+            _filtration(data).alarm_pressure if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -845,9 +824,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:pump",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).pump_type
-            if _filtration(data) is not None
-            else None
+            _filtration(data).pump_type if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -865,9 +842,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:speedometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).speed_cycle1
-            if _filtration(data) is not None
-            else None
+            _filtration(data).speed_cycle1 if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -876,9 +851,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:speedometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).speed_cycle2
-            if _filtration(data) is not None
-            else None
+            _filtration(data).speed_cycle2 if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -887,9 +860,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:speedometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).speed_backwash
-            if _filtration(data) is not None
-            else None
+            _filtration(data).speed_backwash if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -898,9 +869,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         icon="mdi:speedometer",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: (
-            _filtration(data).speed_24
-            if _filtration(data) is not None
-            else None
+            _filtration(data).speed_24 if _filtration(data) is not None else None
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -971,9 +940,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Disinfectant Type",
         icon="mdi:water-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            data.device.settings.disinfection.disinfectant_type
-        ),
+        value_fn=lambda data: data.device.settings.disinfection.disinfectant_type,
     ),
     PoolCopSensorEntityDescription(
         key="orp_temperature_shutdown",
@@ -998,9 +965,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         name="Waterlevel Draining Duration",
         icon="mdi:timer-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            data.device.settings.water_level.draining_duration
-        ),
+        value_fn=lambda data: data.device.settings.water_level.draining_duration,
     ),
     PoolCopSensorEntityDescription(
         key="waterlevel_set_point",

@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiopoolcop import Pool, PoolCopDevice
+from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 
 from custom_components.poolcop.coordinator import (
     DEFAULT_CYCLE_DURATIONS,
@@ -16,8 +17,6 @@ from custom_components.poolcop.coordinator import (
     PoolCopData,
     PoolCopDataUpdateCoordinator,
 )
-
-from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 
 
 def _make_device(overrides: dict | None = None) -> PoolCopDevice:

@@ -32,12 +32,14 @@ async def async_setup_entry(
         return
 
     try:
-        float(lat)
-        float(lon)
-    except (ValueError, TypeError):
+        latitude = float(lat)
+        longitude = float(lon)
+    except ValueError, TypeError:
         return
 
-    async_add_entities([PoolCopGeoLocation(coordinator)])
+    async_add_entities(
+        [PoolCopGeoLocation(coordinator, latitude, longitude, pool.nickname)]
+    )
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -62,18 +64,20 @@ class PoolCopGeoLocation(PoolCopEntity, GeolocationEvent):
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
+        latitude: float,
+        longitude: float,
+        nickname: str | None,
     ) -> None:
         """Initialize the pool geo location."""
         super().__init__(
             coordinator=coordinator,
             description=EntityDescription(key="pool_location", name="Pool"),
         )
-        pool = coordinator.data.pool
-        self._pool_lat = float(pool.latitude)  # type: ignore[arg-type]
-        self._pool_lon = float(pool.longitude)  # type: ignore[arg-type]
+        self._pool_lat = latitude
+        self._pool_lon = longitude
 
-        if pool.nickname:
-            self._attr_name = pool.nickname
+        if nickname:
+            self._attr_name = nickname
 
     @property
     def source(self) -> str:
