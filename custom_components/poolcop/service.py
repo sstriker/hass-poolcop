@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import voluptuous as vol
+import probatio as vol
 from homeassistant.core import HomeAssistant, ServiceCall
 
 from .const import (
