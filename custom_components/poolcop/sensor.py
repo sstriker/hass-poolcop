@@ -15,6 +15,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    EntityCategory,
     UnitOfElectricPotential,
     UnitOfPressure,
     UnitOfTemperature,
@@ -23,7 +24,6 @@ from homeassistant.const import (
     UnitOfVolumeFlowRate,
 )
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
@@ -143,7 +143,7 @@ def _cycle_time_remaining_fn(data: PoolCopData) -> float | None:
     if not _is_cycle_mode(data):
         return None
     if data.cycle_status and data.cycle_status.get("remaining_time") is not None:
-        return data.cycle_status["remaining_time"]
+        return float(data.cycle_status["remaining_time"])
     return None
 
 
@@ -168,7 +168,7 @@ def _cycle_elapsed_time_fn(data: PoolCopData) -> float | None:
     if not _is_cycle_mode(data):
         return None
     if data.cycle_status and data.cycle_status.get("elapsed_time") is not None:
-        return data.cycle_status["elapsed_time"]
+        return float(data.cycle_status["elapsed_time"])
     return None
 
 

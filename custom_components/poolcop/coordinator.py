@@ -8,7 +8,7 @@ import zoneinfo
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from aiopoolcop import (
     FiltrationTimer,
@@ -22,11 +22,10 @@ from aiopoolcop import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import ConfigEntryAuthFailed, HomeAssistantError
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
-    ConfigEntryAuthFailed,
     DataUpdateCoordinator,
     UpdateFailed,
 )
@@ -168,7 +167,9 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 self.flow_rates[speed] = value
 
         # Setup storage for persisting learned data
-        self._store: Store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{device_id}")
+        self._store: Store[dict[str, Any]] = Store(
+            hass, STORAGE_VERSION, f"{STORAGE_KEY}_{device_id}"
+        )
 
         # Daily filtration volume tracking
         self._daily_volume: float = 0.0  # m3 filtered today
@@ -781,7 +782,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Remember a requested state until the device reports it."""
         self._pending[key] = (value, time.monotonic() + PENDING_COMMAND_TIMEOUT)
 
-    def resolve_pending(self, key: str, actual: Any) -> Any:
+    def resolve_pending[T](self, key: str, actual: T) -> T:
         """Return the requested state while a command is pending, else actual.
 
         A pending state is dropped once the device reports it or after
@@ -793,7 +794,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if actual == value or time.monotonic() >= deadline:
             del self._pending[key]
             return actual
-        return value
+        return cast(T, value)
 
     # ------------------------------------------------------------------
     # Command methods

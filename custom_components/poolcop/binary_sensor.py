@@ -8,12 +8,13 @@ from typing import Any
 
 from aiopoolcop import AuxSettings
 from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
+from homeassistant.components.binary_sensor.const import BinarySensorDeviceClass
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory, EntityDescription
+from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
@@ -440,7 +441,7 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         return None
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
         for aux in self.coordinator.data.device.settings.auxs:
             if aux.aux_channel == self._aux_channel and aux.module == self._module:

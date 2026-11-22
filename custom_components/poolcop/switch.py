@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from aiopoolcop import AuxSettings
-from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
+from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch.const import SwitchDeviceClass
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
