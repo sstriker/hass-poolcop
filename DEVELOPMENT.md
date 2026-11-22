@@ -13,16 +13,16 @@ This repository is set up to develop the PoolCop custom component using a Home A
 
 ## Local library development
 
-If you also have `python-poolcop` checked out in `${HOME}/clones/python-poolcop`, it is mounted into the container and installed editable. Changes to the library are reflected immediately without rebuilding.
+If you also have `python-aiopoolcop` checked out in `${HOME}/clones/python-aiopoolcop`, it is mounted into the container and installed editable. Changes to the library are reflected immediately without rebuilding.
 
 ## Pre-commit
 
-Pre-commit is installed and hooks are configured. It runs Ruff and Black with `--fix`.
+Pre-commit is installed and hooks are configured. It runs Ruff (lint and format), codespell and basic file checks.
 
 ## Coverage targets
 
-- hass-poolcop custom components: 93%+
-- python-poolcop library: 99%
+- hass-poolcop custom components: 100%
+- python-aiopoolcop library: 99%+
 
 Run the full suite with coverage:
 ```bash
