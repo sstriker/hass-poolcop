@@ -6,7 +6,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aiopoolcop import Pool, PoolCopDevice
+from aiopoolcop import Pool, PoolCopClientConnectionError, PoolCopDevice
 from conftest import MOCK_DEVICE_RESPONSE, MOCK_POOL_RESPONSE
 
 from custom_components.poolcop.coordinator import (
@@ -40,6 +40,8 @@ def _make_coordinator(hass, config_entry, api=None) -> PoolCopDataUpdateCoordina
     """Create a coordinator with mocked hass and config_entry."""
     if api is None:
         api = AsyncMock()
+    if not isinstance(getattr(api, "units", None), dict):
+        api.units = {}
     coord = PoolCopDataUpdateCoordinator(hass, api, 2478, config_entry)
     return coord
 
@@ -440,7 +442,7 @@ async def test_planned_remaining_volume_continuous(mock_config_entry):
     coord = _make_coordinator(hass, mock_config_entry)
     data = deepcopy(MOCK_DEVICE_RESPONSE)
     data["state"]["pumpsInfo"][0]["runningStatus"] = "TimerMode"
-    data["settings"]["filtrations"][0]["filtrationMode"] = "Continuous24"
+    data["settings"]["filtrations"][0]["filtrationMode"] = "Mode24H"
     coord.data = PoolCopData(device=PoolCopDevice.from_dict(data))
     coord._pool = _make_pool()
     vol = coord.planned_remaining_volume
@@ -985,7 +987,7 @@ async def test_async_update_data_pool_refresh_failure(mock_config_entry):
     hass.async_create_task = MagicMock()
     api = AsyncMock()
     api.get_device.return_value = _make_device()
-    api.get_pools.side_effect = ConnectionError("pool fetch failed")
+    api.get_pools.side_effect = PoolCopClientConnectionError("pool fetch failed")
 
     coord = _make_coordinator(hass, mock_config_entry, api)
     coord._pool_last_fetch = None  # Force refresh
@@ -1051,7 +1053,9 @@ async def test_pool_refresh_respects_interval(mock_config_entry):
 
         fake_time.monotonic.return_value = 120.0 + 1800
         await coord._async_update_data()
-        assert api.get_pools.await_count == 2
+        # Once known, the pool is refreshed by ID
+        assert api.get_pools.await_count == 1
+        api.get_pool.assert_awaited_once_with(_make_pool().id)
 
 
 # ------------------------------------------------------------------

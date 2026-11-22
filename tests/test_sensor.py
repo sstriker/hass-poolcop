@@ -5,7 +5,6 @@ from unittest.mock import patch
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 
-from custom_components.poolcop.const import DOMAIN
 from custom_components.poolcop.coordinator import PoolCopData
 from custom_components.poolcop.sensor import (
     _aux_timer_enabled_fn,
@@ -34,12 +33,13 @@ async def _setup_integration(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+        "custom_components.poolcop.helpers.PoolCopClientAPI",
+        return_value=mock_poolcop_api,
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return hass.data[DOMAIN][mock_config_entry.entry_id]
+    return mock_config_entry.runtime_data
 
 
 async def test_sensor_platform_setup(

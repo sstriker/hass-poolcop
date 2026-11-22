@@ -12,10 +12,9 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
     BinarySensorEntityDescription,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity import EntityCategory, EntityDescription
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
     ALARM_NAMES,
@@ -23,12 +22,11 @@ from .const import (
     AUX_LABEL_ICONS,
     AUX_RELAY_LABELS,
     AUX_VALVE_LABELS,
-    DOMAIN,
     alert_display_name,
     aux_display_name,
     aux_label_id,
 )
-from .coordinator import PoolCopData, PoolCopDataUpdateCoordinator
+from .coordinator import PoolCopConfigEntry, PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
@@ -78,7 +76,7 @@ BINARY_SENSORS = (
     # Running state binary sensors
     PoolCopBinarySensorEntityDescription(
         key="pump",
-        name="Pump",
+        translation_key="pump",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: (
             data.device.state.pumps[0].pump_state if data.device.state.pumps else False
@@ -87,14 +85,14 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="ph_control",
-        name="pH Pump",
+        translation_key="ph_control",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: data.device.state.ph_dosing,
         on_off_icons=PUMP_ICONS,
     ),
     PoolCopBinarySensorEntityDescription(
         key="orp_control",
-        name="Cl Pump",
+        translation_key="orp_control",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: data.device.state.disinfection_dosing,
         on_off_icons=PUMP_ICONS,
@@ -102,7 +100,7 @@ BINARY_SENSORS = (
     # Equipment installation status (connectivity)
     PoolCopBinarySensorEntityDescription(
         key="orp_installed",
-        name="ORP control installed",
+        translation_key="orp_installed",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_orp_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -110,7 +108,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="pH_installed",
-        name="pH control installed",
+        translation_key="pH_installed",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_ph_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -118,7 +116,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_installed",
-        name="Waterlevel control installed",
+        translation_key="waterlevel_installed",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_water_level_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -126,7 +124,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="air_installed",
-        name="Air installed",
+        translation_key="air_installed",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_air_temperature_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -135,7 +133,7 @@ BINARY_SENSORS = (
     # Special binary sensors
     PoolCopBinarySensorEntityDescription(
         key="active_alarm",
-        name="Active Alarm",
+        translation_key="active_alarm",
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=lambda data: len(data.device.state.alarms) > 0,
         on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
@@ -144,7 +142,7 @@ BINARY_SENSORS = (
     # Settings / diagnostic state binary sensors
     PoolCopBinarySensorEntityDescription(
         key="pool_freeze_protection",
-        name="Freeze Protection",
+        translation_key="pool_freeze_protection",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.settings.pool.freeze_protection,
@@ -152,7 +150,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="pool_service_mode",
-        name="Service Mode",
+        translation_key="pool_service_mode",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.state.service_mode,
@@ -160,7 +158,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="pump_protect",
-        name="Pump Protection",
+        translation_key="pump_protect",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: (
@@ -172,7 +170,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="ph_dosing",
-        name="pH Dosing",
+        translation_key="ph_dosing",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.state.ph_dosing,
@@ -180,7 +178,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="disinfection_dosing",
-        name="Disinfection Dosing",
+        translation_key="disinfection_dosing",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.state.disinfection_dosing,
@@ -188,7 +186,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_auto_add",
-        name="Auto Water Add",
+        translation_key="waterlevel_auto_add",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.settings.water_level.can_refill,
@@ -196,7 +194,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_continuous",
-        name="Continuous Water Level",
+        translation_key="waterlevel_continuous",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.settings.water_level.continuous_fill,
@@ -204,7 +202,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_auto_reduce",
-        name="Auto Water Reduce",
+        translation_key="waterlevel_auto_reduce",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.settings.water_level.can_reduce,
@@ -212,27 +210,27 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_on_target",
-        name="Water Level On Target",
+        translation_key="waterlevel_on_target",
         is_on_fn=lambda data: data.device.state.water_level.is_on_target,
         on_off_icons=("mdi:check-circle", "mdi:close-circle"),
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_on_error",
-        name="Water Level Error",
+        translation_key="waterlevel_on_error",
         device_class=BinarySensorDeviceClass.PROBLEM,
         is_on_fn=lambda data: data.device.state.water_level.is_on_error,
         on_off_icons=("mdi:alert-circle", "mdi:check-circle"),
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_refilling",
-        name="Water Level Refilling",
+        translation_key="waterlevel_refilling",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: data.device.state.water_level.is_refilling,
         on_off_icons=("mdi:water-plus", "mdi:water-off"),
     ),
     PoolCopBinarySensorEntityDescription(
         key="waterlevel_measuring",
-        name="Water Level Measuring",
+        translation_key="waterlevel_measuring",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: data.device.state.water_level.is_measuring,
         on_off_icons=("mdi:ruler", "mdi:ruler"),
@@ -240,7 +238,7 @@ BINARY_SENSORS = (
     # Pool cover state
     PoolCopBinarySensorEntityDescription(
         key="pool_cover_open",
-        name="Pool Cover",
+        translation_key="pool_cover_open",
         device_class=BinarySensorDeviceClass.OPENING,
         is_on_fn=lambda data: data.device.state.pool_cover.is_open,
         on_off_icons=("mdi:window-shutter-open", "mdi:window-shutter"),
@@ -254,7 +252,7 @@ BINARY_SENSORS = (
     # Jet stream state
     PoolCopBinarySensorEntityDescription(
         key="jet_stream_running",
-        name="Jet Stream",
+        translation_key="jet_stream_running",
         device_class=BinarySensorDeviceClass.RUNNING,
         is_on_fn=lambda data: data.device.state.jet_stream.is_running,
         on_off_icons=("mdi:waves-arrow-right", "mdi:waves-arrow-right"),
@@ -262,20 +260,20 @@ BINARY_SENSORS = (
     # Digital inputs
     PoolCopBinarySensorEntityDescription(
         key="input_1",
-        name="Input 1",
+        translation_key="input_1",
         is_on_fn=lambda data: data.device.state.inputs.get("Input1", False),
         on_off_icons=("mdi:electric-switch-closed", "mdi:electric-switch"),
     ),
     PoolCopBinarySensorEntityDescription(
         key="input_2",
-        name="Input 2",
+        translation_key="input_2",
         is_on_fn=lambda data: data.device.state.inputs.get("Input2", False),
         on_off_icons=("mdi:electric-switch-closed", "mdi:electric-switch"),
     ),
     # pH auto-adjust setting
     PoolCopBinarySensorEntityDescription(
         key="ph_auto_adjust",
-        name="pH Auto Adjust",
+        translation_key="ph_auto_adjust",
         device_class=BinarySensorDeviceClass.RUNNING,
         entity_category=EntityCategory.DIAGNOSTIC,
         is_on_fn=lambda data: data.device.settings.ph.auto_adjust,
@@ -284,7 +282,7 @@ BINARY_SENSORS = (
     # Equipment inventory flags (always visible for diagnostics)
     PoolCopBinarySensorEntityDescription(
         key="equip_fac_sensor",
-        name="FAC sensor installed",
+        translation_key="equip_fac_sensor",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_fac_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -292,7 +290,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="equip_salt_sensor",
-        name="Salt sensor installed",
+        translation_key="equip_salt_sensor",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_salt_sensor,
         on_off_icons=INSTALLED_ICONS,
@@ -300,7 +298,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="equip_flow_meter",
-        name="Flow meter installed",
+        translation_key="equip_flow_meter",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_flow_meter,
         on_off_icons=INSTALLED_ICONS,
@@ -308,7 +306,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="equip_energy_meter",
-        name="Energy meter installed",
+        translation_key="equip_energy_meter",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_energy_meter,
         on_off_icons=INSTALLED_ICONS,
@@ -316,7 +314,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="equip_pool_cover",
-        name="Pool cover installed",
+        translation_key="equip_pool_cover",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_pool_cover,
         on_off_icons=INSTALLED_ICONS,
@@ -324,7 +322,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="equip_jet_stream",
-        name="Jet stream installed",
+        translation_key="equip_jet_stream",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_jet_stream,
         on_off_icons=INSTALLED_ICONS,
@@ -334,10 +332,12 @@ BINARY_SENSORS = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: PoolCopConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up PoolCop binary sensors based on a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     entities: list[BinarySensorEntity] = [
         PoolCopBinarySensorEntity(coordinator=coordinator, description=description)
@@ -398,8 +398,6 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         aux: AuxSettings,
     ) -> None:
         """Initialize the aux binary sensor."""
-        from homeassistant.helpers.entity import EntityDescription
-
         self._aux_channel: int = aux.aux_channel
         self._module: str = aux.module
         self._aux_id_str: str = f"Aux{aux.aux_channel}"

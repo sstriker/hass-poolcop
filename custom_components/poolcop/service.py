@@ -1,159 +1,257 @@
-"""Services for PoolCop."""
+"""Actions (services) for PoolCop."""
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Coroutine
+from datetime import time
+from typing import Any
+
 import probatio as vol
-from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers import config_validation as cv
 
 from .const import (
+    ATTR_CONFIG_ENTRY_ID,
     DOMAIN,
-    LOGGER,
+    FILTRATION_MODES,
     SERVICE_CLEAR_ALARM,
+    SERVICE_SET_FILTRATION_MODE,
+    SERVICE_SET_FILTRATION_TIMERS,
     SERVICE_SET_PUMP_SPEED,
     SERVICE_SET_VALVE_POSITION,
+    SERVICE_STOP_BACKWASH,
     SERVICE_TOGGLE_AUX,
     SERVICE_TOGGLE_PUMP,
 )
-from .coordinator import PoolCopDataUpdateCoordinator
+from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 
 VALVE_OPTIONS = ["Filter", "Waste", "Closed", "Backwash", "Bypass", "Rinse"]
-SPEED_OPTIONS = [
-    "None",
-    "Speed1",
-    "Speed2",
-    "Speed3",
-    "Speed4",
-    "Speed5",
-    "Speed6",
-    "Speed7",
-    "Speed8",
-]
+MAX_SPEED = 8
 
-SET_PUMP_SPEED_SCHEMA = vol.Schema(
+ATTR_SPEED = "speed"
+ATTR_POSITION = "position"
+ATTR_AUX_ID = "aux_id"
+ATTR_MODULE = "module"
+ATTR_ALARM_CODE = "alarm_code"
+ATTR_MODE = "mode"
+TIMER_FIELDS = {
+    0: ("cycle_1_start", "cycle_1_end", "cycle_1_enabled"),
+    1: ("cycle_2_start", "cycle_2_end", "cycle_2_enabled"),
+}
+
+
+def _speed(value: Any) -> str:
+    """Accept 0-8 or None/Speed1-Speed8 and return the API value."""
+    if isinstance(value, str) and not value.strip().isdigit():
+        for option in ("None", *(f"Speed{i}" for i in range(1, MAX_SPEED + 1))):
+            if value.strip().lower() == option.lower():
+                return option
+        raise vol.Invalid(f"invalid speed: {value}")
+    level = vol.All(vol.Coerce(int), vol.Range(min=0, max=MAX_SPEED))(value)
+    return "None" if level == 0 else f"Speed{level}"
+
+
+def _case_insensitive(options: list[str]) -> Callable[[Any], str]:
+    """Return a validator mapping any casing (and snake_case) onto options."""
+    lookup = {option.lower(): option for option in options}
+
+    def validate(value: Any) -> str:
+        key = str(value).replace("_", "").lower()
+        if key not in lookup:
+            raise vol.Invalid(f"must be one of {', '.join(options)}")
+        return lookup[key]
+
+    return validate
+
+
+BASE_SCHEMA = vol.Schema({vol.Optional(ATTR_CONFIG_ENTRY_ID): cv.string})
+
+SET_PUMP_SPEED_SCHEMA = BASE_SCHEMA.extend({vol.Required(ATTR_SPEED): _speed})
+SET_VALVE_POSITION_SCHEMA = BASE_SCHEMA.extend(
+    {vol.Required(ATTR_POSITION): _case_insensitive(VALVE_OPTIONS)}
+)
+TOGGLE_AUX_SCHEMA = BASE_SCHEMA.extend(
     {
-        vol.Required("speed"): vol.In(SPEED_OPTIONS),
+        vol.Required(ATTR_AUX_ID): vol.All(vol.Coerce(int), vol.Range(min=1, max=15)),
+        vol.Optional(ATTR_MODULE, default="None"): cv.string,
+    }
+)
+CLEAR_ALARM_SCHEMA = BASE_SCHEMA.extend({vol.Optional(ATTR_ALARM_CODE): cv.string})
+SET_FILTRATION_MODE_SCHEMA = BASE_SCHEMA.extend(
+    {vol.Required(ATTR_MODE): _case_insensitive(FILTRATION_MODES)}
+)
+SET_FILTRATION_TIMERS_SCHEMA = BASE_SCHEMA.extend(
+    {
+        vol.Optional(ATTR_MODE): _case_insensitive(FILTRATION_MODES),
+        **{
+            vol.Optional(name): cv.time if not name.endswith("enabled") else cv.boolean
+            for fields in TIMER_FIELDS.values()
+            for name in fields
+        },
     }
 )
 
-SET_VALVE_POSITION_SCHEMA = vol.Schema(
-    {
-        vol.Required("position"): vol.In(VALVE_OPTIONS),
-    }
-)
 
-TOGGLE_AUX_SCHEMA = vol.Schema(
-    {
-        vol.Required("aux_id"): vol.All(vol.Coerce(int), vol.Range(min=1, max=6)),
-        vol.Optional("module", default="None"): str,
-    }
-)
+@callback
+def _async_get_coordinator(
+    hass: HomeAssistant, call: ServiceCall
+) -> PoolCopDataUpdateCoordinator:
+    """Return the coordinator of the targeted (or only) PoolCop."""
+    if entry_id := call.data.get(ATTR_CONFIG_ENTRY_ID):
+        entry: PoolCopConfigEntry | None = hass.config_entries.async_get_entry(entry_id)
+        if entry is None or entry.domain != DOMAIN:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="entry_not_found",
+                translation_placeholders={"entry_id": entry_id},
+            )
+        if entry.state is not ConfigEntryState.LOADED:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="entry_not_loaded",
+                translation_placeholders={"title": entry.title},
+            )
+        return entry.runtime_data
+
+    loaded: list[PoolCopConfigEntry] = hass.config_entries.async_loaded_entries(DOMAIN)
+    if len(loaded) != 1:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN,
+            translation_key="entry_required" if loaded else "no_loaded_entries",
+        )
+    return loaded[0].runtime_data
 
 
-async def async_setup_services(hass: HomeAssistant) -> None:
-    """Set up PoolCop services."""
-    if hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED):
-        return
+async def _async_set_pump_speed(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    await coordinator.set_pump_speed(call.data[ATTR_SPEED])
 
-    async def async_set_pump_speed(service_call: ServiceCall) -> None:
-        """Set the pump speed."""
-        speed = service_call.data["speed"]
 
-        for coordinator in _get_coordinators(hass):
-            try:
-                await coordinator.set_pump_speed(speed)
-                await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error setting pump speed: %s", err)
+async def _async_toggle_pump(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    pumps = coordinator.data.device.state.pumps
+    current = coordinator.resolve_pending(
+        "pump", pumps[0].pump_state if pumps else False
+    )
+    await coordinator.set_pump(on=not current)
 
-    async def async_toggle_pump(service_call: ServiceCall) -> None:
-        """Toggle the pump state."""
-        for coordinator in _get_coordinators(hass):
-            try:
-                pump = (
-                    coordinator.data.device.state.pumps[0]
-                    if coordinator.data.device.state.pumps
-                    else None
-                )
-                current_state = pump.pump_state if pump else False
-                await coordinator.set_pump(on=not current_state)
-                await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error toggling pump: %s", err)
 
-    async def async_toggle_aux(service_call: ServiceCall) -> None:
-        """Toggle an auxiliary output."""
-        aux_id = service_call.data["aux_id"]
-        module = service_call.data.get("module", "None")
+async def _async_toggle_aux(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    aux_id: int = call.data[ATTR_AUX_ID]
+    module: str = call.data[ATTR_MODULE]
+    ports = coordinator.data.device.state.auxiliaries.get(module, {})
+    current = coordinator.resolve_pending(
+        f"aux_{module}_{aux_id}", ports.get(f"Aux{aux_id}", False)
+    )
+    await coordinator.set_auxiliary(module, aux_id, on=not current)
 
-        for coordinator in _get_coordinators(hass):
-            try:
-                # Get current state
-                aux_states = coordinator.data.device.state.auxiliaries.get(module, {})
-                current = aux_states.get(f"Aux{aux_id}", False)
-                await coordinator.set_auxiliary(module, aux_id, on=not current)
-                await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error toggling auxiliary %s: %s", aux_id, err)
 
-    async def async_set_valve_position(service_call: ServiceCall) -> None:
-        """Set the valve position."""
-        position = service_call.data["position"]
+async def _async_set_valve_position(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    await coordinator.set_valve_position(call.data[ATTR_POSITION])
 
-        for coordinator in _get_coordinators(hass):
-            try:
-                await coordinator.set_valve_position(position)
-                await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error setting valve position: %s", err)
 
-    async def async_clear_alarm(service_call: ServiceCall) -> None:
-        """Clear all active alarms."""
-        for coordinator in _get_coordinators(hass):
-            try:
-                await coordinator.clear_all_alarms()
-                await coordinator.async_refresh()
-            except (ConnectionError, TimeoutError) as err:
-                LOGGER.error("Error clearing alarms: %s", err)
+async def _async_clear_alarm(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    if code := call.data.get(ATTR_ALARM_CODE):
+        await coordinator.clear_alarm(code)
+    else:
+        await coordinator.clear_all_alarms()
 
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SET_PUMP_SPEED,
-        async_set_pump_speed,
-        schema=SET_PUMP_SPEED_SCHEMA,
+
+async def _async_stop_backwash(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    await coordinator.stop_backwash()
+
+
+async def _async_set_filtration_mode(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    await coordinator.set_filtration_mode(call.data[ATTR_MODE])
+
+
+async def _async_set_filtration_timers(
+    coordinator: PoolCopDataUpdateCoordinator, call: ServiceCall
+) -> None:
+    changes: dict[int, dict[str, Any]] = {}
+    for index, (start, end, enabled) in TIMER_FIELDS.items():
+        change: dict[str, Any] = {}
+        if start in call.data:
+            change["time_on"] = _format_time(call.data[start])
+        if end in call.data:
+            change["time_off"] = _format_time(call.data[end])
+        if enabled in call.data:
+            change["enabled"] = call.data[enabled]
+        if change:
+            changes[index] = change
+
+    mode: str | None = call.data.get(ATTR_MODE)
+    if not changes and mode is None:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="nothing_to_change"
+        )
+    if mode is None:
+        filtrations = coordinator.data.device.settings.filtrations
+        current = filtrations[0].filtration_mode if filtrations else None
+        mode = current if current in FILTRATION_MODES else "Timer"
+
+    await coordinator.set_filtration_timers(
+        mode, coordinator.filtration_timers_with(changes)
     )
 
-    hass.services.async_register(DOMAIN, SERVICE_TOGGLE_PUMP, async_toggle_pump)
 
-    hass.services.async_register(
-        DOMAIN, SERVICE_TOGGLE_AUX, async_toggle_aux, schema=TOGGLE_AUX_SCHEMA
-    )
-
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_SET_VALVE_POSITION,
-        async_set_valve_position,
-        schema=SET_VALVE_POSITION_SCHEMA,
-    )
-
-    hass.services.async_register(DOMAIN, SERVICE_CLEAR_ALARM, async_clear_alarm)
+def _format_time(value: time) -> str:
+    return value.strftime("%H:%M:%S")
 
 
-def _get_coordinators(hass: HomeAssistant) -> list[PoolCopDataUpdateCoordinator]:
-    """Get all PoolCop coordinators."""
-    return [
-        value
-        for value in hass.data[DOMAIN].values()
-        if isinstance(value, PoolCopDataUpdateCoordinator)
-    ]
+SERVICES: dict[
+    str,
+    tuple[
+        vol.Schema,
+        Callable[[PoolCopDataUpdateCoordinator, ServiceCall], Awaitable[None]],
+    ],
+] = {
+    SERVICE_SET_PUMP_SPEED: (SET_PUMP_SPEED_SCHEMA, _async_set_pump_speed),
+    SERVICE_TOGGLE_PUMP: (BASE_SCHEMA, _async_toggle_pump),
+    SERVICE_TOGGLE_AUX: (TOGGLE_AUX_SCHEMA, _async_toggle_aux),
+    SERVICE_SET_VALVE_POSITION: (SET_VALVE_POSITION_SCHEMA, _async_set_valve_position),
+    SERVICE_CLEAR_ALARM: (CLEAR_ALARM_SCHEMA, _async_clear_alarm),
+    SERVICE_STOP_BACKWASH: (BASE_SCHEMA, _async_stop_backwash),
+    SERVICE_SET_FILTRATION_MODE: (
+        SET_FILTRATION_MODE_SCHEMA,
+        _async_set_filtration_mode,
+    ),
+    SERVICE_SET_FILTRATION_TIMERS: (
+        SET_FILTRATION_TIMERS_SCHEMA,
+        _async_set_filtration_timers,
+    ),
+}
 
 
-async def async_unload_services(hass: HomeAssistant) -> None:
-    """Unload PoolCop services."""
-    if not hass.services.has_service(DOMAIN, SERVICE_SET_PUMP_SPEED):
-        return
+@callback
+def async_setup_services(hass: HomeAssistant) -> None:
+    """Register the PoolCop actions."""
 
-    hass.services.async_remove(DOMAIN, SERVICE_SET_PUMP_SPEED)
-    hass.services.async_remove(DOMAIN, SERVICE_TOGGLE_PUMP)
-    hass.services.async_remove(DOMAIN, SERVICE_TOGGLE_AUX)
-    hass.services.async_remove(DOMAIN, SERVICE_SET_VALVE_POSITION)
-    hass.services.async_remove(DOMAIN, SERVICE_CLEAR_ALARM)
+    def _make_handler(
+        handler: Callable[[PoolCopDataUpdateCoordinator, ServiceCall], Awaitable[None]],
+    ) -> Callable[[ServiceCall], Coroutine[Any, Any, None]]:
+        async def _async_handle(call: ServiceCall) -> None:
+            coordinator = _async_get_coordinator(hass, call)
+            await handler(coordinator, call)
+            coordinator.async_update_listeners()
+
+        return _async_handle
+
+    for name, (schema, handler) in SERVICES.items():
+        hass.services.async_register(
+            DOMAIN, name, _make_handler(handler), schema=schema
+        )

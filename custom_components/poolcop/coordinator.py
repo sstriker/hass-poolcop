@@ -2,21 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
-from dataclasses import dataclass
+import zoneinfo
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
 from aiopoolcop import (
+    FiltrationTimer,
     Pool,
+    PoolCopClientAccessExpiredError,
     PoolCopClientAPI,
     PoolCopClientAuthError,
-    PoolCopClientConnectionError,
+    PoolCopClientError,
     PoolCopClientRateLimitError,
     PoolCopDevice,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import (
     ConfigEntryAuthFailed,
@@ -30,13 +37,16 @@ from .const import (
     CONF_FLOW_RATE_3,
     CONF_POLL_INTERVAL,
     DOMAIN,
+    ENTITY_RATE_LIMIT,
     LOGGER,
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
+    PENDING_COMMAND_TIMEOUT,
     STORAGE_KEY,
     STORAGE_VERSION,
     UPDATE_INTERVAL,
 )
+from .units import to_cubic_meters, to_cubic_meters_per_hour
 
 # Mode name -> numeric ID mapping for cycle tracking.
 # The client API returns string running_status values; we map them to the
@@ -93,6 +103,13 @@ DEFAULT_CYCLE_DURATIONS: dict[int, int] = {
 # Interval for refreshing pool info (lat/lon/timezone) — 30 minutes.
 _POOL_REFRESH_INTERVAL = 1800
 
+# Interval for saving learned data — 1 hour.
+_SAVE_INTERVAL = 3600
+
+ISSUE_ACCESS_EXPIRED = "cloud_access_expired"
+
+type PoolCopConfigEntry = ConfigEntry[PoolCopDataUpdateCoordinator]
+
 
 @dataclass
 class PoolCopData:
@@ -106,28 +123,38 @@ class PoolCopData:
 class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     """Class to manage fetching PoolCop data from the Client API."""
 
-    config_entry: ConfigEntry
+    config_entry: PoolCopConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
         api: PoolCopClientAPI,
         device_id: int,
-        config_entry: ConfigEntry,
+        config_entry: PoolCopConfigEntry,
     ) -> None:
         """Initialize global PoolCop data updater."""
         # Determine polling interval: honour user option, fall back to default.
         poll_seconds = config_entry.options.get(CONF_POLL_INTERVAL, UPDATE_INTERVAL)
         poll_seconds = max(MIN_UPDATE_INTERVAL, min(MAX_UPDATE_INTERVAL, poll_seconds))
 
+        self._poll_interval = timedelta(seconds=poll_seconds)
         super().__init__(
             hass,
             LOGGER,
+            config_entry=config_entry,
             name=DOMAIN,
-            update_interval=timedelta(seconds=poll_seconds),
+            update_interval=self._poll_interval,
         )
         self.api = api
         self.device_id = device_id
+
+        # Requests on the same device must be ENTITY_RATE_LIMIT seconds apart
+        # (pump state, valve position and auxiliary state are exempt).
+        self._device_lock = asyncio.Lock()
+        self._last_device_call: float | None = None
+
+        # Commands awaiting confirmation: key -> (requested value, deadline)
+        self._pending: dict[str, tuple[Any, float]] = {}
 
         # Initialize pump flow rates from options (preferred) or data (pre-migration)
         self.flow_rates: dict[int, float] = {}
@@ -161,6 +188,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         # None until the first successful fetch; monotonic() counts from boot, so
         # a 0.0 sentinel would skip the first fetch on hosts up < 30 minutes.
         self._pool_last_fetch: float | None = None
+        self._last_save_time: float | None = None
 
     # ------------------------------------------------------------------
     # Helpers to extract numeric values from typed models
@@ -197,10 +225,8 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         """Return a zoneinfo timezone from pool data, or None."""
         if self._pool and self._pool.timezone:
             try:
-                import zoneinfo
-
                 return zoneinfo.ZoneInfo(self._pool.timezone)
-            except ImportError, KeyError:
+            except ValueError, zoneinfo.ZoneInfoNotFoundError:
                 pass
         return None
 
@@ -215,8 +241,17 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if device.state.flow_vis:
             rate = device.state.flow_vis[0].flow_rate
             if rate is not None and rate > 0:
-                return rate
+                return to_cubic_meters_per_hour(rate, self.api.units)
         return None
+
+    def _pool_volume_m3(self) -> float | None:
+        """Return the pool volume in m³, or None if unknown."""
+        if self.data is None:
+            return None
+        volume = self.data.device.settings.pool.volume
+        if not volume or volume <= 0:
+            return None
+        return to_cubic_meters(volume, self.api.units)
 
     def get_current_flow_rate(self) -> float:
         """Return the current effective flow rate in m3/h.
@@ -225,7 +260,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         configured speed-based rates.  Returns 0.0 if pump is off or valve
         is not in a flowing position.
         """
-        if not hasattr(self, "data") or self.data is None:
+        if self.data is None:
             return 0.0
 
         device = self.data.device
@@ -378,7 +413,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
 
         # Map filtration mode names to the legacy numeric filter-timer IDs
         # used below.  Only the two we need to distinguish here:
-        is_always_on = filter_timer_name == "Continuous24"
+        is_always_on = filter_timer_name == "Mode24H"
         is_continuous = filter_timer_name == "Continuous" or op_mode == 9
 
         if is_always_on:
@@ -446,10 +481,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     @property
     def planned_remaining_turnovers(self) -> float | None:
         """Return planned remaining turnovers (volume / pool_volume)."""
-        if not self.data:
-            return None
-        pool_volume = self.data.device.settings.pool.volume
-        if not pool_volume or pool_volume <= 0:
+        if (pool_volume := self._pool_volume_m3()) is None:
             return None
         return round(self.planned_remaining_volume / pool_volume, 2)
 
@@ -461,10 +493,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     @property
     def daily_turnovers(self) -> float | None:
         """Return the number of pool turnovers today (1.0 = one full turnover)."""
-        if not hasattr(self, "data") or self.data is None:
-            return None
-        pool_volume = self.data.device.settings.pool.volume
-        if not pool_volume or pool_volume <= 0:
+        if (pool_volume := self._pool_volume_m3()) is None:
             return None
         return round(self._daily_volume / pool_volume, 2)
 
@@ -593,70 +622,112 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     # Data update
     # ------------------------------------------------------------------
 
+    async def _async_device_call[T](
+        self, func: Callable[[], Awaitable[T]], *, exempt: bool = False
+    ) -> T:
+        """Call the API for this device, respecting the per-device rate limit."""
+        async with self._device_lock:
+            if not exempt and self._last_device_call is not None:
+                wait = self._last_device_call + ENTITY_RATE_LIMIT - time.monotonic()
+                if wait > 0:
+                    await asyncio.sleep(wait)
+            try:
+                return await func()
+            finally:
+                self._last_device_call = time.monotonic()
+
+    async def _async_refresh_pool(self) -> None:
+        """Refresh pool info (location, timezone); failures keep stale data."""
+        try:
+            if self._pool is not None:
+                self._pool = await self.api.get_pool(self._pool.id)
+            else:
+                pools = await self.api.get_pools()
+                self._pool = next(
+                    (
+                        pool
+                        for pool in pools
+                        if any(dev.id == self.device_id for dev in pool.devices)
+                    ),
+                    None,
+                )
+            self._pool_last_fetch = time.monotonic()
+        except PoolCopClientError:
+            LOGGER.debug("Failed to refresh pool info", exc_info=True)
+
     async def _async_update_data(self) -> PoolCopData:
         """Fetch data from PoolCop Client API."""
         try:
-            device = await self.api.get_device(self.device_id)
-
-            # Refresh pool info periodically (lat/lon/timezone)
-            now_mono = time.monotonic()
-            if (
-                self._pool_last_fetch is None
-                or now_mono - self._pool_last_fetch >= _POOL_REFRESH_INTERVAL
-            ):
-                try:
-                    pools = await self.api.get_pools()
-                    # Find the pool that contains our device
-                    for pool in pools:
-                        for dev in pool.devices:
-                            if dev.id == self.device_id:
-                                self._pool = pool
-                                break
-                        if self._pool is not None and self._pool.id == pool.id:
-                            break
-                    self._pool_last_fetch = now_mono
-                except Exception:
-                    # Non-critical; keep stale pool data
-                    LOGGER.debug("Failed to refresh pool info", exc_info=True)
-
-            # Seed cycle durations from settings (only overrides defaults)
-            self._seed_cycle_durations_from_settings(device)
-
-            data = PoolCopData(
-                device=device,
-                pool=self._pool,
-                cycle_status=self._update_cycle_tracking(device),
+            device = await self._async_device_call(
+                lambda: self.api.get_device(self.device_id)
             )
-
-            # Accumulate daily filtration volume
-            self._update_daily_volume()
-
-            # Save learned data periodically - every hour
-            current_time = time.time()
-            if (
-                not hasattr(self, "_last_save_time")
-                or current_time - getattr(self, "_last_save_time", 0) > 3600
-            ):
-                self.hass.async_create_task(self.async_save_learned_data())
-                self._last_save_time = current_time
-
         except PoolCopClientAuthError as err:
-            raise ConfigEntryAuthFailed("API key is invalid or expired") from err
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN, translation_key="auth_failed"
+            ) from err
+        except PoolCopClientAccessExpiredError as err:
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                f"{ISSUE_ACCESS_EXPIRED}_{self.config_entry.entry_id}",
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key=ISSUE_ACCESS_EXPIRED,
+                translation_placeholders={"title": self.config_entry.title},
+                learn_more_url="https://my.poolcop.com",
+            )
+            raise UpdateFailed(
+                translation_domain=DOMAIN, translation_key="access_expired"
+            ) from err
         except PoolCopClientRateLimitError as err:
             # Back off until the rate limit window resets
-            retry_after = err.retry_after if err.retry_after else MIN_UPDATE_INTERVAL
-            self.update_interval = timedelta(seconds=retry_after)
-            LOGGER.warning(
-                "PoolCop Client API rate limit hit, retrying in %ds", retry_after
+            retry_after = err.retry_after or MIN_UPDATE_INTERVAL
+            self.update_interval = timedelta(
+                seconds=max(retry_after, self._poll_interval.total_seconds())
             )
-            raise UpdateFailed("PoolCop Client API rate limit exceeded") from err
-        except PoolCopClientConnectionError as err:
-            raise UpdateFailed("Error communicating with PoolCop Client API") from err
-        except Exception as err:
-            LOGGER.exception("Unexpected error processing PoolCop data: %s", err)
-            raise UpdateFailed(f"Unexpected error: {err}") from err
-        else:
-            return data
+            raise UpdateFailed(
+                translation_domain=DOMAIN, translation_key="rate_limited"
+            ) from err
+        except PoolCopClientError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+
+        self.update_interval = self._poll_interval
+        ir.async_delete_issue(
+            self.hass, DOMAIN, f"{ISSUE_ACCESS_EXPIRED}_{self.config_entry.entry_id}"
+        )
+
+        # Refresh pool info periodically (lat/lon/timezone)
+        if (
+            self._pool_last_fetch is None
+            or time.monotonic() - self._pool_last_fetch >= _POOL_REFRESH_INTERVAL
+        ):
+            await self._async_refresh_pool()
+
+        # Seed cycle durations from settings (only overrides defaults)
+        self._seed_cycle_durations_from_settings(device)
+
+        data = PoolCopData(
+            device=device,
+            pool=self._pool,
+            cycle_status=self._update_cycle_tracking(device),
+        )
+
+        # Accumulate daily filtration volume
+        self._update_daily_volume()
+
+        # Save learned data periodically
+        now = time.monotonic()
+        if self._last_save_time is None or now - self._last_save_time > _SAVE_INTERVAL:
+            self._last_save_time = now
+            self.config_entry.async_create_background_task(
+                self.hass, self.async_save_learned_data(), "poolcop_save_learned_data"
+            )
+
+        return data
 
     # ------------------------------------------------------------------
     # Persistence
@@ -703,59 +774,159 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         await super().async_config_entry_first_refresh()
 
     # ------------------------------------------------------------------
-    # Command methods
-    #
-    # TODO: The client API enforces a 10s rate limit per entity (device ID).
-    # Verify with PCFR whether this applies between consecutive commands
-    # (e.g. set speed then immediately stop pump). If so, rapid command
-    # sequences may be rejected with HTTP 429, which is a safety concern
-    # for emergency stops. May need client-side queuing or a confirmation
-    # that interaction endpoints are exempt from the per-entity limit.
+    # Pending commands
     # ------------------------------------------------------------------
+
+    def set_pending(self, key: str, value: Any) -> None:
+        """Remember a requested state until the device reports it."""
+        self._pending[key] = (value, time.monotonic() + PENDING_COMMAND_TIMEOUT)
+
+    def resolve_pending(self, key: str, actual: Any) -> Any:
+        """Return the requested state while a command is pending, else actual.
+
+        A pending state is dropped once the device reports it or after
+        PENDING_COMMAND_TIMEOUT seconds.
+        """
+        if (pending := self._pending.get(key)) is None:
+            return actual
+        value, deadline = pending
+        if actual == value or time.monotonic() >= deadline:
+            del self._pending[key]
+            return actual
+        return value
+
+    # ------------------------------------------------------------------
+    # Command methods
+    # ------------------------------------------------------------------
+
+    async def _async_command(
+        self,
+        func: Callable[[], Awaitable[None]],
+        *,
+        exempt: bool = False,
+        pending: tuple[str, Any] | None = None,
+    ) -> None:
+        """Send a command, translating API errors for the user."""
+        try:
+            await self._async_device_call(func, exempt=exempt)
+        except PoolCopClientAuthError as err:
+            self.config_entry.async_start_reauth(self.hass)
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="auth_failed"
+            ) from err
+        except PoolCopClientAccessExpiredError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="access_expired"
+            ) from err
+        except PoolCopClientRateLimitError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN, translation_key="rate_limited"
+            ) from err
+        except PoolCopClientError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        if pending is not None:
+            self.set_pending(*pending)
 
     async def set_pump(self, on: bool) -> None:
         """Turn the pump on or off."""
-        await self.api.set_pump(self.device_id, on=on)
-        LOGGER.debug("Set pump %s", "on" if on else "off")
+        await self._async_command(
+            lambda: self.api.set_pump(self.device_id, on=on),
+            exempt=True,
+            pending=("pump", on),
+        )
 
     async def set_pump_speed(self, speed: str) -> None:
         """Set the pump speed (None, Speed1-Speed8)."""
-        await self.api.set_pump_speed(self.device_id, speed)
-        LOGGER.debug("Set pump speed to %s", speed)
+        await self._async_command(
+            lambda: self.api.set_pump_speed(self.device_id, speed),
+            pending=("pump_speed", speed),
+        )
 
     async def set_valve_position(self, position: str) -> None:
         """Set the valve position (Filter, Waste, Closed, Backwash, Bypass, Rinse)."""
-        await self.api.set_valve_position(self.device_id, position)
-        LOGGER.debug("Set valve position to %s", position)
+        await self._async_command(
+            lambda: self.api.set_valve_position(self.device_id, position),
+            exempt=True,
+            pending=("valve_position", position),
+        )
+
+    async def stop_backwash(self) -> None:
+        """Stop a backwash in progress."""
+        await self._async_command(
+            lambda: self.api.stop_backwash(self.device_id), exempt=True
+        )
 
     async def clear_alarm(self, code: str) -> None:
         """Clear a specific alarm by code."""
-        await self.api.clear_alarm(self.device_id, code)
-        LOGGER.debug("Cleared alarm %s", code)
+        await self._async_command(lambda: self.api.clear_alarm(self.device_id, code))
 
     async def clear_all_alarms(self) -> None:
         """Clear all active alarms."""
-        await self.api.clear_all_alarms(self.device_id)
-        LOGGER.debug("Cleared all alarms")
+        await self._async_command(lambda: self.api.clear_all_alarms(self.device_id))
 
     async def set_auxiliary(self, module: str, aux_id: int, *, on: bool) -> None:
         """Set an auxiliary output on or off."""
-        await self.api.set_auxiliary(self.device_id, module, aux_id, on=on)
-        LOGGER.debug("Set auxiliary %s/%d %s", module, aux_id, "on" if on else "off")
+        await self._async_command(
+            lambda: self.api.set_auxiliary(self.device_id, module, aux_id, on=on),
+            exempt=True,
+            pending=(f"aux_{module}_{aux_id}", on),
+        )
 
     async def set_forced_filtration(self, mode: str) -> None:
         """Set forced filtration mode (NotForced, Forced24H, Forced48H, Forced72H)."""
-        await self.api.set_pump_forced(self.device_id, mode)
-        LOGGER.debug("Set forced filtration mode to %s", mode)
+        await self._async_command(
+            lambda: self.api.set_pump_forced(self.device_id, mode),
+            pending=("forced_filtration", mode),
+        )
+
+    async def set_filtration_mode(self, mode: str) -> None:
+        """Set the filtration mode, keeping the current timers."""
+        await self._async_command(
+            lambda: self.api.set_filtration_timer(self.device_id, mode),
+            pending=("filtration_mode", mode),
+        )
+
+    async def set_filtration_timers(
+        self, mode: str, timers: Sequence[FiltrationTimer]
+    ) -> None:
+        """Set the filtration mode and timers."""
+        await self._async_command(
+            lambda: self.api.set_filtration_timer(self.device_id, mode, timers=timers),
+            pending=("filtration_mode", mode),
+        )
+
+    def filtration_timers_with(
+        self, changes: dict[int, dict[str, Any]]
+    ) -> list[FiltrationTimer]:
+        """Return the current filtration timers with changes applied.
+
+        ``changes`` maps a timer index (0 = cycle 1) to FiltrationTimer fields.
+        """
+        filtrations = self.data.device.settings.filtrations
+        timers = list(filtrations[0].timers) if filtrations else []
+        for index in sorted(changes):
+            while len(timers) <= index:
+                timers.append(FiltrationTimer(id=len(timers) + 1))
+            timers[index] = replace(timers[index], **changes[index])
+        return timers
 
     async def set_heating_setpoint(
         self, setpoint: float, aux_id: int, module: str = "None"
     ) -> None:
         """Set the heating setpoint for an auxiliary."""
-        await self.api.set_heating_setpoint(self.device_id, setpoint, aux_id, module)
-        LOGGER.debug("Set heating setpoint to %.1f for aux %d", setpoint, aux_id)
+        await self._async_command(
+            lambda: self.api.set_heating_setpoint(
+                self.device_id, setpoint, aux_id, module
+            )
+        )
 
     async def set_jet_stream(self, on: bool) -> None:
         """Turn the jet stream on or off."""
-        await self.api.set_jet_stream(self.device_id, on=on)
-        LOGGER.debug("Set jet stream %s", "on" if on else "off")
+        await self._async_command(
+            lambda: self.api.set_jet_stream(self.device_id, on=on),
+            pending=("jet_stream", on),
+        )

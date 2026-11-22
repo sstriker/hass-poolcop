@@ -5,8 +5,6 @@ from unittest.mock import patch
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 
-from custom_components.poolcop.const import DOMAIN
-
 
 async def _setup_integration(
     hass, mock_config_entry, mock_poolcop_api, device_data, pool_data
@@ -17,12 +15,13 @@ async def _setup_integration(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+        "custom_components.poolcop.helpers.PoolCopClientAPI",
+        return_value=mock_poolcop_api,
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return hass.data[DOMAIN][mock_config_entry.entry_id]
+    return mock_config_entry.runtime_data
 
 
 async def test_pump_switch_state_on(
@@ -152,16 +151,16 @@ async def test_aux_switch_turn_off(
     mock_poolcop_api.set_auxiliary.assert_called_once_with(2478, "None", 4, on=False)
 
 
-async def test_aux_switch_idempotent_on(
+async def test_aux_switch_command_shows_pending_state(
     hass: HomeAssistant,
     mock_config_entry,
     mock_poolcop_api,
     mock_device_data,
     mock_pool_data,
 ):
-    """Already on -> turn_on does not call API."""
-    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
-    await _setup_integration(
+    """The requested state shows until the device reports it (HTTP 202 delay)."""
+    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = False
+    coordinator = await _setup_integration(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
     )
 
@@ -171,7 +170,21 @@ async def test_aux_switch_idempotent_on(
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
     )
-    mock_poolcop_api.set_auxiliary.assert_not_called()
+    mock_poolcop_api.set_auxiliary.assert_called_once_with(2478, "None", 4, on=True)
+    assert hass.states.get(aux_switch.entity_id).state == "on"
+
+    # A refresh that still reports the old state keeps the requested state
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(aux_switch.entity_id).state == "on"
+
+    # Once the device reports it, the pending state is cleared
+    mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
+    mock_poolcop_api.get_device.return_value = PoolCopDevice.from_dict(mock_device_data)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator._pending == {}
+    assert hass.states.get(aux_switch.entity_id).state == "on"
 
 
 async def test_pump_switch_no_pumps(
@@ -379,7 +392,7 @@ async def test_aux_switch_empty_attrs_fallback(
     )
 
     # Remove the aux from settings after setup so extra_state_attributes misses
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    coordinator = mock_config_entry.runtime_data
     coordinator.data.device.settings.auxs.clear()
 
     # Force the entity to re-write its state

@@ -5,7 +5,6 @@ from unittest.mock import patch
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 
-from custom_components.poolcop.const import DOMAIN
 from custom_components.poolcop.diagnostics import async_get_config_entry_diagnostics
 
 
@@ -18,12 +17,13 @@ async def _setup_coordinator(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+        "custom_components.poolcop.helpers.PoolCopClientAPI",
+        return_value=mock_poolcop_api,
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return hass.data[DOMAIN][mock_config_entry.entry_id]
+    return mock_config_entry.runtime_data
 
 
 async def test_diagnostics_basic(
@@ -43,7 +43,7 @@ async def test_diagnostics_basic(
     assert "config_entry" in result
     assert "coordinator" in result
     assert "data" in result
-    assert result["config_entry"]["version"] == 2
+    assert result["config_entry"]["version"] == 3
 
 
 async def test_diagnostics_redacts_api_key(
@@ -116,7 +116,7 @@ async def test_diagnostics_no_data(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
     )
 
-    coordinator = hass.data[DOMAIN][mock_config_entry.entry_id]
+    coordinator = mock_config_entry.runtime_data
     coordinator.data = None
 
     result = await async_get_config_entry_diagnostics(hass, mock_config_entry)

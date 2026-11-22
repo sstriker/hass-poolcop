@@ -1,7 +1,7 @@
 """Common fixtures for the PoolCop tests."""
 
 from copy import deepcopy
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import CONF_API_KEY
@@ -21,6 +21,13 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations in Home Assistant."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def no_entity_rate_limit():
+    """Don't wait between device requests in tests."""
+    with patch("custom_components.poolcop.coordinator.ENTITY_RATE_LIMIT", 0):
+        yield
 
 
 MOCK_API_KEY = "test-api-key-12345"
@@ -304,6 +311,27 @@ def mock_config_entry():
         },
         unique_id=MOCK_DEVICE_ID,
         entry_id="test_entry_id",
+        version=3,
+    )
+
+
+@pytest.fixture
+def mock_v2_config_entry():
+    """Return a 2.x (PoolCopilot API) config entry."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="Striker",
+        data={
+            CONF_API_KEY: MOCK_API_KEY,
+            "pump_speeds": 3,
+        },
+        options={
+            CONF_FLOW_RATE_1: 10.0,
+            CONF_FLOW_RATE_2: 15.0,
+            CONF_FLOW_RATE_3: 20.0,
+        },
+        unique_id=MOCK_DEVICE_ID,
+        entry_id="test_entry_id",
         version=2,
     )
 
@@ -342,6 +370,7 @@ def mock_pool_data():
 def mock_poolcop_api():
     """Return a mocked PoolCopClientAPI instance."""
     api = AsyncMock()
+    api.units = {}
     api.get_device = AsyncMock()
     api.get_pools = AsyncMock()
     api.set_pump = AsyncMock()
@@ -353,5 +382,7 @@ def mock_poolcop_api():
     api.set_pump_forced = AsyncMock()
     api.set_heating_setpoint = AsyncMock()
     api.set_jet_stream = AsyncMock()
+    api.stop_backwash = AsyncMock()
+    api.set_filtration_timer = AsyncMock()
     api.close = AsyncMock()
     return api

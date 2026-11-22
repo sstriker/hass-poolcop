@@ -28,12 +28,13 @@ async def _setup_integration(
     config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+        "custom_components.poolcop.helpers.PoolCopClientAPI",
+        return_value=mock_poolcop_api,
     ):
         assert await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return hass.data[DOMAIN][config_entry.entry_id]
+    return config_entry.runtime_data
 
 
 async def test_geo_location_with_coords(
@@ -116,7 +117,7 @@ async def test_geo_location_attention_mode_no_alarms(
         },
         unique_id="2478",
         entry_id="test_attention_no_alarms",
-        version=2,
+        version=3,
     )
     await _setup_integration(
         hass, entry, mock_poolcop_api, mock_device_data, mock_pool_data
@@ -226,7 +227,7 @@ async def test_geo_location_attention_mode_with_alarms(
         },
         unique_id="2478",
         entry_id="test_attention_with_alarms",
-        version=2,
+        version=3,
     )
     await _setup_integration(
         hass, entry, mock_poolcop_api, mock_device_data, mock_pool_data

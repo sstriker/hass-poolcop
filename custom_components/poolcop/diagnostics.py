@@ -6,12 +6,10 @@ from dataclasses import asdict
 from typing import Any
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
-from .coordinator import PoolCopDataUpdateCoordinator
+from .coordinator import PoolCopConfigEntry
 
 TO_REDACT = {CONF_API_KEY}
 FIELDS_TO_REDACT = {
@@ -29,10 +27,10 @@ FIELDS_TO_REDACT = {
 
 
 async def async_get_config_entry_diagnostics(
-    hass: HomeAssistant, config_entry: ConfigEntry
+    hass: HomeAssistant, config_entry: PoolCopConfigEntry
 ) -> dict[str, Any]:
     """Return diagnostics for a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator = config_entry.runtime_data
 
     diagnostics_data: dict[str, Any] = {
         "config_entry": {

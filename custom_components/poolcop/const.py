@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import Final
 
 DOMAIN: Final = "poolcop"
@@ -30,8 +29,6 @@ CONF_FLOW_RATE_1 = "flow_rate_1"  # Low speed
 CONF_FLOW_RATE_2 = "flow_rate_2"  # Medium speed
 CONF_FLOW_RATE_3 = "flow_rate_3"  # High speed
 
-SCAN_INTERVAL = timedelta(seconds=UPDATE_INTERVAL)
-
 # Map mode
 CONF_MAP_MODE = "map_mode"
 MAP_MODE_ALWAYS = "always"
@@ -43,6 +40,70 @@ SERVICE_TOGGLE_PUMP = "toggle_pump"
 SERVICE_TOGGLE_AUX = "toggle_aux"
 SERVICE_SET_VALVE_POSITION = "set_valve_position"
 SERVICE_CLEAR_ALARM = "clear_alarm"
+SERVICE_STOP_BACKWASH = "stop_backwash"
+SERVICE_SET_FILTRATION_MODE = "set_filtration_mode"
+SERVICE_SET_FILTRATION_TIMERS = "set_filtration_timers"
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+
+# Client API rate limits (seconds). Requests on the same device must be
+# 10 s apart, except the pump state, valve position and auxiliary state
+# commands, which only need the 1 s per-key spacing the client applies.
+ENTITY_RATE_LIMIT = 10.0
+
+# Commands are accepted with HTTP 202 and take 30 s to 2 min to show up in
+# the device state. Entities show the requested state until then.
+PENDING_COMMAND_TIMEOUT = 150.0
+
+# Filtration modes accepted by the filtrationtimer command. Forced24H/48H/72H
+# are set through the forced filtration select instead.
+FILTRATION_MODES: Final = [
+    "Stop",
+    "Timer",
+    "EcoPlus",
+    "Volume",
+    "Continuous",
+    "Mode24H",
+]
+
+# Repair issue raised when a 2.x (PoolCopilot API) entry is migrated
+ISSUE_NEW_API_KEY = "new_api_key"
+
+# Entities from 2.x (PoolCopilot API) that the Client API no longer provides,
+# as (platform, key). Removed from the entity registry by the v2 -> v3 migration.
+REMOVED_ENTITY_KEYS: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("binary_sensor", "autochlor_acid"),
+        ("binary_sensor", "autochlor_auto"),
+        ("binary_sensor", "autochlor_control"),
+        ("binary_sensor", "autochlor_installed"),
+        ("binary_sensor", "ioniser_control"),
+        ("binary_sensor", "ioniser_installed"),
+        ("binary_sensor", "ioniser_mode"),
+        ("binary_sensor", "orp_control_enabled"),
+        ("binary_sensor", "watervalve"),
+        ("sensor", "autochlor_duration"),
+        ("sensor", "autochlor_next_injection"),
+        ("sensor", "filter_mode"),
+        ("sensor", "forced_filtration_mode"),
+        ("sensor", "forced_filtration_remaining"),
+        ("sensor", "ioniser"),
+        ("sensor", "ioniser_current"),
+        ("sensor", "ioniser_duration"),
+        ("sensor", "ioniser_next_injection"),
+        ("sensor", "orp_hyper_day"),
+        ("sensor", "orp_hyper_set_point"),
+        ("sensor", "orp_next_injection"),
+        ("sensor", "ph_next_injection"),
+        ("sensor", "refill_status"),
+        ("sensor", "waterlevel_cable_status"),
+    }
+)
+
+# Entities whose 3.0 counterpart has a different key, as
+# (platform, old key) -> new key. They keep their entity ID and history.
+RENAMED_ENTITY_KEYS: Final[dict[tuple[str, str], str]] = {
+    ("sensor", "poolcop"): "running_status",
+}
 
 VALVE_POSITIONS = {
     "filter": 0,

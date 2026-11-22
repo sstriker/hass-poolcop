@@ -5,8 +5,6 @@ from unittest.mock import patch
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 
-from custom_components.poolcop.const import DOMAIN
-
 
 async def _setup_integration(
     hass, mock_config_entry, mock_poolcop_api, device_data, pool_data
@@ -17,12 +15,13 @@ async def _setup_integration(
     mock_config_entry.add_to_hass(hass)
 
     with patch(
-        "custom_components.poolcop.PoolCopClientAPI", return_value=mock_poolcop_api
+        "custom_components.poolcop.helpers.PoolCopClientAPI",
+        return_value=mock_poolcop_api,
     ):
         assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
-    return hass.data[DOMAIN][mock_config_entry.entry_id]
+    return mock_config_entry.runtime_data
 
 
 async def test_clear_alarm_button_setup(

@@ -6,21 +6,22 @@ import math
 from typing import Any, cast
 
 from homeassistant.components.geo_location import GeolocationEvent
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityDescription
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_MAP_MODE, DOMAIN, MAP_MODE_ATTENTION
-from .coordinator import PoolCopDataUpdateCoordinator
+from .const import CONF_MAP_MODE, MAP_MODE_ATTENTION
+from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: PoolCopConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up PoolCop geo location based on a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     pool = coordinator.data.pool
     if pool is None:

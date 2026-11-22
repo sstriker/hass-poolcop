@@ -2,40 +2,60 @@
 
 from __future__ import annotations
 
-from homeassistant.components.button import ButtonEntity
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import EntityCategory, EntityDescription
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 
-from .const import DOMAIN
-from .coordinator import PoolCopDataUpdateCoordinator
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
 
+@dataclass(frozen=True, kw_only=True)
+class PoolCopButtonEntityDescription(ButtonEntityDescription):
+    """Class describing PoolCop buttons."""
+
+    press_fn: Callable[[PoolCopDataUpdateCoordinator], Awaitable[None]]
+
+
+BUTTONS: tuple[PoolCopButtonEntityDescription, ...] = (
+    PoolCopButtonEntityDescription(
+        key="clear_alarm",
+        translation_key="clear_alarm",
+        icon="mdi:alert-remove",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        press_fn=lambda coordinator: coordinator.clear_all_alarms(),
+    ),
+    PoolCopButtonEntityDescription(
+        key="stop_backwash",
+        translation_key="stop_backwash",
+        icon="mdi:stop-circle-outline",
+        press_fn=lambda coordinator: coordinator.stop_backwash(),
+    ),
+)
+
+
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: PoolCopConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up PoolCop buttons based on a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([PoolCopClearAlarmButton(coordinator)])
+    coordinator = entry.runtime_data
+    async_add_entities(
+        PoolCopButton(coordinator=coordinator, description=description)
+        for description in BUTTONS
+    )
 
 
-class PoolCopClearAlarmButton(PoolCopEntity, ButtonEntity):  # type: ignore[misc]
-    """Button to clear PoolCop alarms."""
+class PoolCopButton(PoolCopEntity, ButtonEntity):
+    """A PoolCop command button."""
 
-    _attr_has_entity_name = True
-    _attr_entity_category = EntityCategory.DIAGNOSTIC
-    _attr_icon = "mdi:alert-remove"
-
-    def __init__(self, coordinator: PoolCopDataUpdateCoordinator) -> None:
-        """Initialize the clear alarm button."""
-        super().__init__(
-            coordinator=coordinator,
-            description=EntityDescription(key="clear_alarm", name="Clear Alarm"),
-        )
+    entity_description: PoolCopButtonEntityDescription
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.coordinator.clear_all_alarms()
-        await self.coordinator.async_refresh()
+        await self.entity_description.press_fn(self.coordinator)
