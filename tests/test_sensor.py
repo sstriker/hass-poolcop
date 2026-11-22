@@ -2,8 +2,10 @@
 
 from unittest.mock import patch
 
+import pytest
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 
 from custom_components.poolcop.coordinator import PoolCopData
 from custom_components.poolcop.sensor import (
@@ -1167,3 +1169,30 @@ async def test_flow_meter_not_installed(
         s for s in hass.states.async_all("sensor") if "flow_meter_rate" in s.entity_id
     ]
     assert len(states) == 0
+
+
+@pytest.mark.default_enabled_state
+async def test_settings_sensors_disabled_by_default(
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
+):
+    """Rarely needed settings sensors are disabled by default."""
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
+    registry = er.async_get(hass)
+    entries = {
+        entry.translation_key: entry
+        for entry in er.async_entries_for_config_entry(
+            registry, mock_config_entry.entry_id
+        )
+    }
+    assert entries["pump_type"].disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert entries["equip_flow_meter"].disabled_by is (
+        er.RegistryEntryDisabler.INTEGRATION
+    )
+    assert entries["firmware_version"].disabled_by is None
+    assert hass.states.get(entries["temperature_water"].entity_id) is not None

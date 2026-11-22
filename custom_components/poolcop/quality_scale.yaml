@@ -55,15 +55,15 @@ rules:
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default:
-    status: todo
-    comment: Decide which of the many diagnostic settings sensors to disable by default.
+    status: done
+    comment: Rarely needed settings and installed-equipment entities are disabled by default.
   entity-translations:
     status: done
     comment: Auxiliary outputs are named after the label set on the PoolCop.
   exception-translations: done
   icon-translations:
-    status: todo
-    comment: Icons are still set in code (several depend on state).
+    status: done
+    comment: Auxiliary outputs pick their icon from the label set on the PoolCop, in code.
   reconfiguration-flow: done
   repair-issues: done
   stale-devices:

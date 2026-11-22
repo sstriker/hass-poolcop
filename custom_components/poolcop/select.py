@@ -165,7 +165,6 @@ async def async_setup_entry(
             description=PoolCopSelectEntityDescription(
                 key="valve_position",
                 translation_key="valve_position",
-                icon="mdi:valve",
                 options=VALVE_POSITION_OPTIONS,
                 async_set_fn=_async_set_valve_position,
                 current_fn=_get_current_valve_position,
@@ -183,7 +182,6 @@ async def async_setup_entry(
                 description=PoolCopSelectEntityDescription(
                     key="pump_speed",
                     translation_key="pump_speed",
-                    icon="mdi:pump",
                     options=pump_speed_options,
                     async_set_fn=_async_set_pump_speed,
                     current_fn=_get_current_pump_speed,
@@ -198,7 +196,6 @@ async def async_setup_entry(
             description=PoolCopSelectEntityDescription(
                 key="filtration_mode",
                 translation_key="filtration_mode",
-                icon="mdi:air-filter",
                 options=list(FILTRATION_MODES),
                 async_set_fn=_async_set_filtration_mode,
                 current_fn=_get_current_filtration_mode,
@@ -214,7 +211,6 @@ async def async_setup_entry(
             description=PoolCopSelectEntityDescription(
                 key="forced_filtration",
                 translation_key="forced_filtration",
-                icon="mdi:pump",
                 options=FORCED_FILTRATION_OPTIONS,
                 async_set_fn=_async_set_forced_filtration,
                 current_fn=_get_current_forced_mode,

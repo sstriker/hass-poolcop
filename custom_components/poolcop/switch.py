@@ -45,7 +45,6 @@ class PoolCopPumpSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
 
     _attr_has_entity_name = True
     _attr_device_class = SwitchDeviceClass.SWITCH
-    _attr_icon = "mdi:pump"
 
     def __init__(self, coordinator: PoolCopDataUpdateCoordinator) -> None:
         """Initialize the pump switch."""
@@ -79,7 +78,6 @@ class PoolCopJetStreamSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
 
     _attr_has_entity_name = True
     _attr_device_class = SwitchDeviceClass.SWITCH
-    _attr_icon = "mdi:waves-arrow-right"
 
     def __init__(self, coordinator: PoolCopDataUpdateCoordinator) -> None:
         """Initialize the jet stream switch."""

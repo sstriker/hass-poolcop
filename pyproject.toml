@@ -34,3 +34,6 @@ addopts = "-q --cov=custom_components/poolcop --cov-report=term-missing"
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+markers = [
+  "default_enabled_state: don't enable entities that are disabled by default",
+]

@@ -28,14 +28,12 @@ BUTTONS: tuple[PoolCopButtonEntityDescription, ...] = (
     PoolCopButtonEntityDescription(
         key="clear_alarm",
         translation_key="clear_alarm",
-        icon="mdi:alert-remove",
         entity_category=EntityCategory.DIAGNOSTIC,
         press_fn=lambda coordinator: coordinator.clear_all_alarms(),
     ),
     PoolCopButtonEntityDescription(
         key="stop_backwash",
         translation_key="stop_backwash",
-        icon="mdi:stop-circle-outline",
         press_fn=lambda coordinator: coordinator.stop_backwash(),
     ),
 )

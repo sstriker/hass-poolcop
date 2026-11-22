@@ -1,0 +1,442 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "active_alarm": {
+        "default": "mdi:check-circle",
+        "state": {
+          "on": "mdi:alert-circle"
+        }
+      },
+      "air_installed": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "disinfection_dosing": {
+        "default": "mdi:flask-empty",
+        "state": {
+          "on": "mdi:flask"
+        }
+      },
+      "equip_energy_meter": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "equip_fac_sensor": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "equip_flow_meter": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "equip_jet_stream": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "equip_pool_cover": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "equip_salt_sensor": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "input_1": {
+        "default": "mdi:electric-switch",
+        "state": {
+          "on": "mdi:electric-switch-closed"
+        }
+      },
+      "input_2": {
+        "default": "mdi:electric-switch",
+        "state": {
+          "on": "mdi:electric-switch-closed"
+        }
+      },
+      "jet_stream_running": {
+        "default": "mdi:waves-arrow-right",
+        "state": {
+          "on": "mdi:waves-arrow-right"
+        }
+      },
+      "orp_control": {
+        "default": "mdi:pump-off",
+        "state": {
+          "on": "mdi:pump"
+        }
+      },
+      "orp_installed": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "ph_auto_adjust": {
+        "default": "mdi:ph",
+        "state": {
+          "on": "mdi:ph"
+        }
+      },
+      "ph_control": {
+        "default": "mdi:pump-off",
+        "state": {
+          "on": "mdi:pump"
+        }
+      },
+      "ph_dosing": {
+        "default": "mdi:flask-empty",
+        "state": {
+          "on": "mdi:flask"
+        }
+      },
+      "ph_installed": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "pool_cover_open": {
+        "default": "mdi:window-shutter",
+        "state": {
+          "on": "mdi:window-shutter-open"
+        }
+      },
+      "pool_freeze_protection": {
+        "default": "mdi:snowflake-off",
+        "state": {
+          "on": "mdi:snowflake-alert"
+        }
+      },
+      "pool_service_mode": {
+        "default": "mdi:tools-off",
+        "state": {
+          "on": "mdi:tools"
+        }
+      },
+      "pump": {
+        "default": "mdi:pump-off",
+        "state": {
+          "on": "mdi:pump"
+        }
+      },
+      "pump_protect": {
+        "default": "mdi:shield-off",
+        "state": {
+          "on": "mdi:shield"
+        }
+      },
+      "waterlevel_auto_add": {
+        "default": "mdi:water-off",
+        "state": {
+          "on": "mdi:water-plus"
+        }
+      },
+      "waterlevel_auto_reduce": {
+        "default": "mdi:water-off",
+        "state": {
+          "on": "mdi:water-minus"
+        }
+      },
+      "waterlevel_continuous": {
+        "default": "mdi:water-off",
+        "state": {
+          "on": "mdi:water-sync"
+        }
+      },
+      "waterlevel_installed": {
+        "default": "mdi:close-circle-outline",
+        "state": {
+          "on": "mdi:check-circle-outline"
+        }
+      },
+      "waterlevel_measuring": {
+        "default": "mdi:ruler",
+        "state": {
+          "on": "mdi:ruler"
+        }
+      },
+      "waterlevel_on_error": {
+        "default": "mdi:check-circle",
+        "state": {
+          "on": "mdi:alert-circle"
+        }
+      },
+      "waterlevel_on_target": {
+        "default": "mdi:close-circle",
+        "state": {
+          "on": "mdi:check-circle"
+        }
+      },
+      "waterlevel_refilling": {
+        "default": "mdi:water-off",
+        "state": {
+          "on": "mdi:water-plus"
+        }
+      }
+    },
+    "button": {
+      "clear_alarm": {
+        "default": "mdi:alert-remove"
+      },
+      "stop_backwash": {
+        "default": "mdi:stop-circle-outline"
+      }
+    },
+    "select": {
+      "filtration_mode": {
+        "default": "mdi:air-filter"
+      },
+      "forced_filtration": {
+        "default": "mdi:clock-fast"
+      },
+      "pump_speed": {
+        "default": "mdi:pump"
+      },
+      "valve_position": {
+        "default": "mdi:valve"
+      }
+    },
+    "sensor": {
+      "api_cycle_elapsed_time": {
+        "default": "mdi:timer"
+      },
+      "api_cycle_remaining_time": {
+        "default": "mdi:timer-sand"
+      },
+      "cycle1_enabled": {
+        "default": "mdi:toggle-switch"
+      },
+      "cycle1_start_time": {
+        "default": "mdi:clock-start"
+      },
+      "cycle1_stop_time": {
+        "default": "mdi:clock-end"
+      },
+      "cycle2_enabled": {
+        "default": "mdi:toggle-switch"
+      },
+      "cycle2_start_time": {
+        "default": "mdi:clock-start"
+      },
+      "cycle2_stop_time": {
+        "default": "mdi:clock-end"
+      },
+      "cycle_elapsed_time": {
+        "default": "mdi:timer"
+      },
+      "cycle_predicted_end": {
+        "default": "mdi:clock-end"
+      },
+      "cycle_remaining_time": {
+        "default": "mdi:timer-sand"
+      },
+      "daily_filtration_volume": {
+        "default": "mdi:water-sync"
+      },
+      "daily_turnovers": {
+        "default": "mdi:sync"
+      },
+      "device_model": {
+        "default": "mdi:information-outline"
+      },
+      "disinfection_last_injection_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "filter_backwash_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "filter_backwash_mode": {
+        "default": "mdi:cog"
+      },
+      "filter_backwash_time": {
+        "default": "mdi:clock-outline"
+      },
+      "filter_max_days": {
+        "default": "mdi:calendar-range"
+      },
+      "filter_rinse_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "filter_timer_mode": {
+        "default": "mdi:timer-cog"
+      },
+      "filter_type": {
+        "default": "mdi:air-filter"
+      },
+      "filtration_mode": {
+        "default": "mdi:air-filter"
+      },
+      "firmware_version": {
+        "default": "mdi:chip"
+      },
+      "flow_meter_rate": {
+        "default": "mdi:water-pump"
+      },
+      "forced_remaining": {
+        "default": "mdi:timer-outline"
+      },
+      "free_available_chlorine": {
+        "default": "mdi:molecule"
+      },
+      "free_chlorine": {
+        "default": "mdi:flask"
+      },
+      "orp": {
+        "default": "mdi:molecule"
+      },
+      "orp_disinfectant": {
+        "default": "mdi:water-outline"
+      },
+      "orp_set_point": {
+        "default": "mdi:molecule"
+      },
+      "os_version": {
+        "default": "mdi:chip"
+      },
+      "ph_dosing_time": {
+        "default": "mdi:timer-outline"
+      },
+      "ph_high_threshold": {
+        "default": "mdi:ph"
+      },
+      "ph_last_injection_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "ph_low_threshold": {
+        "default": "mdi:ph"
+      },
+      "ph_set_point": {
+        "default": "mdi:ph"
+      },
+      "ph_type": {
+        "default": "mdi:ph"
+      },
+      "planned_remaining_turnovers": {
+        "default": "mdi:sync-circle"
+      },
+      "planned_remaining_volume": {
+        "default": "mdi:water-outline"
+      },
+      "pool_cover_reduction": {
+        "default": "mdi:percent"
+      },
+      "pool_nickname": {
+        "default": "mdi:tag-text"
+      },
+      "pool_turnover": {
+        "default": "mdi:refresh"
+      },
+      "pool_type": {
+        "default": "mdi:pool"
+      },
+      "pool_volume": {
+        "default": "mdi:pool"
+      },
+      "pump_flow_rate": {
+        "default": "mdi:water-pump"
+      },
+      "pump_flowrate": {
+        "default": "mdi:water-pump"
+      },
+      "pump_nb_speeds": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed_24h": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed_backwash": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed_cover": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed_cycle1": {
+        "default": "mdi:speedometer"
+      },
+      "pump_speed_cycle2": {
+        "default": "mdi:speedometer"
+      },
+      "pump_type": {
+        "default": "mdi:pump"
+      },
+      "running_status": {
+        "default": "mdi:state-machine"
+      },
+      "salt": {
+        "default": "mdi:shaker"
+      },
+      "total_chlorine": {
+        "default": "mdi:flask"
+      },
+      "valve_position": {
+        "default": "mdi:valve"
+      },
+      "waterlevel": {
+        "default": "mdi:waves"
+      },
+      "waterlevel_draining_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "waterlevel_max_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "waterlevel_set_point": {
+        "default": "mdi:waves-arrow-up"
+      }
+    },
+    "switch": {
+      "jet_stream_switch": {
+        "default": "mdi:waves-arrow-right"
+      },
+      "pump_switch": {
+        "default": "mdi:pump",
+        "state": {
+          "off": "mdi:pump-off"
+        }
+      }
+    }
+  },
+  "services": {
+    "set_pump_speed": {
+      "service": "mdi:speedometer"
+    },
+    "toggle_pump": {
+      "service": "mdi:pump"
+    },
+    "toggle_aux": {
+      "service": "mdi:toggle-switch"
+    },
+    "set_valve_position": {
+      "service": "mdi:valve"
+    },
+    "clear_alarm": {
+      "service": "mdi:alert-remove"
+    },
+    "stop_backwash": {
+      "service": "mdi:stop-circle-outline"
+    },
+    "set_filtration_mode": {
+      "service": "mdi:air-filter"
+    },
+    "set_filtration_timers": {
+      "service": "mdi:timer-cog"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 """Common fixtures for the PoolCop tests."""
 
 from copy import deepcopy
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, PropertyMock, patch
 
 import pytest
 from homeassistant.const import CONF_API_KEY
@@ -21,6 +21,20 @@ pytest_plugins = "pytest_homeassistant_custom_component"
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations in Home Assistant."""
     yield
+
+
+@pytest.fixture(autouse=True)
+def enable_all_entities(request):
+    """Create entities that are disabled by default as enabled, for testing."""
+    if request.node.get_closest_marker("default_enabled_state"):
+        yield
+        return
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        new_callable=PropertyMock,
+        return_value=True,
+    ):
+        yield
 
 
 @pytest.fixture(autouse=True)

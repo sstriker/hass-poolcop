@@ -1,9 +1,15 @@
 """Test PoolCop binary sensor platform."""
 
+import json
+from pathlib import Path
 from unittest.mock import patch
 
 from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
+
+ICONS = json.loads(
+    (Path(__file__).parent.parent / "custom_components/poolcop/icons.json").read_text()
+)["entity"]["binary_sensor"]
 
 
 async def _setup_integration(
@@ -126,7 +132,7 @@ async def test_pump_icon(
         if s.entity_id.endswith("_pump")
     ]
     assert len(states) >= 1
-    assert states[0].attributes.get("icon") == "mdi:pump"
+    assert ICONS["pump"] == {"default": "mdi:pump-off", "state": {"on": "mdi:pump"}}
 
 
 async def test_aux_binary_sensor_reserved(
@@ -432,7 +438,7 @@ async def test_pool_cover_binary_sensor_off(
     assert len(states) >= 1
     assert states[0].state == "off"
     assert states[0].attributes.get("device_class") == "opening"
-    assert states[0].attributes.get("icon") == "mdi:window-shutter"
+    assert ICONS["pool_cover_open"]["default"] == "mdi:window-shutter"
 
 
 async def test_pool_cover_binary_sensor_on(
@@ -457,7 +463,7 @@ async def test_pool_cover_binary_sensor_on(
     ]
     assert len(states) >= 1
     assert states[0].state == "on"
-    assert states[0].attributes.get("icon") == "mdi:window-shutter-open"
+    assert ICONS["pool_cover_open"]["state"]["on"] == "mdi:window-shutter-open"
     assert states[0].attributes["is_opening"] is True
     assert states[0].attributes["is_stopped"] is False
     assert states[0].attributes["controllable"] is False
@@ -545,7 +551,7 @@ async def test_input_1_on(
     ]
     assert len(states) >= 1
     assert states[0].state == "on"
-    assert states[0].attributes.get("icon") == "mdi:electric-switch-closed"
+    assert ICONS["input_1"]["state"]["on"] == "mdi:electric-switch-closed"
 
 
 async def test_input_2_off(
@@ -565,7 +571,7 @@ async def test_input_2_off(
     ]
     assert len(states) >= 1
     assert states[0].state == "off"
-    assert states[0].attributes.get("icon") == "mdi:electric-switch"
+    assert ICONS["input_2"]["default"] == "mdi:electric-switch"
 
 
 async def test_ph_auto_adjust_on(
