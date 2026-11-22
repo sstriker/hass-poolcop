@@ -42,6 +42,9 @@ from .coordinator import (
 from .entity import PoolCopEntity
 from .units import FLOW_RATE, PRESSURE, TEMPERATURE, VOLUME, ha_unit
 
+# Coordinator-driven; no per-entity polling
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True)
 class PoolCopSensorEntityDescriptionMixin:
@@ -407,7 +410,7 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
     ),
     PoolCopSensorEntityDescription(
         key="pH",
-        translation_key="pH",
+        translation_key="ph",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="pH",
         value_fn=lambda data: data.device.state.ph,

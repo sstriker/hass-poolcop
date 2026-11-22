@@ -112,7 +112,7 @@
         "name": "Active Alarm"
       },
       "air_installed": {
-        "name": "Air installed"
+        "name": "Air temperature sensor installed"
       },
       "disinfection_dosing": {
         "name": "Disinfection Dosing"
@@ -150,9 +150,6 @@
       "orp_installed": {
         "name": "ORP control installed"
       },
-      "pH_installed": {
-        "name": "pH control installed"
-      },
       "ph_auto_adjust": {
         "name": "pH Auto Adjust"
       },
@@ -161,6 +158,9 @@
       },
       "ph_dosing": {
         "name": "pH Dosing"
+      },
+      "ph_installed": {
+        "name": "pH control installed"
       },
       "pool_cover_open": {
         "name": "Pool Cover"
@@ -384,7 +384,7 @@
       "os_version": {
         "name": "OS Version"
       },
-      "pH": {
+      "ph": {
         "name": "pH"
       },
       "ph_dosing_time": {
@@ -506,6 +506,15 @@
       "voltage": {
         "name": "Battery Voltage"
       },
+      "water_level": {
+        "state": {
+          "faulty": "Faulty",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very High"
+        }
+      },
       "waterlevel": {
         "name": "Water level"
       },
@@ -517,15 +526,6 @@
       },
       "waterlevel_set_point": {
         "name": "Waterlevel Set Point"
-      },
-      "water_level": {
-        "state": {
-          "faulty": "Faulty",
-          "low": "Low",
-          "normal": "Normal",
-          "high": "High",
-          "very_high": "Very High"
-        }
       }
     },
     "switch": {
@@ -572,7 +572,7 @@
   "issues": {
     "new_api_key": {
       "title": "{title} needs a new PoolCop API key",
-      "description": "Version 3.0 of the PoolCop integration uses the new PoolCop Client API, because the PoolCopilot API is shutting down. Your existing key does not work with it.\n\nLog in to [MyPoolCop](https://my.poolcop.com/profile/apikey), open **Profile → API key**, click **Generate a key**, and enter it when Home Assistant asks you to re-authenticate {title}. This message disappears once the new key works."
+      "description": "Version 3.0 of the PoolCop integration uses the new PoolCop Client API, because the PoolCopilot API is shutting down. Your existing key does not work with it.\n\nLog in to [MyPoolCop]({api_key_url}), open **Profile → API key**, click **Generate a key**, and enter it when Home Assistant asks you to re-authenticate {title}. This message disappears once the new key works."
     },
     "cloud_access_expired": {
       "title": "PoolCop cloud access expired for {title}",

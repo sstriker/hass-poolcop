@@ -21,6 +21,9 @@ from .coordinator import (
 )
 from .entity import PoolCopEntity
 
+# Send one command at a time per platform
+PARALLEL_UPDATES = 1
+
 # Valve position options are the string keys from the client API
 VALVE_POSITION_OPTIONS: Final = list(VALVE_NAME_TO_ID.keys())
 

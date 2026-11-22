@@ -29,6 +29,9 @@ from .const import (
 from .coordinator import PoolCopConfigEntry, PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
+# Coordinator-driven; no per-entity polling
+PARALLEL_UPDATES = 0
+
 
 @dataclass(frozen=True)
 class PoolCopBinarySensorEntityDescriptionMixin:
@@ -108,7 +111,7 @@ BINARY_SENSORS = (
     ),
     PoolCopBinarySensorEntityDescription(
         key="pH_installed",
-        translation_key="pH_installed",
+        translation_key="ph_installed",
         device_class=BinarySensorDeviceClass.CONNECTIVITY,
         is_on_fn=lambda data: data.device.equipments_info.has_ph_sensor,
         on_off_icons=INSTALLED_ICONS,

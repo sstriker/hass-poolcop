@@ -215,7 +215,10 @@ async def test_migrate_v2_to_v3(
     issue_id = f"new_api_key_{entry.entry_id}"
     issue = ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
     assert issue is not None
-    assert issue.translation_placeholders == {"title": "Striker"}
+    assert issue.translation_placeholders == {
+        "title": "Striker",
+        "api_key_url": "https://my.poolcop.com/profile/apikey",
+    }
     assert entry.state is ConfigEntryState.SETUP_ERROR
 
     # With a working key the issue goes away

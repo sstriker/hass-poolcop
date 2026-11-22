@@ -35,6 +35,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    API_KEY_URL,
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
@@ -48,7 +49,6 @@ from .helpers import async_get_client
 
 CONF_DEVICE_ID = "device_id"
 CONF_PUMP_SPEEDS = "pump_speeds"
-API_KEY_URL = "https://my.poolcop.com/profile/apikey"
 FLOW_RATE_KEYS = (CONF_FLOW_RATE_1, CONF_FLOW_RATE_2, CONF_FLOW_RATE_3)
 
 STEP_API_KEY_SCHEMA = vol.Schema(

@@ -13,6 +13,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
+# Send one command at a time per platform
+PARALLEL_UPDATES = 1
+
 
 @dataclass(frozen=True, kw_only=True)
 class PoolCopButtonEntityDescription(ButtonEntityDescription):

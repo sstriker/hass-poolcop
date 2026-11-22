@@ -1,11 +1,15 @@
 {
   "domain": "poolcop",
   "name": "PoolCop",
-  "codeowners": ["@sstriker"],
+  "codeowners": [
+    "@sstriker"
+  ],
   "config_flow": true,
   "documentation": "https://github.com/sstriker/hass-poolcop",
-  "issue_tracker": "https://github.com/sstriker/hass-poolcop/issues",
   "iot_class": "cloud_polling",
-  "requirements": ["aiopoolcop==1.1.0"],
+  "issue_tracker": "https://github.com/sstriker/hass-poolcop/issues",
+  "requirements": [
+    "aiopoolcop==1.1.0"
+  ],
   "version": "3.0.0"
 }

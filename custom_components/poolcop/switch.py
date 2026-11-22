@@ -14,6 +14,9 @@ from .const import AUX_LABEL_ICONS, aux_display_name, aux_label_id
 from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
+# Send one command at a time per platform
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

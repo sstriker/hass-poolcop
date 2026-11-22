@@ -14,6 +14,9 @@ from .const import CONF_MAP_MODE, MAP_MODE_ATTENTION
 from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
+# Coordinator-driven; no per-entity polling
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

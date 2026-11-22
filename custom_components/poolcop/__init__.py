@@ -10,6 +10,7 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
 
 from .const import (
+    API_KEY_URL,
     CONF_FLOW_RATE_1,
     CONF_FLOW_RATE_2,
     CONF_FLOW_RATE_3,
@@ -71,7 +72,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: PoolCopConfigEntry) ->
             is_persistent=True,
             severity=ir.IssueSeverity.WARNING,
             translation_key=ISSUE_NEW_API_KEY,
-            translation_placeholders={"title": entry.title},
+            translation_placeholders={"title": entry.title, "api_key_url": API_KEY_URL},
             learn_more_url="https://github.com/sstriker/hass-poolcop#getting-an-api-key",
         )
         hass.config_entries.async_update_entry(entry, version=3)

@@ -65,6 +65,9 @@ FILTRATION_MODES: Final = [
     "Mode24H",
 ]
 
+# Where users generate a Client API key
+API_KEY_URL: Final = "https://my.poolcop.com/profile/apikey"
+
 # Repair issue raised when a 2.x (PoolCopilot API) entry is migrated
 ISSUE_NEW_API_KEY = "new_api_key"
 
