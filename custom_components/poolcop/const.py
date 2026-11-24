@@ -50,6 +50,9 @@ ATTR_CONFIG_ENTRY_ID = "config_entry_id"
 # commands, which only need the 1 s per-key spacing the client applies.
 ENTITY_RATE_LIMIT = 10.0
 
+# The first request after a quiet period can take more than 15 s to answer.
+REQUEST_TIMEOUT = 45.0
+
 # Commands are accepted with HTTP 202 and take 30 s to 2 min to show up in
 # the device state. Entities show the requested state until then.
 PENDING_COMMAND_TIMEOUT = 150.0

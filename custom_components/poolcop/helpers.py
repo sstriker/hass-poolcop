@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util.hass_dict import HassKey
 
-from .const import DOMAIN
+from .const import DOMAIN, REQUEST_TIMEOUT
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -27,7 +27,9 @@ def async_get_client(hass: HomeAssistant, api_key: str) -> PoolCopClientAPI:
     clients = hass.data.setdefault(DATA_CLIENTS, {})
     if (client := clients.get(api_key)) is None:
         client = clients[api_key] = PoolCopClientAPI(
-            api_key=api_key, session=async_get_clientsession(hass)
+            api_key=api_key,
+            session=async_get_clientsession(hass),
+            request_timeout=REQUEST_TIMEOUT,
         )
     return client
 
