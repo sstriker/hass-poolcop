@@ -349,7 +349,10 @@ async def test_filtration_mode_select(
         {"entity_id": entity_id, "option": "mode_24h"},
         blocking=True,
     )
-    mock_poolcop_api.set_filtration_timer.assert_called_once_with(2478, "Mode24H")
+    call = mock_poolcop_api.set_filtration_timer.call_args
+    assert call.args == (2478, "Mode24H")
+    # The current timers are sent along (Timer mode is refused without them)
+    assert call.kwargs["timers"][0].time_on == "23:59:00"
     # Shown as requested until the device reports it
     assert hass.states.get(entity_id).state == "mode_24h"
 

@@ -139,7 +139,9 @@ async def test_stop_backwash(hass: HomeAssistant, coordinator, mock_poolcop_api)
 async def test_set_filtration_mode(hass: HomeAssistant, coordinator, mock_poolcop_api):
     """Set the filtration mode (snake_case from the UI)."""
     await _call(hass, "set_filtration_mode", {"mode": "eco_plus"})
-    mock_poolcop_api.set_filtration_timer.assert_called_once_with(2478, "EcoPlus")
+    call = mock_poolcop_api.set_filtration_timer.call_args
+    assert call.args == (2478, "EcoPlus")
+    assert len(call.kwargs["timers"]) == 2
 
 
 async def test_set_filtration_timers(

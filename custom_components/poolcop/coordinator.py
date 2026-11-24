@@ -895,9 +895,13 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         )
 
     async def set_filtration_mode(self, mode: str) -> None:
-        """Set the filtration mode, keeping the current timers."""
+        """Set the filtration mode, keeping the current timers.
+
+        The timers are sent along: the API refuses Timer mode without them.
+        """
+        timers = self.filtration_timers_with({}) or None
         await self._async_command(
-            lambda: self.api.set_filtration_timer(self.device_id, mode),
+            lambda: self.api.set_filtration_timer(self.device_id, mode, timers=timers),
             pending=("filtration_mode", mode),
         )
 
