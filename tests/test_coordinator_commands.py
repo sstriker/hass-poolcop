@@ -9,6 +9,7 @@ from aiopoolcop import (
     Pool,
     PoolCopClientAccessExpiredError,
     PoolCopClientConnectionError,
+    PoolCopClientError,
     PoolCopClientRateLimitError,
     PoolCopDevice,
 )
@@ -182,4 +183,25 @@ async def test_short_rate_limit_retried_only_once(coordinator, mock_poolcop_api)
         pytest.raises(UpdateFailed),
     ):
         await coordinator._async_update_data()
+    assert mock_poolcop_api.get_device.call_count == 2
+
+
+async def test_server_error_is_retried_once(coordinator, mock_poolcop_api):
+    """A 500 on a read is retried once."""
+    device = mock_poolcop_api.get_device.return_value
+    mock_poolcop_api.get_device.side_effect = [
+        PoolCopClientError("Server error (500)"),
+        device,
+    ]
+    data = await coordinator._async_update_data()
+    assert data.device is device
+    assert mock_poolcop_api.get_device.call_count == 2
+
+
+async def test_repeated_server_error_fails_update(coordinator, mock_poolcop_api):
+    """A second server error fails the update."""
+    mock_poolcop_api.get_device.side_effect = PoolCopClientError("Server error (500)")
+    with pytest.raises(UpdateFailed) as err:
+        await coordinator._async_update_data()
+    assert err.value.translation_key == "update_failed"
     assert mock_poolcop_api.get_device.call_count == 2

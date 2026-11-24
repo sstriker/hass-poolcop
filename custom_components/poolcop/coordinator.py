@@ -16,7 +16,9 @@ from aiopoolcop import (
     PoolCopClientAccessExpiredError,
     PoolCopClientAPI,
     PoolCopClientAuthError,
+    PoolCopClientConnectionError,
     PoolCopClientError,
+    PoolCopClientNotFoundError,
     PoolCopClientRateLimitError,
     PoolCopDevice,
 )
@@ -647,6 +649,30 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
             finally:
                 self._last_device_call = time.monotonic()
 
+    async def _async_get_device(self) -> PoolCopDevice:
+        """Read the device, retrying once after a server error.
+
+        The API occasionally answers a read with a 500; one retry avoids
+        making every entity unavailable until the next update.
+        """
+        try:
+            return await self._async_device_call(
+                lambda: self.api.get_device(self.device_id)
+            )
+        except (
+            PoolCopClientAccessExpiredError,
+            PoolCopClientAuthError,
+            PoolCopClientConnectionError,
+            PoolCopClientNotFoundError,
+            PoolCopClientRateLimitError,
+        ):
+            raise
+        except PoolCopClientError as err:
+            LOGGER.debug("Reading the PoolCop failed, retrying once: %s", err)
+            return await self._async_device_call(
+                lambda: self.api.get_device(self.device_id)
+            )
+
     async def _async_refresh_pool(self) -> None:
         """Refresh pool info (location, timezone); failures keep stale data."""
         try:
@@ -669,9 +695,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
     async def _async_update_data(self) -> PoolCopData:
         """Fetch data from PoolCop Client API."""
         try:
-            device = await self._async_device_call(
-                lambda: self.api.get_device(self.device_id)
-            )
+            device = await self._async_get_device()
         except PoolCopClientAuthError as err:
             raise ConfigEntryAuthFailed(
                 translation_domain=DOMAIN, translation_key="auth_failed"
