@@ -41,11 +41,11 @@ from .const import (
     MAX_UPDATE_INTERVAL,
     MIN_UPDATE_INTERVAL,
     PENDING_COMMAND_TIMEOUT,
+    RATE_LIMIT_RETRY_MAX,
     STORAGE_KEY,
     STORAGE_VERSION,
     UPDATE_INTERVAL,
 )
-from .units import to_cubic_meters, to_cubic_meters_per_hour
 
 # Mode name -> numeric ID mapping for cycle tracking.
 # The client API returns string running_status values; we map them to the
@@ -242,7 +242,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         if device.state.flow_vis:
             rate = device.state.flow_vis[0].flow_rate
             if rate is not None and rate > 0:
-                return to_cubic_meters_per_hour(rate, self.api.units)
+                return rate
         return None
 
     def _pool_volume_m3(self) -> float | None:
@@ -252,7 +252,7 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         volume = self.data.device.settings.pool.volume
         if not volume or volume <= 0:
             return None
-        return to_cubic_meters(volume, self.api.units)
+        return volume
 
     def get_current_flow_rate(self) -> float:
         """Return the current effective flow rate in m3/h.
@@ -633,7 +633,17 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
                 if wait > 0:
                     await asyncio.sleep(wait)
             try:
-                return await func()
+                try:
+                    return await func()
+                except PoolCopClientRateLimitError as err:
+                    if (
+                        err.retry_after is None
+                        or err.retry_after > RATE_LIMIT_RETRY_MAX
+                    ):
+                        raise
+                    LOGGER.debug("Rate limited, retrying in %s s", err.retry_after)
+                    await asyncio.sleep(err.retry_after + 0.5)
+                    return await func()
             finally:
                 self._last_device_call = time.monotonic()
 

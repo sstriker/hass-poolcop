@@ -100,7 +100,7 @@ async def test_aux_switch_exists(
     )
 
     states = [
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     ]
     assert len(states) >= 1
 
@@ -120,7 +120,7 @@ async def test_aux_switch_turn_on(
     )
 
     aux_switch = next(
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     )
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
@@ -143,7 +143,7 @@ async def test_aux_switch_turn_off(
     )
 
     aux_switch = next(
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     )
     await hass.services.async_call(
         "switch", "turn_off", {"entity_id": aux_switch.entity_id}, blocking=True
@@ -165,7 +165,7 @@ async def test_aux_switch_command_shows_pending_state(
     )
 
     aux_switch = next(
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     )
     await hass.services.async_call(
         "switch", "turn_on", {"entity_id": aux_switch.entity_id}, blocking=True
@@ -223,7 +223,7 @@ async def test_aux_switch_no_module_returns_none(
     )
 
     states = [
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     ]
     assert len(states) >= 1
     assert states[0].state == "unknown"
@@ -247,13 +247,30 @@ async def test_aux_switch_extra_attrs_days(
     )
 
     states = [
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     ]
     assert len(states) >= 1
     assert states[0].attributes.get("days") == ["Monday", "Friday"]
     assert states[0].attributes.get("label") == "TransferPump"
-    assert states[0].attributes.get("friendly_name") is not None
     assert states[0].attributes.get("mode") == "Manual"
+
+
+async def test_aux_switch_uses_friendly_name(
+    hass: HomeAssistant,
+    mock_config_entry,
+    mock_poolcop_api,
+    mock_device_data,
+    mock_pool_data,
+):
+    """A friendly name set on the PoolCop names the switch."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["friendlyName"] = "Fountain"
+    await _setup_integration(
+        hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
+    )
+
+    state = hass.states.get("switch.poolcop_2478_fountain")
+    assert state is not None
+    assert state.attributes["label"] == "TransferPump"
 
 
 async def test_aux_switch_icon_with_known_label(
@@ -263,8 +280,8 @@ async def test_aux_switch_icon_with_known_label(
     mock_device_data,
     mock_pool_data,
 ):
-    """Aux switch with known label_aux_0 (Pool Light) shows light icon."""
-    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_0"
+    """Aux switch with known PoolLight (Pool Light) shows light icon."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "PoolLight"
     mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = True
     await _setup_integration(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
@@ -283,7 +300,7 @@ async def test_aux_switch_icon_off_state(
     mock_pool_data,
 ):
     """Aux switch off with known label shows off icon."""
-    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_0"
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "PoolLight"
     mock_device_data["state"]["auxiliaries"]["None"]["Aux4"] = False
     await _setup_integration(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
@@ -400,7 +417,7 @@ async def test_aux_switch_empty_attrs_fallback(
     await hass.async_block_till_done()
 
     states = [
-        s for s in hass.states.async_all("switch") if "transferpump" in s.entity_id
+        s for s in hass.states.async_all("switch") if "transfer_pump" in s.entity_id
     ]
     assert len(states) >= 1
     # Extra attrs should not have days/label/mode from the aux

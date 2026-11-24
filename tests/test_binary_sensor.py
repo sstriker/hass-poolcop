@@ -144,13 +144,13 @@ async def test_aux_binary_sensor_reserved(
 ):
     """Reserved aux creates a binary sensor, not a switch."""
 
-    # Add a reserved aux (label_aux_16 = Waste Valve, is_reserved=True)
+    # Add a reserved aux (ReservedWasteValve = Waste Valve, is_reserved=True)
     mock_device_data["settings"]["auxs"]["None"]["Aux5"] = {
         "id": "Aux5",
         "auxChannel": 5,
         "module": "None",
         "moduleId": 0,
-        "label": "label_aux_16",
+        "label": "ReservedWasteValve",
         "friendlyName": "Waste",
         "status": False,
         "isSlave": False,
@@ -178,7 +178,7 @@ async def test_aux_binary_sensor_reserved(
     assert state.attributes.get("icon") == "mdi:valve-open"
     # Extra attrs from reserved aux
     assert state.attributes.get("days") == ["Monday", "Wednesday"]
-    assert state.attributes.get("label") == "label_aux_16"
+    assert state.attributes.get("label") == "ReservedWasteValve"
 
 
 async def test_aux_binary_sensor_slave(
@@ -194,7 +194,7 @@ async def test_aux_binary_sensor_slave(
         "auxChannel": 6,
         "module": "None",
         "moduleId": 0,
-        "label": "label_aux_17",
+        "label": "ReservedSpeedControl",
         "friendlyName": "Speed",
         "status": False,
         "isSlave": True,
@@ -276,7 +276,7 @@ async def test_aux_binary_sensor_with_icon_label(
         "auxChannel": 2,
         "module": "None",
         "moduleId": 0,
-        "label": "label_aux_0",
+        "label": "PoolLight",
         "friendlyName": "My Pool Light",
         "status": False,
         "isSlave": False,
@@ -296,9 +296,9 @@ async def test_aux_binary_sensor_with_icon_label(
     states = hass.states.async_all("binary_sensor")
     aux_bs = [s for s in states if "pool_light" in s.entity_id]
     assert len(aux_bs) >= 1
-    # label_aux_0 = Pool Light -> icon should be mdi:lightbulb-on (is_on=True)
+    # PoolLight = Pool Light -> icon should be mdi:lightbulb-on (is_on=True)
     assert aux_bs[0].attributes.get("icon") == "mdi:lightbulb-on"
-    assert aux_bs[0].attributes.get("friendly_name") is not None
+    assert aux_bs[0].attributes["friendly_name"].endswith("My Pool Light")
 
 
 async def test_aux_binary_sensor_attrs_no_match(
@@ -347,15 +347,15 @@ async def test_aux_binary_sensor_attrs_no_match(
     assert "label" not in aux_bs[0].attributes
 
 
-async def test_alarm_attrs_with_alert_title(
+async def test_alarm_attrs_names(
     hass: HomeAssistant,
     mock_config_entry,
     mock_poolcop_api,
     mock_device_data,
     mock_pool_data,
 ):
-    """Alarm with alert_title_ prefix resolves to display name."""
-    mock_device_data["state"]["alarms"] = ["alert_title_1", "PressureLow"]
+    """Alarm codes get a readable description."""
+    mock_device_data["state"]["alarms"] = ["ORPLow", "PressureLow"]
     await _setup_integration(
         hass, mock_config_entry, mock_poolcop_api, mock_device_data, mock_pool_data
     )
@@ -369,8 +369,8 @@ async def test_alarm_attrs_with_alert_title(
     attrs = states[0].attributes
     assert attrs["alarm_count"] == 2
     alarms = attrs["alarms"]
-    assert alarms[0]["description"] == "Freezing Risk"
-    assert alarms[1]["code"] == "PressureLow"
+    assert alarms[0] == {"code": "ORPLow", "description": "ORP Low"}
+    assert alarms[1] == {"code": "PressureLow", "description": "Pressure Low"}
 
 
 async def test_alarm_attrs_empty(

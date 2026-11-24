@@ -613,11 +613,11 @@ async def test_aux_timer_sensors_created(
     )
 
     states = hass.states.async_all("sensor")
-    # Aux timer sensors have entity IDs like poolcop_2478_transferpump_start_time
+    # Aux timer sensors have entity IDs like poolcop_2478_transfer_pump_start_time
     aux_timer = [
         s
         for s in states
-        if "transferpump" in s.entity_id and "start_time" in s.entity_id
+        if "transfer_pump" in s.entity_id and "start_time" in s.entity_id
     ]
     assert len(aux_timer) >= 1
 
@@ -629,8 +629,8 @@ async def test_aux_timer_sensors_skip_fixed_function(
     mock_device_data,
     mock_pool_data,
 ):
-    """Fixed-function aux (label_aux_16 = Waste Valve) timers are skipped."""
-    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "label_aux_16"
+    """Fixed-function aux (ReservedWasteValve = Waste Valve) timers are skipped."""
+    mock_device_data["settings"]["auxs"]["None"]["Aux4"]["label"] = "ReservedWasteValve"
     mock_device_data["settings"]["auxs"]["None"]["Aux4"]["timers"] = [
         {"id": 1, "timeOn": "08:00:00", "timeOff": "20:00:00"}
     ]
@@ -639,7 +639,7 @@ async def test_aux_timer_sensors_skip_fixed_function(
     )
 
     states = hass.states.async_all("sensor")
-    # Fixed-function label_aux_16 (Waste Valve) sensors should not exist
+    # Fixed-function ReservedWasteValve (Waste Valve) sensors should not exist
     aux_timer = [
         s
         for s in states
@@ -665,7 +665,7 @@ async def test_aux_no_timers_no_sensors(
     aux_timer = [
         s
         for s in states
-        if "transferpump" in s.entity_id and "start_time" in s.entity_id
+        if "transfer_pump" in s.entity_id and "start_time" in s.entity_id
     ]
     assert len(aux_timer) == 0
 

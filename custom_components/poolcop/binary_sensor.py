@@ -18,14 +18,12 @@ from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import (
-    ALARM_NAMES,
     AUX_FIXED_FUNCTION_LABELS,
     AUX_LABEL_ICONS,
     AUX_RELAY_LABELS,
     AUX_VALVE_LABELS,
-    alert_display_name,
+    alarm_display_name,
     aux_display_name,
-    aux_label_id,
 )
 from .coordinator import PoolCopConfigEntry, PoolCopData, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
@@ -55,14 +53,9 @@ def _alarm_attrs(data: PoolCopData) -> dict[str, Any]:
     alarms = data.device.state.alarms
     if not alarms:
         return {"alarm_count": 0, "alarms": []}
-    resolved = []
-    for code in alarms:
-        display = alert_display_name(code) if code.startswith("alert_title_") else code
-        # Try to look up by alarm name string directly
-        if not code.startswith("alert_title_"):
-            # Code is a string like "FreezeRisk" or numeric string
-            display = ALARM_NAMES.get(int(code), code) if code.isdigit() else code
-        resolved.append({"code": code, "description": display})
+    resolved = [
+        {"code": code, "description": alarm_display_name(code)} for code in alarms
+    ]
     first = resolved[0] if resolved else {}
     return {
         "alarm_count": len(resolved),
@@ -374,14 +367,12 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         self._aux_channel: int = aux.aux_channel
         self._module: str = aux.module
         self._aux_id_str: str = f"Aux{aux.aux_channel}"
-        api_label = aux.label or ""
-        label = aux_display_name(api_label, aux.aux_channel)
-        self._label_id = aux_label_id(api_label)
-        lid = self._label_id
+        self._label = aux.label
+        label = aux_display_name(aux.label, aux.friendly_name, aux.aux_channel)
 
         # Fixed-function aux ports have first-class entity counterparts
         # -- show as "Label (Aux N)" and mark diagnostic
-        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
+        if aux.label in AUX_FIXED_FUNCTION_LABELS:
             label = f"{label} (Aux {aux.aux_channel})"
             self._attr_entity_category = EntityCategory.DIAGNOSTIC
 
@@ -394,10 +385,10 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         )
 
         # Valve-type aux ports: Open/Closed
-        if lid is not None and lid in AUX_VALVE_LABELS:
+        if aux.label in AUX_VALVE_LABELS:
             self._attr_device_class = BinarySensorDeviceClass.OPENING
         # Relay-type aux ports with first-class counterparts: On/Off
-        elif lid is not None and lid in AUX_RELAY_LABELS:
+        elif aux.label in AUX_RELAY_LABELS:
             self._attr_device_class = BinarySensorDeviceClass.POWER
 
     @property
@@ -421,8 +412,6 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
                     attrs["days"] = aux.days_of_week
                 if aux.label:
                     attrs["label"] = aux.label
-                if aux.friendly_name:
-                    attrs["friendly_name"] = aux.friendly_name
                 if aux.mode:
                     attrs["mode"] = aux.mode
                 return attrs
@@ -433,9 +422,6 @@ class PoolCopAuxBinarySensor(PoolCopEntity, BinarySensorEntity):  # type: ignore
         """Return the icon."""
         if self._attr_device_class == BinarySensorDeviceClass.OPENING:
             return "mdi:valve-open" if self.is_on else "mdi:valve-closed"
-        icons = (
-            AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
-        )
-        if icons:
+        if icons := AUX_LABEL_ICONS.get(self._label):
             return icons[0] if self.is_on else icons[1]
         return "mdi:toggle-switch" if self.is_on else "mdi:toggle-switch-off"

@@ -31,7 +31,6 @@ from .const import (
     CYCLE_ACTIVE_MODES,
     LOGGER,
     aux_display_name,
-    aux_label_id,
 )
 from .coordinator import (
     MODE_NAME_TO_ID,
@@ -59,8 +58,8 @@ class PoolCopSensorEntityDescription(
 ):
     """Describes PoolCop sensor entity."""
 
-    # Measurement kind in the API's units header; the unit then follows the
-    # account's preferences instead of native_unit_of_measurement.
+    # Measurement kind in the API's units header. Values always come in the
+    # metric native unit; the account's preferred unit is suggested for display.
     unit_kind: str | None = None
 
 
@@ -665,8 +664,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
     PoolCopSensorEntityDescription(
         key="pool_volume",
         translation_key="pool_volume",
+        device_class=SensorDeviceClass.VOLUME_STORAGE,
         state_class=SensorStateClass.MEASUREMENT,
-        native_unit_of_measurement="m\u00b3",
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         unit_kind=VOLUME,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda data: data.device.settings.pool.volume,
@@ -828,6 +828,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
     PoolCopSensorEntityDescription(
         key="pump_flowrate",
         translation_key="pump_flowrate",
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         unit_kind=FLOW_RATE,
@@ -1067,10 +1068,9 @@ async def async_setup_entry(
     for aux in coordinator.data.device.settings.auxs:
         if not aux.timers:
             continue
-        lid = aux_label_id(aux.label)
-        if lid is not None and lid in AUX_FIXED_FUNCTION_LABELS:
+        if aux.is_reserved or aux.label in AUX_FIXED_FUNCTION_LABELS:
             continue
-        label = aux_display_name(aux.label, aux.aux_channel)
+        label = aux_display_name(aux.label, aux.friendly_name, aux.aux_channel)
 
         entities.append(
             PoolCopSensorEntity(
@@ -1126,11 +1126,12 @@ class PoolCopSensorEntity(PoolCopEntity, SensorEntity):
         return self.entity_description.value_fn(self.coordinator.data)
 
     @property
-    def native_unit_of_measurement(self) -> str | None:
-        """Return the unit, following the account's unit preferences."""
-        if (kind := self.entity_description.unit_kind) is not None:
+    def suggested_unit_of_measurement(self) -> str | None:
+        """Suggest the unit chosen in the account's PoolCop app preferences."""
+        kind = self.entity_description.unit_kind
+        if kind is not None and kind in self.coordinator.api.units:
             return ha_unit(self.coordinator.api.units, kind)
-        return super().native_unit_of_measurement
+        return super().suggested_unit_of_measurement
 
 
 class FlowRateSensor(PoolCopSensorEntity):

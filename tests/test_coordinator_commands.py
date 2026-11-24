@@ -151,3 +151,35 @@ async def test_learned_data_saved_periodically(coordinator, mock_config_entry):
         assert task.call_count == 2
     for call in task.call_args_list:
         call.args[1].close()
+
+
+async def test_short_rate_limit_is_retried(coordinator, mock_poolcop_api):
+    """A 429 with a short Retry-After is waited out and retried once."""
+    device = mock_poolcop_api.get_device.return_value
+    mock_poolcop_api.get_device.side_effect = [
+        PoolCopClientRateLimitError("429", retry_after=1),
+        device,
+    ]
+    sleeps: list[float] = []
+
+    async def fake_sleep(delay: float) -> None:
+        sleeps.append(delay)
+
+    with patch(f"{COORDINATOR}.asyncio.sleep", fake_sleep):
+        data = await coordinator._async_update_data()
+    assert data.device is device
+    assert sleeps == [1.5]
+    assert mock_poolcop_api.get_device.call_count == 2
+
+
+async def test_short_rate_limit_retried_only_once(coordinator, mock_poolcop_api):
+    """A second 429 fails the update."""
+    mock_poolcop_api.get_device.side_effect = PoolCopClientRateLimitError(
+        "429", retry_after=1
+    )
+    with (
+        patch(f"{COORDINATOR}.asyncio.sleep", AsyncMock()),
+        pytest.raises(UpdateFailed),
+    ):
+        await coordinator._async_update_data()
+    assert mock_poolcop_api.get_device.call_count == 2

@@ -229,7 +229,7 @@ MOCK_DEVICE_RESPONSE = {
                     "module": "None",
                     "moduleId": 0,
                     "label": "TransferPump",
-                    "friendlyName": "Apf",
+                    "friendlyName": "",
                     "status": False,
                     "isSlave": False,
                     "slavedTo": "NotSlave",

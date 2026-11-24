@@ -152,10 +152,11 @@ automation:
   until the PoolCop reports it (or 2.5 minutes pass).
 - The Client API allows one request per second per key and 10 seconds between
   requests for the same PoolCop (pump, valve and auxiliary commands are
-  exempt). The integration spaces its requests to stay within these limits,
-  so a command can take up to 10 seconds to be sent.
-- Values use the units chosen in your PoolCop app preferences (for example
-  °F, psi or gallons); Home Assistant converts them to your unit system.
+  exempt). The integration spaces its requests 12 seconds apart to stay within
+  these limits, so a command can take up to 12 seconds to be sent.
+- Temperatures, pressures, volumes and flow rates are first shown in the units
+  chosen in your PoolCop app preferences (for example °F, psi or gallons). You
+  can change the unit of each sensor in its settings in Home Assistant.
 
 ## Known limitations
 

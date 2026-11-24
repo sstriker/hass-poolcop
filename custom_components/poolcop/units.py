@@ -1,8 +1,11 @@
 """Map the Client API's UCUM unit codes to Home Assistant units.
 
-The API reports measurements in the units chosen in the account's PoolCop app
-preferences, and names them in a ``units`` response header such as
-``temperature=Cel,pressure=kPa,volume=m3,flowRate=m3/h`` (UCUM codes).
+The API names the units chosen in the account's PoolCop app preferences in a
+``units`` response header such as
+``temperature=Cel,pressure=kPa,volume=m3,flowRate=m3/h`` (UCUM codes). The
+values themselves are always metric (°C, kPa, m³, m³/h): an account set to bar
+still gets a filter pressure of 62.7. The header is only used to suggest the
+display unit.
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ from homeassistant.const import (
     UnitOfVolume,
     UnitOfVolumeFlowRate,
 )
-from homeassistant.util.unit_conversion import VolumeConverter, VolumeFlowRateConverter
 
 from .const import LOGGER
 
@@ -61,7 +63,7 @@ UCUM_UNITS: Final[dict[str, dict[str, str]]] = {
     },
 }
 
-# Used when the API sends no units header (the API's default is metric).
+# The units the API's values are in.
 METRIC_UNITS: Final[dict[str, str]] = {
     TEMPERATURE: UnitOfTemperature.CELSIUS,
     PRESSURE: UnitOfPressure.KPA,
@@ -88,19 +90,3 @@ def ha_unit(units: Mapping[str, str], kind: str) -> str:
             )
         return METRIC_UNITS[kind]
     return unit
-
-
-def to_cubic_meters(value: float, units: Mapping[str, str]) -> float:
-    """Convert a volume in the account's unit to m³."""
-    return VolumeConverter.convert(
-        value, ha_unit(units, VOLUME), UnitOfVolume.CUBIC_METERS
-    )
-
-
-def to_cubic_meters_per_hour(value: float, units: Mapping[str, str]) -> float:
-    """Convert a flow rate in the account's unit to m³/h."""
-    return VolumeFlowRateConverter.convert(
-        value,
-        ha_unit(units, FLOW_RATE),
-        UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
-    )

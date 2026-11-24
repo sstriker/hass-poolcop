@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import AUX_LABEL_ICONS, aux_display_name, aux_label_id
+from .const import AUX_LABEL_ICONS, aux_display_name
 from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
 
@@ -121,9 +121,8 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
         self._module: str = aux.module
         self._aux_id_str: str = f"Aux{aux.aux_channel}"
         self._pending_key = f"aux_{aux.module}_{aux.aux_channel}"
-        api_label = aux.label or ""
-        label = aux_display_name(api_label, aux.aux_channel)
-        self._label_id = aux_label_id(api_label)
+        self._label = aux.label
+        label = aux_display_name(aux.label, aux.friendly_name, aux.aux_channel)
 
         super().__init__(
             coordinator=coordinator,
@@ -153,8 +152,6 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
                     attrs["days"] = aux.days_of_week
                 if aux.label:
                     attrs["label"] = aux.label
-                if aux.friendly_name:
-                    attrs["friendly_name"] = aux.friendly_name
                 if aux.mode:
                     attrs["mode"] = aux.mode
                 return attrs
@@ -163,10 +160,7 @@ class PoolCopAuxSwitch(PoolCopEntity, SwitchEntity):  # type: ignore[misc]
     @property
     def icon(self) -> str | None:
         """Return the icon."""
-        icons = (
-            AUX_LABEL_ICONS.get(self._label_id) if self._label_id is not None else None
-        )
-        if icons:
+        if icons := AUX_LABEL_ICONS.get(self._label):
             return icons[0] if self.is_on else icons[1]
         return None
 
