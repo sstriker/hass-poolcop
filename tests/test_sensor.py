@@ -1,5 +1,6 @@
 """Test PoolCop sensor platform."""
 
+from datetime import UTC, datetime
 from unittest.mock import patch
 
 import pytest
@@ -211,6 +212,32 @@ async def test_cycle_elapsed_time_fn():
     )
     data_timer = PoolCopData(device=device_timer, cycle_status={"elapsed_time": 300})
     assert _cycle_elapsed_time_fn(data_timer) == 300
+
+
+async def test_cycle_fns_prefer_api_times(freezer):
+    """The API's cycle times win over the coordinator's own tracking."""
+    freezer.move_to("2026-11-24T12:00:30+00:00")
+    device = PoolCopDevice.from_dict(
+        {
+            "id": 1,
+            "state": {"pumpsInfo": [{"runningStatus": "TimerMode"}]},
+            "settings": {
+                "filtrations": [
+                    {
+                        "currentCycleElapsedTime": "01:30:00",
+                        "currentCycleRemainingTime": "02:30:00",
+                    }
+                ]
+            },
+        }
+    )
+    data = PoolCopData(
+        device=device,
+        cycle_status={"elapsed_time": 5, "remaining_time": 5, "predicted_end": 5},
+    )
+    assert _cycle_elapsed_time_fn(data) == 5400
+    assert _cycle_time_remaining_fn(data) == 9000
+    assert _cycle_end_time_fn(data) == datetime(2026, 11, 24, 14, 30, tzinfo=UTC)
 
 
 async def test_cycle_end_time_fn_not_in_cycle():

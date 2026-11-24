@@ -25,6 +25,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from .const import (
     AUX_FIXED_FUNCTION_LABELS,
@@ -137,10 +138,22 @@ def _is_cycle_mode(data: PoolCopData) -> bool:
     return mode_id in CYCLE_ACTIVE_MODES if mode_id is not None else False
 
 
+def _api_cycle_seconds(data: PoolCopData, attr: str) -> int | None:
+    """Return the current cycle's elapsed or remaining time reported by the API."""
+    filtration = _filtration(data)
+    if filtration is None:
+        return None
+    return _parse_duration_seconds(getattr(filtration, attr))
+
+
 def _cycle_time_remaining_fn(data: PoolCopData) -> float | None:
     """Get remaining time in seconds for the current cycle."""
     if not _is_cycle_mode(data):
         return None
+    if (
+        seconds := _api_cycle_seconds(data, "current_cycle_remaining_time")
+    ) is not None:
+        return float(seconds)
     if data.cycle_status and data.cycle_status.get("remaining_time") is not None:
         return float(data.cycle_status["remaining_time"])
     return None
@@ -150,6 +163,13 @@ def _cycle_end_time_fn(data: PoolCopData) -> datetime | None:
     """Get predicted end time for the current cycle."""
     if not _is_cycle_mode(data):
         return None
+    if (
+        seconds := _api_cycle_seconds(data, "current_cycle_remaining_time")
+    ) is not None:
+        # Whole minutes, so the state doesn't change on every update
+        return (dt_util.utcnow() + timedelta(seconds=seconds)).replace(
+            second=0, microsecond=0
+        )
     if data.cycle_status and data.cycle_status.get("predicted_end") is not None:
         timestamp = data.cycle_status["predicted_end"]
         pool_tz_name = data.pool.timezone if data.pool else None
@@ -166,6 +186,8 @@ def _cycle_elapsed_time_fn(data: PoolCopData) -> float | None:
     """Get elapsed time in seconds for the current cycle."""
     if not _is_cycle_mode(data):
         return None
+    if (seconds := _api_cycle_seconds(data, "current_cycle_elapsed_time")) is not None:
+        return float(seconds)
     if data.cycle_status and data.cycle_status.get("elapsed_time") is not None:
         return float(data.cycle_status["elapsed_time"])
     return None
