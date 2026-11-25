@@ -1237,7 +1237,7 @@ async def async_setup_entry(
             PoolCopSensorEntity(
                 coordinator=coordinator,
                 description=PoolCopSensorEntityDescription(
-                    key=f"aux_{aux.id}_enabled",
+                    key=f"aux{aux.aux_channel}_enabled",
                     translation_key="aux_timer_enabled",
                     translation_placeholders={"aux": label},
                     device_class=SensorDeviceClass.ENUM,
@@ -1252,7 +1252,7 @@ async def async_setup_entry(
             PoolCopSensorEntity(
                 coordinator=coordinator,
                 description=PoolCopSensorEntityDescription(
-                    key=f"aux_{aux.id}_start_time",
+                    key=f"aux{aux.aux_channel}_start_time",
                     translation_key="aux_timer_start_time",
                     translation_placeholders={"aux": label},
                     device_class=SensorDeviceClass.TIMESTAMP,

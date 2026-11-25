@@ -8,6 +8,7 @@ from aiopoolcop import Pool, PoolCopDevice
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
+from custom_components.poolcop.const import DOMAIN
 from custom_components.poolcop.coordinator import PoolCopData
 from custom_components.poolcop.sensor import (
     _aux_timer_enabled_fn,
@@ -650,6 +651,11 @@ async def test_aux_timer_sensors_created(
         if "transfer_pump" in s.entity_id and "start_time" in s.entity_id
     ]
     assert len(aux_timer) >= 1
+
+    # Unique IDs match 2.x so upgraded installs keep these entities.
+    registry = er.async_get(hass)
+    for key in ("aux4_enabled", "aux4_start_time"):
+        assert registry.async_get_entity_id("sensor", DOMAIN, f"{DOMAIN}_2478_{key}")
 
 
 async def test_aux_timer_sensors_skip_fixed_function(
