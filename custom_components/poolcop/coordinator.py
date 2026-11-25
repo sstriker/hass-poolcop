@@ -360,15 +360,19 @@ class PoolCopDataUpdateCoordinator(DataUpdateCoordinator[PoolCopData]):
         except ValueError, TypeError:
             return 0.0
 
-        # Ensure stop is after start (same-day cycle)
-        if stop_dt <= start_dt:
+        if stop_dt == start_dt:
             return 0.0
+        if stop_dt > start_dt:
+            periods = [(start_dt, stop_dt)]
+        else:
+            # The cycle crosses midnight: today it runs until the stop time
+            # and again from the start time until midnight.
+            midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            periods = [(midnight, stop_dt), (start_dt, midnight + timedelta(days=1))]
 
-        if now >= stop_dt:
-            return 0.0
-        if now <= start_dt:
-            return (stop_dt - start_dt).total_seconds()
-        return (stop_dt - now).total_seconds()
+        return sum(
+            max(0.0, (end - max(begin, now)).total_seconds()) for begin, end in periods
+        )
 
     def _get_flow_rate_for_speed(self, speed: int | None) -> float:
         """Return flow rate for a given pump speed, with fallback.

@@ -399,6 +399,12 @@
       },
       "waterlevel_set_point": {
         "default": "mdi:waves-arrow-up"
+      },
+      "aux_timer_enabled": {
+        "default": "mdi:toggle-switch"
+      },
+      "aux_timer_start_time": {
+        "default": "mdi:clock-start"
       }
     },
     "switch": {

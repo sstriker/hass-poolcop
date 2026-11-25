@@ -317,16 +317,31 @@ async def test_get_remaining_cycle_seconds_invalid_time(mock_config_entry):
     assert coord._get_remaining_cycle_seconds(0) == 0.0
 
 
-async def test_get_remaining_cycle_seconds_stop_before_start(mock_config_entry):
-    """stop <= start returns 0."""
+@pytest.mark.parametrize(
+    ("time_on", "time_off", "now", "expected_hours"),
+    [
+        ("08:00:00", "12:00:00", "06:00:00", 4),  # before the cycle
+        ("08:00:00", "12:00:00", "10:00:00", 2),  # during the cycle
+        ("08:00:00", "12:00:00", "13:00:00", 0),  # after the cycle
+        ("10:00:00", "10:00:00", "06:00:00", 0),  # zero-length cycle
+        ("22:00:00", "04:00:00", "02:00:00", 4),  # crosses midnight: 2 + 2
+        ("22:00:00", "04:00:00", "12:00:00", 2),  # only tonight's part left
+        ("22:00:00", "04:00:00", "23:00:00", 1),  # running until midnight
+    ],
+)
+async def test_get_remaining_cycle_seconds_until_midnight(
+    mock_config_entry, freezer, time_on, time_off, now, expected_hours
+):
+    """Remaining filtration time counts the rest of today, across midnight."""
+    freezer.move_to(f"2026-07-01 {now}")
     hass = MagicMock()
     hass.data = {}
     coord = _make_coordinator(hass, mock_config_entry)
     data = deepcopy(MOCK_DEVICE_RESPONSE)
-    data["settings"]["filtrations"][0]["timers"][0]["timeOn"] = "20:00:00"
-    data["settings"]["filtrations"][0]["timers"][0]["timeOff"] = "10:00:00"
+    data["settings"]["filtrations"][0]["timers"][0]["timeOn"] = time_on
+    data["settings"]["filtrations"][0]["timers"][0]["timeOff"] = time_off
     coord.data = PoolCopData(device=PoolCopDevice.from_dict(data))
-    assert coord._get_remaining_cycle_seconds(0) == 0.0
+    assert coord._get_remaining_cycle_seconds(0) == expected_hours * 3600
 
 
 async def test_get_remaining_cycle_seconds_disabled_timer(mock_config_entry):

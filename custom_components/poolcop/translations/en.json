@@ -265,7 +265,11 @@
         "name": "Cycle Remaining Time (API)"
       },
       "cycle1_enabled": {
-        "name": "Cycle 1 Enabled"
+        "name": "Cycle 1 Enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
       },
       "cycle1_start_time": {
         "name": "Cycle 1 Start Time"
@@ -274,7 +278,11 @@
         "name": "Cycle 1 Stop Time"
       },
       "cycle2_enabled": {
-        "name": "Cycle 2 Enabled"
+        "name": "Cycle 2 Enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
       },
       "cycle2_start_time": {
         "name": "Cycle 2 Start Time"
@@ -307,7 +315,12 @@
         "name": "Backwash Duration"
       },
       "filter_backwash_mode": {
-        "name": "Backwash Mode"
+        "name": "Backwash Mode",
+        "state": {
+          "inhibited": "Inhibited",
+          "manual": "Manual",
+          "automatic": "Automatic"
+        }
       },
       "filter_backwash_time": {
         "name": "Backwash Time"
@@ -322,10 +335,27 @@
         "name": "Rinse Duration"
       },
       "filter_timer_mode": {
-        "name": "Filter Timer Mode"
+        "name": "Filter Timer Mode",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continuous",
+          "forced_24h": "Forced 24 h",
+          "forced_48h": "Forced 48 h",
+          "forced_72h": "Forced 72 h",
+          "mode_24h": "24/24",
+          "no_pump": "No pump"
+        }
       },
       "filter_type": {
-        "name": "Filter Type"
+        "name": "Filter Type",
+        "state": {
+          "no_filter": "No filter",
+          "pressure": "Pressure",
+          "suction": "Suction"
+        }
       },
       "filtration_mode": {
         "name": "Filtration Mode",
@@ -373,7 +403,17 @@
         "name": "Oxidation-Reduction Potential"
       },
       "orp_disinfectant": {
-        "name": "Disinfectant Type"
+        "name": "Disinfectant Type",
+        "state": {
+          "read_only": "Read only",
+          "chlorine": "Chlorine",
+          "salt": "Salt",
+          "bromine": "Bromine",
+          "poolcop_ocean": "PoolCop Ocean",
+          "da_space": "DA Space",
+          "da_gen": "DA Gen",
+          "aquark": "Aquark"
+        }
       },
       "orp_set_point": {
         "name": "ORP Set Point"
@@ -403,7 +443,12 @@
         "name": "pH Set Point"
       },
       "ph_type": {
-        "name": "pH Dosing Mode"
+        "name": "pH Dosing Mode",
+        "state": {
+          "ph_minus": "pH-",
+          "ph_plus": "pH+",
+          "read_only": "Read only"
+        }
       },
       "planned_remaining_turnovers": {
         "name": "Planned Remaining Turnovers"
@@ -421,7 +466,13 @@
         "name": "Pool Turnover Rate"
       },
       "pool_type": {
-        "name": "Pool Type"
+        "name": "Pool Type",
+        "state": {
+          "classic_pool": "Classic pool",
+          "rimflow_type_a": "Rimflow type A",
+          "rimflow_type_b": "Rimflow type B",
+          "spa": "Spa"
+        }
       },
       "pool_volume": {
         "name": "Pool Volume"
@@ -445,25 +496,110 @@
         "name": "Pump Low Pressure Threshold"
       },
       "pump_speed": {
-        "name": "Pump speed"
+        "name": "Pump speed",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_speed_24h": {
-        "name": "Pump Speed 24H"
+        "name": "Pump Speed 24H",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_speed_backwash": {
-        "name": "Pump Speed Backwash"
+        "name": "Pump Speed Backwash",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_speed_cover": {
-        "name": "Pump Speed Cover"
+        "name": "Pump Speed Cover",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_speed_cycle1": {
-        "name": "Pump Speed Cycle 1"
+        "name": "Pump Speed Cycle 1",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_speed_cycle2": {
-        "name": "Pump Speed Cycle 2"
+        "name": "Pump Speed Cycle 2",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
       },
       "pump_type": {
-        "name": "Pump Type"
+        "name": "Pump Type",
+        "state": {
+          "no_pump": "No pump",
+          "mono_speed_pump": "Single-speed pump",
+          "pentair_intelliflo": "Pentair IntelliFlo",
+          "pentair_superflo": "Pentair SuperFlo",
+          "hayward_ecostar": "Hayward EcoStar",
+          "hayward_tristar": "Hayward TriStar",
+          "badu_ecotouch": "BADU EcoTouch",
+          "badu_ecomotion": "BADU EcoMotion",
+          "zodiac_flopro": "Zodiac FloPro",
+          "invertek_optidrive": "Invertek Optidrive",
+          "binary_combination": "Binary combination",
+          "davey_promaster": "Davey ProMaster",
+          "acis_vipool_mkb": "ACIS VIPool MKB",
+          "dab_eswim": "DAB E.swim",
+          "aquagem_isaver_plus": "AquaGem iSAVER+",
+          "saci_epool_ejoy": "SACI e-pool e.joy",
+          "schneider_atv21": "Schneider ATV21"
+        }
       },
       "running_status": {
         "name": "Running Status",
@@ -506,7 +642,8 @@
       "voltage": {
         "name": "Battery Voltage"
       },
-      "water_level": {
+      "waterlevel": {
+        "name": "Water level",
         "state": {
           "faulty": "Faulty",
           "low": "Low",
@@ -515,9 +652,6 @@
           "very_high": "Very High"
         }
       },
-      "waterlevel": {
-        "name": "Water level"
-      },
       "waterlevel_draining_duration": {
         "name": "Waterlevel Draining Duration"
       },
@@ -525,7 +659,24 @@
         "name": "Waterlevel Max Fill Duration"
       },
       "waterlevel_set_point": {
-        "name": "Waterlevel Set Point"
+        "name": "Waterlevel Set Point",
+        "state": {
+          "faulty": "Faulty",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very High"
+        }
+      },
+      "aux_timer_enabled": {
+        "name": "{aux} enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
+      "aux_timer_start_time": {
+        "name": "{aux} start time"
       }
     },
     "switch": {

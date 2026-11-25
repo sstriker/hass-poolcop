@@ -22,7 +22,10 @@ from custom_components.poolcop.sensor import (
     _parse_datetime,
     _parse_duration_seconds,
     _pool_timezone,
+    _setting_days,
+    _setting_seconds,
     _slugify_enum,
+    _speed_count,
     _time_str_to_time_today,
 )
 
@@ -311,8 +314,8 @@ async def test_parse_datetime_aware_kept():
 
 
 async def test_slugify_enum_unknown_value():
-    """Unknown value falls back to lower-case."""
-    assert _slugify_enum("UnknownNew", {"Known": "known"}) == "unknownnew"
+    """Unknown value is reported as unknown."""
+    assert _slugify_enum("UnknownNew", {"Known": "known"}) is None
 
 
 async def test_slugify_enum_none():
@@ -416,15 +419,15 @@ async def test_filtration_returns_none_no_filtrations():
 
 
 async def test_filtration_timer_enabled_no_filtrations():
-    """No filtrations returns 'Disabled'."""
+    """No filtrations returns 'disabled'."""
     device = PoolCopDevice.from_dict({"id": 1, "state": {}, "settings": {}})
     data = PoolCopData(device=device)
     fn = _filtration_timer_enabled_fn(0)
-    assert fn(data) == "Disabled"
+    assert fn(data) == "disabled"
 
 
 async def test_filtration_timer_enabled_out_of_range():
-    """Timer index out of range returns 'Disabled'."""
+    """Timer index out of range returns 'disabled'."""
     from copy import deepcopy
 
     from conftest import MOCK_DEVICE_RESPONSE
@@ -432,7 +435,7 @@ async def test_filtration_timer_enabled_out_of_range():
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
     fn = _filtration_timer_enabled_fn(99)
-    assert fn(data) == "Disabled"
+    assert fn(data) == "disabled"
 
 
 async def test_filtration_timer_time_no_filtrations():
@@ -504,7 +507,7 @@ async def test_filtration_timer_time_valid():
 
 
 async def test_aux_timer_enabled_active():
-    """Aux with active timer returns 'Enabled'."""
+    """Aux with active timer returns 'enabled'."""
     from copy import deepcopy
 
     from conftest import MOCK_DEVICE_RESPONSE
@@ -516,11 +519,11 @@ async def test_aux_timer_enabled_active():
     device = PoolCopDevice.from_dict(device_data)
     data = PoolCopData(device=device)
     fn = _aux_timer_enabled_fn("Aux4")
-    assert fn(data) == "Enabled"
+    assert fn(data) == "enabled"
 
 
 async def test_aux_timer_enabled_inactive():
-    """Aux with 00:00:00 timer returns 'Disabled'."""
+    """Aux with 00:00:00 timer returns 'disabled'."""
     from copy import deepcopy
 
     from conftest import MOCK_DEVICE_RESPONSE
@@ -528,11 +531,11 @@ async def test_aux_timer_enabled_inactive():
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
     fn = _aux_timer_enabled_fn("Aux4")
-    assert fn(data) == "Disabled"
+    assert fn(data) == "disabled"
 
 
 async def test_aux_timer_enabled_not_found():
-    """Aux ID not found returns 'Disabled'."""
+    """Aux ID not found returns 'disabled'."""
     from copy import deepcopy
 
     from conftest import MOCK_DEVICE_RESPONSE
@@ -540,7 +543,7 @@ async def test_aux_timer_enabled_not_found():
     device = PoolCopDevice.from_dict(deepcopy(MOCK_DEVICE_RESPONSE))
     data = PoolCopData(device=device)
     fn = _aux_timer_enabled_fn("NonExistent")
-    assert fn(data) == "Disabled"
+    assert fn(data) == "disabled"
 
 
 async def test_aux_timer_time_valid():
@@ -1048,7 +1051,7 @@ async def test_waterlevel_set_point(
         if "waterlevel_set_point" in s.entity_id
     ]
     assert len(states) >= 1
-    assert states[0].state == "High"
+    assert states[0].state == "high"
 
 
 async def test_backwash_mode(
@@ -1068,7 +1071,7 @@ async def test_backwash_mode(
         s for s in hass.states.async_all("sensor") if "backwash_mode" in s.entity_id
     ]
     assert len(states) >= 1
-    assert states[0].state == "Automatic"
+    assert states[0].state == "automatic"
 
 
 async def test_backwash_time(
@@ -1110,7 +1113,7 @@ async def test_filter_type(
         if s.entity_id.endswith("_filter_type")
     ]
     assert len(states) >= 1
-    assert states[0].state == "Pressure"
+    assert states[0].state == "pressure"
 
 
 async def test_pump_speed_24h(
@@ -1128,7 +1131,7 @@ async def test_pump_speed_24h(
 
     states = [s for s in hass.states.async_all("sensor") if "speed_24h" in s.entity_id]
     assert len(states) >= 1
-    assert states[0].state == "Speed1"
+    assert states[0].state == "speed_1"
 
 
 # ---------------------------------------------------------------------------
@@ -1223,3 +1226,23 @@ async def test_settings_sensors_disabled_by_default(
     )
     assert entries["firmware_version"].disabled_by is None
     assert hass.states.get(entries["temperature_water"].entity_id) is not None
+
+
+async def test_setting_durations():
+    """Settings TimeSpans parse to seconds and days, zero included."""
+    assert _setting_seconds("00:02:30") == 150
+    assert _setting_seconds("00:00:00") == 0
+    assert _setting_seconds("1.02:00:00") == 93600
+    assert _setting_seconds("") is None
+    assert _setting_seconds(None) is None
+    assert _setting_seconds("bad") is None
+    assert _setting_days("14.00:00:00") == 14
+    assert _setting_days("12:00:00") == 0.5
+    assert _setting_days(None) is None
+
+
+async def test_speed_count():
+    """Number of speeds 'SpeedN' becomes N."""
+    assert _speed_count("Speed3") == 3
+    assert _speed_count("None") is None
+    assert _speed_count(None) is None

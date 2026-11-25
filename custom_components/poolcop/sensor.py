@@ -102,6 +102,27 @@ def _parse_duration_seconds(value: str | None) -> int | None:
         return None
 
 
+def _setting_seconds(value: str | None) -> int | None:
+    """Parse a settings TimeSpan (D.HH:MM:SS or HH:MM:SS) to seconds.
+
+    Unlike _parse_duration_seconds, a zero duration is a valid setting.
+    """
+    if not value:
+        return None
+    days, _, rest = value.rpartition(".")
+    try:
+        hours, minutes, seconds = (int(part) for part in rest.split(":"))
+        return int(days or 0) * 86400 + hours * 3600 + minutes * 60 + seconds
+    except ValueError:
+        return None
+
+
+def _setting_days(value: str | None) -> float | None:
+    """Parse a settings TimeSpan to days."""
+    seconds = _setting_seconds(value)
+    return None if seconds is None else round(seconds / 86400, 2)
+
+
 # ---------------------------------------------------------------------------
 # Helper: safe pump accessor
 # ---------------------------------------------------------------------------
@@ -289,12 +310,103 @@ _WATER_LEVEL_SLUG: dict[str, str] = {
     "VeryHigh": "very_high",
 }
 
+_SPEED_SLUG: dict[str, str] = {
+    "None": "none",
+    **{f"Speed{n}": f"speed_{n}" for n in range(1, 9)},
+}
+
+_POOL_TYPE_SLUG: dict[str, str] = {
+    "ClassicPool": "classic_pool",
+    "RimflowTypeA": "rimflow_type_a",
+    "RimflowTypeB": "rimflow_type_b",
+    "Spa": "spa",
+}
+
+_BACKWASH_MODE_SLUG: dict[str, str] = {
+    "Inhibited": "inhibited",
+    "Manual": "manual",
+    "Automatic": "automatic",
+}
+
+_FILTER_TYPE_SLUG: dict[str, str] = {
+    "NoFilter": "no_filter",
+    "Pressure": "pressure",
+    "Suction": "suction",
+}
+
+_PUMP_TYPE_SLUG: dict[str, str] = {
+    "NoPump": "no_pump",
+    "MonoSpeedPump": "mono_speed_pump",
+    "PentairIntelliFlo": "pentair_intelliflo",
+    "PentairSuperFlo": "pentair_superflo",
+    "HaywardEcostar": "hayward_ecostar",
+    "HaywardTristar": "hayward_tristar",
+    "BaduEcoTouch": "badu_ecotouch",
+    "BaduEcoMotion": "badu_ecomotion",
+    "ZodiacFloPro": "zodiac_flopro",
+    "InvertekOptidrive": "invertek_optidrive",
+    "BinaryCombination": "binary_combination",
+    "DaveyProMaster": "davey_promaster",
+    "ACISVIPoolMKB": "acis_vipool_mkb",
+    "DABESwim": "dab_eswim",
+    "AQUAGEMiSAVERplus": "aquagem_isaver_plus",
+    "SACIEpoolEjoy": "saci_epool_ejoy",
+    "SCHNEIDERATV21": "schneider_atv21",
+}
+
+_PH_MODE_SLUG: dict[str, str] = {
+    "phMinus": "ph_minus",
+    "pHPlus": "ph_plus",
+    "ReadOnly": "read_only",
+}
+
+_DISINFECTANT_SLUG: dict[str, str] = {
+    "ReadOnly": "read_only",
+    "Chlorine": "chlorine",
+    "Salt": "salt",
+    "Bromine": "bromine",
+    "PoolCopOcean": "poolcop_ocean",
+    "DASpace": "da_space",
+    "DAGen": "da_gen",
+    "Aquark": "aquark",
+}
+
+_TIMER_ENABLED_OPTIONS = ["disabled", "enabled"]
+
 
 def _slugify_enum(value: str | None, mapping: dict[str, str]) -> str | None:
-    """Convert an API enum value to a translation slug."""
+    """Convert an API enum value to a translation slug.
+
+    Values the API adds later are reported as unknown rather than failing
+    the enum option check.
+    """
     if value is None:
         return None
-    return mapping.get(value, value.lower())
+    return mapping.get(value)
+
+
+def _enum_fn(
+    getter: Callable[[PoolCopData], str | None], mapping: dict[str, str]
+) -> Callable[[PoolCopData], str | None]:
+    """Return a value_fn that maps an API enum value to its slug."""
+    return lambda data: _slugify_enum(getter(data), mapping)
+
+
+def _filtration_attr(attr: str) -> Callable[[PoolCopData], Any]:
+    """Return a getter for a first-filtration settings attribute."""
+
+    def getter(data: PoolCopData) -> Any:
+        filt = _filtration(data)
+        return getattr(filt, attr) if filt is not None else None
+
+    return getter
+
+
+def _speed_count(value: str | None) -> int | None:
+    """Convert a 'SpeedN' number-of-speeds value to N."""
+    if not value or not value.startswith("Speed"):
+        return None
+    return int(value[5:])
 
 
 # ---------------------------------------------------------------------------
@@ -310,8 +422,8 @@ def _filtration_timer_enabled_fn(
     def value_fn(data: PoolCopData) -> str:
         filt = _filtration(data)
         if filt is None or timer_index >= len(filt.timers):
-            return "Disabled"
-        return "Enabled" if filt.timers[timer_index].enabled else "Disabled"
+            return "disabled"
+        return "enabled" if filt.timers[timer_index].enabled else "disabled"
 
     return value_fn
 
@@ -361,9 +473,9 @@ def _aux_timer_enabled_fn(
                     # Aux timers don't have an enabled flag; they are active
                     # if time_on != "00:00:00"
                     if timer.time_on and timer.time_on != "00:00:00":
-                        return "Enabled"
-                return "Disabled"
-        return "Disabled"
+                        return "enabled"
+                return "disabled"
+        return "disabled"
 
     return value_fn
 
@@ -509,8 +621,11 @@ SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
     PoolCopSensorEntityDescription(
         key="pump_speed",
         translation_key="pump_speed",
-        value_fn=lambda data: (
-            _pump(data).current_speed if _pump(data) is not None else None
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(
+            lambda data: _pump(data).current_speed if _pump(data) is not None else None,
+            _SPEED_SLUG,
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -720,7 +835,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="pool_type",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.pool.type,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_POOL_TYPE_SLUG.values()),
+        value_fn=_enum_fn(lambda data: data.device.settings.pool.type, _POOL_TYPE_SLUG),
     ),
     # Filter settings
     PoolCopSensorEntityDescription(
@@ -742,10 +859,10 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="filter_backwash_duration",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).backwash_duration
-            if _filtration(data) is not None
-            else None
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _setting_seconds(
+            _filtration_attr("backwash_duration")(data)
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -753,8 +870,10 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="filter_rinse_duration",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).rinse_duration if _filtration(data) is not None else None
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _setting_seconds(
+            _filtration_attr("rinse_duration")(data)
         ),
     ),
     PoolCopSensorEntityDescription(
@@ -762,28 +881,28 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="filter_max_days",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).max_interval_between_backwash
-            if _filtration(data) is not None
-            else None
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.DAYS,
+        value_fn=lambda data: _setting_days(
+            _filtration_attr("max_interval_between_backwash")(data)
         ),
     ),
     PoolCopSensorEntityDescription(
         key="filter_timer_mode",
         translation_key="filter_timer_mode",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).filtration_mode if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_FILTRATION_MODE_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("filtration_mode"), _FILTRATION_MODE_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="filter_backwash_mode",
         translation_key="filter_backwash_mode",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).backwash_mode if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_BACKWASH_MODE_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("backwash_mode"), _BACKWASH_MODE_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="filter_backwash_time",
@@ -798,9 +917,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="filter_type",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).filter_type if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_FILTER_TYPE_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("filter_type"), _FILTER_TYPE_SLUG),
     ),
     # Pump settings
     PoolCopSensorEntityDescription(
@@ -808,9 +927,7 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="pump_nb_speeds",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).nb_speeds if _filtration(data) is not None else None
-        ),
+        value_fn=lambda data: _speed_count(_filtration_attr("nb_speeds")(data)),
     ),
     PoolCopSensorEntityDescription(
         key="pump_pressure_low",
@@ -843,9 +960,9 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="pump_type",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).pump_type if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_PUMP_TYPE_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("pump_type"), _PUMP_TYPE_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="pump_flowrate",
@@ -862,47 +979,45 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="pump_speed_cycle1",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).speed_cycle1 if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("speed_cycle1"), _SPEED_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed_cycle2",
         translation_key="pump_speed_cycle2",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).speed_cycle2 if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("speed_cycle2"), _SPEED_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed_backwash",
         translation_key="pump_speed_backwash",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).speed_backwash if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("speed_backwash"), _SPEED_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed_24h",
         translation_key="pump_speed_24h",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).speed_24 if _filtration(data) is not None else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("speed_24"), _SPEED_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="pump_speed_cover",
         translation_key="pump_speed_cover",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: (
-            _filtration(data).cover_filtration_speed
-            if _filtration(data) is not None
-            else None
-        ),
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_SPEED_SLUG.values()),
+        value_fn=_enum_fn(_filtration_attr("cover_filtration_speed"), _SPEED_SLUG),
     ),
     # pH settings
     PoolCopSensorEntityDescription(
@@ -918,14 +1033,20 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="ph_type",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.ph.mode,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_PH_MODE_SLUG.values()),
+        value_fn=_enum_fn(lambda data: data.device.settings.ph.mode, _PH_MODE_SLUG),
     ),
     PoolCopSensorEntityDescription(
         key="ph_dosing_time",
         translation_key="ph_dosing_time",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.ph.max_dosing_duration,
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _setting_seconds(
+            data.device.settings.ph.max_dosing_duration
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="ph_low_threshold",
@@ -959,7 +1080,12 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="orp_disinfectant",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.disinfection.disinfectant_type,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_DISINFECTANT_SLUG.values()),
+        value_fn=_enum_fn(
+            lambda data: data.device.settings.disinfection.disinfectant_type,
+            _DISINFECTANT_SLUG,
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="orp_temperature_shutdown",
@@ -979,20 +1105,33 @@ SETTINGS_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         translation_key="waterlevel_max_duration",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.water_level.max_fill_duration,
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _setting_seconds(
+            data.device.settings.water_level.max_fill_duration
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="waterlevel_draining_duration",
         translation_key="waterlevel_draining_duration",
         entity_registry_enabled_default=False,
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.water_level.draining_duration,
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        value_fn=lambda data: _setting_seconds(
+            data.device.settings.water_level.draining_duration
+        ),
     ),
     PoolCopSensorEntityDescription(
         key="waterlevel_set_point",
         translation_key="waterlevel_set_point",
         entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda data: data.device.settings.water_level.set_point,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(_WATER_LEVEL_SLUG.values()),
+        value_fn=_enum_fn(
+            lambda data: data.device.settings.water_level.set_point,
+            _WATER_LEVEL_SLUG,
+        ),
     ),
 )
 
@@ -1006,7 +1145,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="cycle1_enabled",
         translation_key="cycle1_enabled",
         device_class=SensorDeviceClass.ENUM,
-        options=["Disabled", "Enabled"],
+        options=_TIMER_ENABLED_OPTIONS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_filtration_timer_enabled_fn(0),
     ),
@@ -1029,7 +1168,7 @@ TIMER_SENSORS: tuple[PoolCopSensorEntityDescription, ...] = (
         key="cycle2_enabled",
         translation_key="cycle2_enabled",
         device_class=SensorDeviceClass.ENUM,
-        options=["Disabled", "Enabled"],
+        options=_TIMER_ENABLED_OPTIONS,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=_filtration_timer_enabled_fn(1),
     ),
@@ -1099,10 +1238,10 @@ async def async_setup_entry(
                 coordinator=coordinator,
                 description=PoolCopSensorEntityDescription(
                     key=f"aux_{aux.id}_enabled",
-                    name=f"{label} Enabled",
-                    icon="mdi:toggle-switch",
+                    translation_key="aux_timer_enabled",
+                    translation_placeholders={"aux": label},
                     device_class=SensorDeviceClass.ENUM,
-                    options=["Disabled", "Enabled"],
+                    options=_TIMER_ENABLED_OPTIONS,
                     entity_category=EntityCategory.DIAGNOSTIC,
                     value_fn=_aux_timer_enabled_fn(aux.id),
                 ),
@@ -1114,8 +1253,8 @@ async def async_setup_entry(
                 coordinator=coordinator,
                 description=PoolCopSensorEntityDescription(
                     key=f"aux_{aux.id}_start_time",
-                    name=f"{label} Start Time",
-                    icon="mdi:clock-start",
+                    translation_key="aux_timer_start_time",
+                    translation_placeholders={"aux": label},
                     device_class=SensorDeviceClass.TIMESTAMP,
                     entity_category=EntityCategory.DIAGNOSTIC,
                     value_fn=_aux_timer_time_fn(aux.id, 0, "time_on"),

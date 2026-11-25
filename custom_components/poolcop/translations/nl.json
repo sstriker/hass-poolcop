@@ -265,7 +265,11 @@
         "name": "Resterende cyclustijd (API)"
       },
       "cycle1_enabled": {
-        "name": "Cyclus 1 ingeschakeld"
+        "name": "Cyclus 1 ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
       },
       "cycle1_start_time": {
         "name": "Starttijd cyclus 1"
@@ -274,7 +278,11 @@
         "name": "Stoptijd cyclus 1"
       },
       "cycle2_enabled": {
-        "name": "Cyclus 2 ingeschakeld"
+        "name": "Cyclus 2 ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
       },
       "cycle2_start_time": {
         "name": "Starttijd cyclus 2"
@@ -307,7 +315,12 @@
         "name": "Duur terugspoelen"
       },
       "filter_backwash_mode": {
-        "name": "Terugspoelmodus"
+        "name": "Terugspoelmodus",
+        "state": {
+          "inhibited": "Geblokkeerd",
+          "manual": "Handmatig",
+          "automatic": "Automatisch"
+        }
       },
       "filter_backwash_time": {
         "name": "Tijdstip terugspoelen"
@@ -322,10 +335,27 @@
         "name": "Duur naspoelen"
       },
       "filter_timer_mode": {
-        "name": "Filtertimermodus"
+        "name": "Filtertimermodus",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continu",
+          "forced_24h": "Geforceerd 24 u",
+          "forced_48h": "Geforceerd 48 u",
+          "forced_72h": "Geforceerd 72 u",
+          "mode_24h": "24/24",
+          "no_pump": "Geen pomp"
+        }
       },
       "filter_type": {
-        "name": "Filtertype"
+        "name": "Filtertype",
+        "state": {
+          "no_filter": "Geen filter",
+          "pressure": "Drukfilter",
+          "suction": "Zuigfilter"
+        }
       },
       "filtration_mode": {
         "name": "Filtratiemodus",
@@ -373,7 +403,17 @@
         "name": "Redoxpotentiaal"
       },
       "orp_disinfectant": {
-        "name": "Type desinfectiemiddel"
+        "name": "Type desinfectiemiddel",
+        "state": {
+          "read_only": "Alleen meten",
+          "chlorine": "Chloor",
+          "salt": "Zout",
+          "bromine": "Broom",
+          "poolcop_ocean": "PoolCop Ocean",
+          "da_space": "DA Space",
+          "da_gen": "DA Gen",
+          "aquark": "Aquark"
+        }
       },
       "orp_set_point": {
         "name": "ORP-streefwaarde"
@@ -403,7 +443,12 @@
         "name": "pH-streefwaarde"
       },
       "ph_type": {
-        "name": "pH-doseermodus"
+        "name": "pH-doseermodus",
+        "state": {
+          "ph_minus": "pH-",
+          "ph_plus": "pH+",
+          "read_only": "Alleen meten"
+        }
       },
       "planned_remaining_turnovers": {
         "name": "Geplande resterende omlopen"
@@ -421,7 +466,13 @@
         "name": "Omloopsnelheid zwembad"
       },
       "pool_type": {
-        "name": "Zwembadtype"
+        "name": "Zwembadtype",
+        "state": {
+          "classic_pool": "Klassiek zwembad",
+          "rimflow_type_a": "Overloopzwembad type A",
+          "rimflow_type_b": "Overloopzwembad type B",
+          "spa": "Spa"
+        }
       },
       "pool_volume": {
         "name": "Zwembadvolume"
@@ -445,25 +496,110 @@
         "name": "Drempel lage pompdruk"
       },
       "pump_speed": {
-        "name": "Pompsnelheid"
+        "name": "Pompsnelheid",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_speed_24h": {
-        "name": "Pompsnelheid 24 u"
+        "name": "Pompsnelheid 24 u",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_speed_backwash": {
-        "name": "Pompsnelheid terugspoelen"
+        "name": "Pompsnelheid terugspoelen",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_speed_cover": {
-        "name": "Pompsnelheid afdekking"
+        "name": "Pompsnelheid afdekking",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_speed_cycle1": {
-        "name": "Pompsnelheid cyclus 1"
+        "name": "Pompsnelheid cyclus 1",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_speed_cycle2": {
-        "name": "Pompsnelheid cyclus 2"
+        "name": "Pompsnelheid cyclus 2",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
       },
       "pump_type": {
-        "name": "Pomptype"
+        "name": "Pomptype",
+        "state": {
+          "no_pump": "Geen pomp",
+          "mono_speed_pump": "Eentoerenpomp",
+          "pentair_intelliflo": "Pentair IntelliFlo",
+          "pentair_superflo": "Pentair SuperFlo",
+          "hayward_ecostar": "Hayward EcoStar",
+          "hayward_tristar": "Hayward TriStar",
+          "badu_ecotouch": "BADU EcoTouch",
+          "badu_ecomotion": "BADU EcoMotion",
+          "zodiac_flopro": "Zodiac FloPro",
+          "invertek_optidrive": "Invertek Optidrive",
+          "binary_combination": "Binaire combinatie",
+          "davey_promaster": "Davey ProMaster",
+          "acis_vipool_mkb": "ACIS VIPool MKB",
+          "dab_eswim": "DAB E.swim",
+          "aquagem_isaver_plus": "AquaGem iSAVER+",
+          "saci_epool_ejoy": "SACI e-pool e.joy",
+          "schneider_atv21": "Schneider ATV21"
+        }
       },
       "running_status": {
         "name": "Bedrijfsstatus",
@@ -506,7 +642,8 @@
       "voltage": {
         "name": "Batterijspanning"
       },
-      "water_level": {
+      "waterlevel": {
+        "name": "Waterpeil",
         "state": {
           "faulty": "Defect",
           "low": "Laag",
@@ -515,9 +652,6 @@
           "very_high": "Zeer hoog"
         }
       },
-      "waterlevel": {
-        "name": "Waterpeil"
-      },
       "waterlevel_draining_duration": {
         "name": "Afvoerduur waterpeil"
       },
@@ -525,7 +659,24 @@
         "name": "Maximale bijvulduur waterpeil"
       },
       "waterlevel_set_point": {
-        "name": "Streefwaarde waterpeil"
+        "name": "Streefwaarde waterpeil",
+        "state": {
+          "faulty": "Defect",
+          "low": "Laag",
+          "normal": "Normaal",
+          "high": "Hoog",
+          "very_high": "Zeer hoog"
+        }
+      },
+      "aux_timer_enabled": {
+        "name": "{aux} ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
+      },
+      "aux_timer_start_time": {
+        "name": "{aux} starttijd"
       }
     },
     "switch": {

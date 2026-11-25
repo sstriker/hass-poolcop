@@ -15,3 +15,33 @@ def test_icons_match_translation_keys():
         for icon in entities.values():
             assert icon["default"].startswith("mdi:")
     assert set(icons["services"]) == set(strings["services"])
+
+
+def test_enum_sensor_states_are_translated():
+    """Every enum sensor option has a state translation in every language."""
+    from homeassistant.components.sensor import SensorDeviceClass
+
+    from custom_components.poolcop.sensor import (
+        SENSORS,
+        SETTINGS_SENSORS,
+        TIMER_SENSORS,
+    )
+
+    languages = {
+        path.name: json.loads(path.read_text())
+        for path in [
+            COMPONENT / "strings.json",
+            *(COMPONENT / "translations").glob("*.json"),
+        ]
+    }
+    enums = [
+        d
+        for d in (*SENSORS, *SETTINGS_SENSORS, *TIMER_SENSORS)
+        if d.device_class == SensorDeviceClass.ENUM
+    ]
+    assert enums
+    for name, strings in languages.items():
+        sensors = strings["entity"]["sensor"]
+        for description in enums:
+            states = sensors[description.translation_key].get("state", {})
+            assert set(description.options) == set(states), (name, description.key)
