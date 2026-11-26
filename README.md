@@ -21,9 +21,11 @@ The integration uses the official PoolCop Client API
 ## Getting an API key
 
 1. Log in to [MyPoolCop](https://my.poolcop.com) with your PoolCop account.
-2. Open **Profile → API key**
-   ([my.poolcop.com/profile/apikey](https://my.poolcop.com/profile/apikey)).
-3. Click **Generate a key** and copy it.
+2. Go to [my.poolcop.com/profile/apikey](https://my.poolcop.com/profile/apikey).
+   From the menu: **Profile** (side menu, or your avatar at the top right),
+   then **Manage my key** in the **API key** card.
+3. Click **Generate a key** (**Regenerate the key** if you already have one)
+   and copy it.
 
 One key gives access to every PoolCop on your account. Generating a new key
 invalidates the old one, so update Home Assistant afterwards (see
@@ -173,7 +175,7 @@ automation:
 
 | Problem | What to do |
 | --- | --- |
-| "Invalid API key" | Generate a new key in MyPoolCop (Profile → API key). PoolCopilot keys don't work. |
+| "Invalid API key" | Generate a new key in [MyPoolCop](https://my.poolcop.com/profile/apikey) (Profile → API key → Manage my key). PoolCopilot keys don't work. |
 | "This API key cannot access this PoolCop" | Use a key from the account that owns the PoolCop. |
 | Repair: "PoolCop cloud access expired" | Renew the cloud access in MyPoolCop or with your dealer. |
 | Entities unavailable | Check that the PoolCop is online in MyPoolCop. Rate-limit errors in the log usually clear by themselves. |

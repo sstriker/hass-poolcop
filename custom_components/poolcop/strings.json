@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to PoolCop",
-        "description": "Enter your PoolCop Client API key. Log in to [MyPoolCop]({api_key_url}), open **Profile → API key** and click **Generate a key**. One key covers every PoolCop on your account.",
+        "description": "Enter your PoolCop Client API key. Log in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**. One key covers every PoolCop on your account.",
         "data": {
           "api_key": "API key"
         },
@@ -29,7 +29,7 @@
       },
       "reauth_confirm": {
         "title": "New PoolCop API key needed",
-        "description": "The API key for {title} was rejected. Since version 3.0 this integration uses the PoolCop Client API, which needs a new key: log in to [MyPoolCop]({api_key_url}), open **Profile → API key** and click **Generate a key**.",
+        "description": "The API key for {title} was rejected. Since version 3.0 this integration uses the PoolCop Client API, which needs a new key: log in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**.",
         "data": {
           "api_key": "API key"
         },
@@ -39,7 +39,7 @@
       },
       "reconfigure": {
         "title": "Change the API key",
-        "description": "Enter a new API key for {title}. Get one in [MyPoolCop]({api_key_url}) under **Profile → API key**.",
+        "description": "Enter a new API key for {title}. Get one in [MyPoolCop]({api_key_url}) under **Profile → Manage my key**.",
         "data": {
           "api_key": "API key"
         },
@@ -723,7 +723,7 @@
   "issues": {
     "new_api_key": {
       "title": "{title} needs a new PoolCop API key",
-      "description": "Version 3.0 of the PoolCop integration uses the new PoolCop Client API, because the PoolCopilot API is shutting down. Your existing key does not work with it.\n\nLog in to [MyPoolCop]({api_key_url}), open **Profile → API key**, click **Generate a key**, and enter it when Home Assistant asks you to re-authenticate {title}. This message disappears once the new key works."
+      "description": "Version 3.0 of the PoolCop integration uses the new PoolCop Client API, because the PoolCopilot API is shutting down. Your existing key does not work with it.\n\nLog in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**, and enter the key when Home Assistant asks you to re-authenticate {title}. This message disappears once the new key works."
     },
     "cloud_access_expired": {
       "title": "PoolCop cloud access expired for {title}",

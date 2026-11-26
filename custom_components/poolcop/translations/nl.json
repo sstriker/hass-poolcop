@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Verbinden met PoolCop",
-        "description": "Voer je PoolCop Client API-sleutel in. Log in op [MyPoolCop]({api_key_url}), open **Profiel → API-sleutel** en klik op **Sleutel genereren**. Eén sleutel geldt voor elke PoolCop in je account.",
+        "description": "Voer je PoolCop Client API-sleutel in. Log in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren**. Eén sleutel geldt voor elke PoolCop in je account.",
         "data": {
           "api_key": "API-sleutel"
         },
@@ -29,7 +29,7 @@
       },
       "reauth_confirm": {
         "title": "Nieuwe PoolCop API-sleutel nodig",
-        "description": "De API-sleutel voor {title} is geweigerd. Sinds versie 3.0 gebruikt deze integratie de PoolCop Client API, die een nieuwe sleutel nodig heeft: log in op [MyPoolCop]({api_key_url}), open **Profiel → API-sleutel** en klik op **Sleutel genereren**.",
+        "description": "De API-sleutel voor {title} is geweigerd. Sinds versie 3.0 gebruikt deze integratie de PoolCop Client API, die een nieuwe sleutel nodig heeft: log in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren**.",
         "data": {
           "api_key": "API-sleutel"
         },
@@ -39,7 +39,7 @@
       },
       "reconfigure": {
         "title": "API-sleutel wijzigen",
-        "description": "Voer een nieuwe API-sleutel in voor {title}. Je krijgt er een in [MyPoolCop]({api_key_url}) onder **Profiel → API-sleutel**.",
+        "description": "Voer een nieuwe API-sleutel in voor {title}. Je krijgt er een in [MyPoolCop]({api_key_url}) onder **Profiel → Mijn sleutel beheren**.",
         "data": {
           "api_key": "API-sleutel"
         },
@@ -723,7 +723,7 @@
   "issues": {
     "new_api_key": {
       "title": "{title} heeft een nieuwe PoolCop API-sleutel nodig",
-      "description": "Versie 3.0 van de PoolCop-integratie gebruikt de nieuwe PoolCop Client API, omdat de PoolCopilot API wordt stopgezet. Je bestaande sleutel werkt hier niet mee.\n\nLog in op [MyPoolCop]({api_key_url}), open **Profiel → API-sleutel**, klik op **Sleutel genereren** en voer die in wanneer Home Assistant je vraagt om {title} opnieuw te authenticeren. Dit bericht verdwijnt zodra de nieuwe sleutel werkt."
+      "description": "Versie 3.0 van de PoolCop-integratie gebruikt de nieuwe PoolCop Client API, omdat de PoolCopilot API wordt stopgezet. Je bestaande sleutel werkt hier niet mee.\n\nLog in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren** en voer die in wanneer Home Assistant je vraagt om {title} opnieuw te authenticeren. Dit bericht verdwijnt zodra de nieuwe sleutel werkt."
     },
     "cloud_access_expired": {
       "title": "PoolCop-cloudtoegang verlopen voor {title}",
