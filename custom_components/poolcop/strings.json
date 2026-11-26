@@ -2,83 +2,864 @@
   "config": {
     "step": {
       "user": {
-        "description": "Enter your PoolCop API key from the PoolCopilot account",
+        "title": "Connect to PoolCop",
+        "description": "Enter your PoolCop Client API key. Log in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**. One key covers every PoolCop on your account.",
         "data": {
-          "api_key": "API Key"
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "The PoolCop Client API key from MyPoolCop. Keys for the old PoolCopilot API do not work."
+        }
+      },
+      "device": {
+        "title": "Choose a PoolCop",
+        "description": "Your account has more than one PoolCop. Choose the one to add; you can add the others afterwards with the same key.",
+        "data": {
+          "device_id": "PoolCop"
         }
       },
       "flow_rates": {
-        "description": "Your pool pump has {pump_speeds} speeds. Configure the flow rates for each speed.\n\nPool volume: {vol} m\u00b3\nDetected flow rate: {flowrate} m\u00b3/h",
+        "title": "Pump flow rates",
+        "description": "Your pump has {pump_speeds} speed(s). Enter the flow rate at each speed; it is used to calculate filtered volume and turnovers.\n\nPool volume: {vol} m³\nEstimated flow rate reported by PoolCop: {flowrate} m³/h",
         "data": {
-          "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
-          "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
-          "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+          "flow_rate_1": "Flow rate at speed 1",
+          "flow_rate_2": "Flow rate at speed 2",
+          "flow_rate_3": "Flow rate at speed 3"
         }
       },
       "reauth_confirm": {
-        "description": "Your PoolCopilot API key is no longer valid. Please enter a new API key.",
+        "title": "New PoolCop API key needed",
+        "description": "The API key for {title} was rejected. Since version 3.0 this integration uses the PoolCop Client API, which needs a new key: log in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**.",
         "data": {
-          "api_key": "API Key"
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "The PoolCop Client API key from MyPoolCop. Keys for the old PoolCopilot API do not work."
+        }
+      },
+      "reconfigure": {
+        "title": "Change the API key",
+        "description": "Enter a new API key for {title}. Get one in [MyPoolCop]({api_key_url}) under **Profile → Manage my key**.",
+        "data": {
+          "api_key": "API key"
+        },
+        "data_description": {
+          "api_key": "The PoolCop Client API key from MyPoolCop. Keys for the old PoolCopilot API do not work."
         }
       }
     },
     "abort": {
-      "already_configured": "Device is already configured",
-      "reauth_successful": "Re-authentication successful"
+      "already_configured": "Every PoolCop on this account is already configured",
+      "cannot_connect": "Failed to connect",
+      "reauth_successful": "Re-authentication was successful",
+      "reconfigure_successful": "Re-configuration was successful"
     },
     "error": {
       "cannot_connect": "Failed to connect",
       "invalid_auth": "Invalid API key",
+      "no_devices": "No PoolCop devices found for this API key",
+      "device_not_found": "This API key cannot access this PoolCop. Use a key from the account that owns it.",
       "unknown": "Unexpected error"
-    }
-  },
-  "entity": {
-    "sensor": {
-      "poolcop": {
-        "name": "Operation Mode",
-        "state": {
-          "stop": "Stop",
-          "freeze": "Freeze",
-          "forced": "Forced",
-          "auto": "Auto",
-          "timer": "Timer",
-          "manual": "Manual",
-          "paused": "Paused",
-          "external": "External",
-          "eco_": "Eco+",
-          "continuous": "Continuous"
-        },
-        "state_attributes": {
-          "description": {
-            "name": "Description"
-          }
-        }
-      },
-      "filter_timer_mode": {
-        "name": "Filter Timer Mode",
-        "state": {
-          "stop_disabled": "STOP - Disabled",
-          "timer_manual_schedule": "TIMER - Manual Schedule",
-          "eco_intelligent": "ECO+ - Intelligent",
-          "volume_pool_volume": "VOLUME - Pool Volume",
-          "continuous_23h_day": "CONTINUOUS - 23h/day",
-          "force_24h": "FORCE 24H",
-          "force_48h": "FORCE 48H",
-          "force_72h": "FORCE 72H",
-          "_24_24_always_on": "24/24 - Always On"
-        }
-      }
     }
   },
   "options": {
     "step": {
       "init": {
-        "description": "Adjust the flow rate for each pump speed. These values are used to calculate filtration volume.",
+        "title": "PoolCop options",
         "data": {
-          "map_mode": "Pool map visibility",
-          "flow_rate_1": "Flow rate at speed 1 (m\u00b3/h)",
-          "flow_rate_2": "Flow rate at speed 2 (m\u00b3/h)",
-          "flow_rate_3": "Flow rate at speed 3 (m\u00b3/h)"
+          "map_mode": "Pool on the map",
+          "flow_rate_1": "Flow rate at speed 1",
+          "flow_rate_2": "Flow rate at speed 2",
+          "flow_rate_3": "Flow rate at speed 3"
+        },
+        "data_description": {
+          "map_mode": "Show the pool on the map always, or only when it needs attention (alarms or a problem)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "map_mode": {
+      "options": {
+        "always": "Always",
+        "attention": "Only when attention is needed"
+      }
+    },
+    "valve_position": {
+      "options": {
+        "filter": "Filter",
+        "waste": "Waste",
+        "closed": "Closed",
+        "backwash": "Backwash",
+        "bypass": "Bypass",
+        "rinse": "Rinse"
+      }
+    },
+    "filtration_mode": {
+      "options": {
+        "stop": "Stop",
+        "timer": "Timer",
+        "eco_plus": "Eco+",
+        "volume": "Volume",
+        "continuous": "Continuous",
+        "mode_24h": "24/24"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "active_alarm": {
+        "name": "Active Alarm"
+      },
+      "air_installed": {
+        "name": "Air temperature sensor installed"
+      },
+      "disinfection_dosing": {
+        "name": "Disinfection Dosing"
+      },
+      "equip_energy_meter": {
+        "name": "Energy meter installed"
+      },
+      "equip_fac_sensor": {
+        "name": "FAC sensor installed"
+      },
+      "equip_flow_meter": {
+        "name": "Flow meter installed"
+      },
+      "equip_jet_stream": {
+        "name": "Jet stream installed"
+      },
+      "equip_pool_cover": {
+        "name": "Pool cover installed"
+      },
+      "equip_salt_sensor": {
+        "name": "Salt sensor installed"
+      },
+      "input_1": {
+        "name": "Input 1"
+      },
+      "input_2": {
+        "name": "Input 2"
+      },
+      "jet_stream_running": {
+        "name": "Jet Stream"
+      },
+      "orp_control": {
+        "name": "Cl Pump"
+      },
+      "orp_installed": {
+        "name": "ORP control installed"
+      },
+      "ph_auto_adjust": {
+        "name": "pH Auto Adjust"
+      },
+      "ph_control": {
+        "name": "pH Pump"
+      },
+      "ph_dosing": {
+        "name": "pH Dosing"
+      },
+      "ph_installed": {
+        "name": "pH control installed"
+      },
+      "pool_cover_open": {
+        "name": "Pool Cover"
+      },
+      "pool_freeze_protection": {
+        "name": "Freeze Protection"
+      },
+      "pool_service_mode": {
+        "name": "Service Mode"
+      },
+      "pump": {
+        "name": "Pump"
+      },
+      "pump_protect": {
+        "name": "Pump Protection"
+      },
+      "waterlevel_auto_add": {
+        "name": "Auto Water Add"
+      },
+      "waterlevel_auto_reduce": {
+        "name": "Auto Water Reduce"
+      },
+      "waterlevel_continuous": {
+        "name": "Continuous Water Level"
+      },
+      "waterlevel_installed": {
+        "name": "Waterlevel control installed"
+      },
+      "waterlevel_measuring": {
+        "name": "Water Level Measuring"
+      },
+      "waterlevel_on_error": {
+        "name": "Water Level Error"
+      },
+      "waterlevel_on_target": {
+        "name": "Water Level On Target"
+      },
+      "waterlevel_refilling": {
+        "name": "Water Level Refilling"
+      }
+    },
+    "button": {
+      "clear_alarm": {
+        "name": "Clear Alarm"
+      },
+      "stop_backwash": {
+        "name": "Stop Backwash"
+      }
+    },
+    "select": {
+      "filtration_mode": {
+        "name": "Filtration Mode",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continuous",
+          "mode_24h": "24/24"
+        }
+      },
+      "forced_filtration": {
+        "name": "Forced Filtration",
+        "state": {
+          "not_forced": "Not forced",
+          "forced_24h": "24 hours",
+          "forced_48h": "48 hours",
+          "forced_72h": "72 hours"
+        }
+      },
+      "pump_speed": {
+        "name": "Pump Speed",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "valve_position": {
+        "name": "Valve Position",
+        "state": {
+          "filter": "Filter",
+          "waste": "Waste",
+          "closed": "Closed",
+          "backwash": "Backwash",
+          "bypass": "Bypass",
+          "rinse": "Rinse"
+        }
+      }
+    },
+    "sensor": {
+      "api_cycle_elapsed_time": {
+        "name": "Cycle Elapsed Time (API)"
+      },
+      "api_cycle_remaining_time": {
+        "name": "Cycle Remaining Time (API)"
+      },
+      "cycle1_enabled": {
+        "name": "Cycle 1 Enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
+      "cycle1_start_time": {
+        "name": "Cycle 1 Start Time"
+      },
+      "cycle1_stop_time": {
+        "name": "Cycle 1 Stop Time"
+      },
+      "cycle2_enabled": {
+        "name": "Cycle 2 Enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
+      "cycle2_start_time": {
+        "name": "Cycle 2 Start Time"
+      },
+      "cycle2_stop_time": {
+        "name": "Cycle 2 Stop Time"
+      },
+      "cycle_elapsed_time": {
+        "name": "Cycle Elapsed Time"
+      },
+      "cycle_predicted_end": {
+        "name": "Cycle Predicted End"
+      },
+      "cycle_remaining_time": {
+        "name": "Cycle Remaining Time"
+      },
+      "daily_filtration_volume": {
+        "name": "Daily Filtration Volume"
+      },
+      "daily_turnovers": {
+        "name": "Daily Turnovers"
+      },
+      "device_model": {
+        "name": "Device Model"
+      },
+      "disinfection_last_injection_duration": {
+        "name": "Disinfection Last Injection Duration"
+      },
+      "filter_backwash_duration": {
+        "name": "Backwash Duration"
+      },
+      "filter_backwash_mode": {
+        "name": "Backwash Mode",
+        "state": {
+          "inhibited": "Inhibited",
+          "manual": "Manual",
+          "automatic": "Automatic"
+        }
+      },
+      "filter_backwash_time": {
+        "name": "Backwash Time"
+      },
+      "filter_max_days": {
+        "name": "Maximum Days Between Backwash"
+      },
+      "filter_pressure": {
+        "name": "Filter Pressure Threshold"
+      },
+      "filter_rinse_duration": {
+        "name": "Rinse Duration"
+      },
+      "filter_timer_mode": {
+        "name": "Filter Timer Mode",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continuous",
+          "forced_24h": "Forced 24 h",
+          "forced_48h": "Forced 48 h",
+          "forced_72h": "Forced 72 h",
+          "mode_24h": "24/24",
+          "no_pump": "No pump"
+        }
+      },
+      "filter_type": {
+        "name": "Filter Type",
+        "state": {
+          "no_filter": "No filter",
+          "pressure": "Pressure",
+          "suction": "Suction"
+        }
+      },
+      "filtration_mode": {
+        "name": "Filtration Mode",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continuous",
+          "forced_24h": "Forced 24 h",
+          "forced_48h": "Forced 48 h",
+          "forced_72h": "Forced 72 h",
+          "mode_24h": "24/24",
+          "no_pump": "No pump"
+        }
+      },
+      "firmware_version": {
+        "name": "Firmware Version"
+      },
+      "flow_meter_rate": {
+        "name": "Flow Meter Rate"
+      },
+      "forced_remaining": {
+        "name": "Forced Filtration Remaining"
+      },
+      "free_available_chlorine": {
+        "name": "Free Available Chlorine"
+      },
+      "free_chlorine": {
+        "name": "Free Chlorine"
+      },
+      "last_backwash": {
+        "name": "Last backwash"
+      },
+      "last_ph_measure": {
+        "name": "Last pH measure"
+      },
+      "last_refill": {
+        "name": "Last refill"
+      },
+      "mains_voltage": {
+        "name": "Mains Voltage"
+      },
+      "orp": {
+        "name": "Oxidation-Reduction Potential"
+      },
+      "orp_disinfectant": {
+        "name": "Disinfectant Type",
+        "state": {
+          "read_only": "Read only",
+          "chlorine": "Chlorine",
+          "salt": "Salt",
+          "bromine": "Bromine",
+          "poolcop_ocean": "PoolCop Ocean",
+          "da_space": "DA Space",
+          "da_gen": "DA Gen",
+          "aquark": "Aquark"
+        }
+      },
+      "orp_set_point": {
+        "name": "ORP Set Point"
+      },
+      "orp_temperature_shutdown": {
+        "name": "ORP Temperature Shutdown"
+      },
+      "os_version": {
+        "name": "OS Version"
+      },
+      "ph": {
+        "name": "pH"
+      },
+      "ph_dosing_time": {
+        "name": "pH Max Dosing Duration"
+      },
+      "ph_high_threshold": {
+        "name": "pH High Threshold"
+      },
+      "ph_last_injection_duration": {
+        "name": "pH Last Injection Duration"
+      },
+      "ph_low_threshold": {
+        "name": "pH Low Threshold"
+      },
+      "ph_set_point": {
+        "name": "pH Set Point"
+      },
+      "ph_type": {
+        "name": "pH Dosing Mode",
+        "state": {
+          "ph_minus": "pH-",
+          "ph_plus": "pH+",
+          "read_only": "Read only"
+        }
+      },
+      "planned_remaining_turnovers": {
+        "name": "Planned Remaining Turnovers"
+      },
+      "planned_remaining_volume": {
+        "name": "Planned Remaining Filter Volume"
+      },
+      "pool_cover_reduction": {
+        "name": "Cover Flow Reduction"
+      },
+      "pool_nickname": {
+        "name": "Pool Nickname"
+      },
+      "pool_turnover": {
+        "name": "Pool Turnover Rate"
+      },
+      "pool_type": {
+        "name": "Pool Type",
+        "state": {
+          "classic_pool": "Classic pool",
+          "rimflow_type_a": "Rimflow type A",
+          "rimflow_type_b": "Rimflow type B",
+          "spa": "Spa"
+        }
+      },
+      "pool_volume": {
+        "name": "Pool Volume"
+      },
+      "pressure": {
+        "name": "Pressure"
+      },
+      "pump_flow_rate": {
+        "name": "Pump Flow Rate"
+      },
+      "pump_flowrate": {
+        "name": "Pump Base Flowrate"
+      },
+      "pump_nb_speeds": {
+        "name": "Pump Speed Levels"
+      },
+      "pump_pressure_alarm": {
+        "name": "Pump Alarm Pressure Threshold"
+      },
+      "pump_pressure_low": {
+        "name": "Pump Low Pressure Threshold"
+      },
+      "pump_speed": {
+        "name": "Pump speed",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_speed_24h": {
+        "name": "Pump Speed 24H",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_speed_backwash": {
+        "name": "Pump Speed Backwash",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_speed_cover": {
+        "name": "Pump Speed Cover",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_speed_cycle1": {
+        "name": "Pump Speed Cycle 1",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_speed_cycle2": {
+        "name": "Pump Speed Cycle 2",
+        "state": {
+          "none": "Off",
+          "speed_1": "Speed 1",
+          "speed_2": "Speed 2",
+          "speed_3": "Speed 3",
+          "speed_4": "Speed 4",
+          "speed_5": "Speed 5",
+          "speed_6": "Speed 6",
+          "speed_7": "Speed 7",
+          "speed_8": "Speed 8"
+        }
+      },
+      "pump_type": {
+        "name": "Pump Type",
+        "state": {
+          "no_pump": "No pump",
+          "mono_speed_pump": "Single-speed pump",
+          "pentair_intelliflo": "Pentair IntelliFlo",
+          "pentair_superflo": "Pentair SuperFlo",
+          "hayward_ecostar": "Hayward EcoStar",
+          "hayward_tristar": "Hayward TriStar",
+          "badu_ecotouch": "BADU EcoTouch",
+          "badu_ecomotion": "BADU EcoMotion",
+          "zodiac_flopro": "Zodiac FloPro",
+          "invertek_optidrive": "Invertek Optidrive",
+          "binary_combination": "Binary combination",
+          "davey_promaster": "Davey ProMaster",
+          "acis_vipool_mkb": "ACIS VIPool MKB",
+          "dab_eswim": "DAB E.swim",
+          "aquagem_isaver_plus": "AquaGem iSAVER+",
+          "saci_epool_ejoy": "SACI e-pool e.joy",
+          "schneider_atv21": "Schneider ATV21"
+        }
+      },
+      "running_status": {
+        "name": "Running Status",
+        "state": {
+          "stopped": "Stopped",
+          "freeze_protection": "Freeze Protection",
+          "forced_mode": "Forced Filtration",
+          "eco_plus_mode": "Eco+",
+          "timer_mode": "Timer",
+          "manual": "Manual",
+          "paused": "Paused",
+          "external_request": "External",
+          "water_level_management": "Water Level Management",
+          "mode_24h": "24/24"
+        }
+      },
+      "salt": {
+        "name": "Salt"
+      },
+      "temperature_air": {
+        "name": "Air temperature"
+      },
+      "temperature_water": {
+        "name": "Water temperature"
+      },
+      "total_chlorine": {
+        "name": "Total Chlorine"
+      },
+      "valve_position": {
+        "name": "Valve position",
+        "state": {
+          "filter": "Filter",
+          "waste": "Waste",
+          "closed": "Closed",
+          "backwash": "Backwash",
+          "bypass": "Bypass",
+          "rinse": "Rinse"
+        }
+      },
+      "voltage": {
+        "name": "Battery Voltage"
+      },
+      "waterlevel": {
+        "name": "Water level",
+        "state": {
+          "faulty": "Faulty",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very High"
+        }
+      },
+      "waterlevel_draining_duration": {
+        "name": "Waterlevel Draining Duration"
+      },
+      "waterlevel_max_duration": {
+        "name": "Waterlevel Max Fill Duration"
+      },
+      "waterlevel_set_point": {
+        "name": "Waterlevel Set Point",
+        "state": {
+          "faulty": "Faulty",
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "very_high": "Very High"
+        }
+      },
+      "aux_timer_enabled": {
+        "name": "{aux} enabled",
+        "state": {
+          "disabled": "Disabled",
+          "enabled": "Enabled"
+        }
+      },
+      "aux_timer_start_time": {
+        "name": "{aux} start time"
+      }
+    },
+    "switch": {
+      "jet_stream_switch": {
+        "name": "Jet Stream"
+      },
+      "pump_switch": {
+        "name": "Pump"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "The PoolCop API key was rejected"
+    },
+    "access_expired": {
+      "message": "The PoolCop cloud access for this device has expired"
+    },
+    "rate_limited": {
+      "message": "The PoolCop API rate limit was exceeded; try again in a few seconds"
+    },
+    "update_failed": {
+      "message": "Error communicating with the PoolCop API: {error}"
+    },
+    "command_failed": {
+      "message": "The PoolCop command failed: {error}"
+    },
+    "entry_not_found": {
+      "message": "PoolCop config entry {entry_id} was not found"
+    },
+    "entry_not_loaded": {
+      "message": "{title} is not loaded"
+    },
+    "entry_required": {
+      "message": "More than one PoolCop is configured; choose which one with config_entry_id"
+    },
+    "no_loaded_entries": {
+      "message": "No PoolCop is loaded"
+    },
+    "nothing_to_change": {
+      "message": "Provide a filtration mode or at least one cycle setting"
+    }
+  },
+  "issues": {
+    "new_api_key": {
+      "title": "{title} needs a new PoolCop API key",
+      "description": "Version 3.0 of the PoolCop integration uses the new PoolCop Client API, because the PoolCopilot API is shutting down. Your existing key does not work with it.\n\nLog in to [MyPoolCop]({api_key_url}), open **Profile**, click **Manage my key** in the **API key** card and then **Generate a key**, and enter the key when Home Assistant asks you to re-authenticate {title}. This message disappears once the new key works."
+    },
+    "cloud_access_expired": {
+      "title": "PoolCop cloud access expired for {title}",
+      "description": "PoolCop reports that the cloud access for {title} has expired, so Home Assistant cannot read or control it. Renew the cloud access in MyPoolCop or contact your PoolCop dealer. This message disappears once the device is reachable again."
+    }
+  },
+  "services": {
+    "set_pump_speed": {
+      "name": "Set pump speed",
+      "description": "Sets the pump speed.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "speed": {
+          "name": "Speed",
+          "description": "Pump speed: 0 is off, 1 to 8 are the speeds your pump supports."
+        }
+      }
+    },
+    "toggle_pump": {
+      "name": "Toggle pump",
+      "description": "Turns the pump on if it is off, or off if it is on.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        }
+      }
+    },
+    "toggle_aux": {
+      "name": "Toggle auxiliary",
+      "description": "Turns an auxiliary output on if it is off, or off if it is on.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "aux_id": {
+          "name": "Auxiliary",
+          "description": "The auxiliary output number."
+        },
+        "module": {
+          "name": "Module",
+          "description": "The extension module of the output; None for the PoolCop itself."
+        }
+      }
+    },
+    "set_valve_position": {
+      "name": "Set valve position",
+      "description": "Turns the multiport valve to a position.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "position": {
+          "name": "Position",
+          "description": "The valve position."
+        }
+      }
+    },
+    "clear_alarm": {
+      "name": "Clear alarm",
+      "description": "Clears one alarm, or all active alarms.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "alarm_code": {
+          "name": "Alarm code",
+          "description": "The alarm to clear, for example PressureLowPump1. Leave empty to clear all alarms."
+        }
+      }
+    },
+    "stop_backwash": {
+      "name": "Stop backwash",
+      "description": "Stops a backwash in progress.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        }
+      }
+    },
+    "set_filtration_mode": {
+      "name": "Set filtration mode",
+      "description": "Sets the filtration mode, keeping the current cycle times.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "The filtration mode."
+        }
+      }
+    },
+    "set_filtration_timers": {
+      "name": "Set filtration timers",
+      "description": "Sets the filtration cycle times and, optionally, the filtration mode. Settings you leave out keep their current value.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "The PoolCop to control. Required when more than one is configured."
+        },
+        "mode": {
+          "name": "Mode",
+          "description": "The filtration mode. Defaults to the current mode."
+        },
+        "cycle_1_enabled": {
+          "name": "Cycle 1 enabled",
+          "description": "Whether filtration cycle 1 runs."
+        },
+        "cycle_1_start": {
+          "name": "Cycle 1 start",
+          "description": "Start time of filtration cycle 1."
+        },
+        "cycle_1_end": {
+          "name": "Cycle 1 end",
+          "description": "End time of filtration cycle 1."
+        },
+        "cycle_2_enabled": {
+          "name": "Cycle 2 enabled",
+          "description": "Whether filtration cycle 2 runs."
+        },
+        "cycle_2_start": {
+          "name": "Cycle 2 start",
+          "description": "Start time of filtration cycle 2."
+        },
+        "cycle_2_end": {
+          "name": "Cycle 2 end",
+          "description": "End time of filtration cycle 2."
         }
       }
     }

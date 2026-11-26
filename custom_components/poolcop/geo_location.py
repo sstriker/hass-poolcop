@@ -6,38 +6,44 @@ import math
 from typing import Any, cast
 
 from homeassistant.components.geo_location import GeolocationEvent
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityDescription
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import CONF_MAP_MODE, DOMAIN, MAP_MODE_ATTENTION
-from .coordinator import PoolCopDataUpdateCoordinator
+from .const import CONF_MAP_MODE, MAP_MODE_ATTENTION
+from .coordinator import PoolCopConfigEntry, PoolCopDataUpdateCoordinator
 from .entity import PoolCopEntity
+
+# Coordinator-driven; no per-entity polling
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: PoolCopConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up PoolCop geo location based on a config entry."""
-    coordinator: PoolCopDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
-    pool_data = coordinator.data.status_value("", prefix="Pool") or {}
-    if not isinstance(pool_data, dict):
+    pool = coordinator.data.pool
+    if pool is None:
         return
 
-    lat = pool_data.get("latitude")
-    lon = pool_data.get("longitude")
+    lat = pool.latitude
+    lon = pool.longitude
     if lat is None or lon is None:
         return
 
     try:
-        float(lat)
-        float(lon)
+        latitude = float(lat)
+        longitude = float(lon)
     except ValueError, TypeError:
         return
 
-    async_add_entities([PoolCopGeoLocation(coordinator, pool_data)])
+    async_add_entities(
+        [PoolCopGeoLocation(coordinator, latitude, longitude, pool.nickname)]
+    )
 
 
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -62,23 +68,20 @@ class PoolCopGeoLocation(PoolCopEntity, GeolocationEvent):
     def __init__(
         self,
         coordinator: PoolCopDataUpdateCoordinator,
-        pool_data: dict,
+        latitude: float,
+        longitude: float,
+        nickname: str | None,
     ) -> None:
         """Initialize the pool geo location."""
         super().__init__(
             coordinator=coordinator,
             description=EntityDescription(key="pool_location", name="Pool"),
         )
-        self._pool_lat = float(pool_data["latitude"])
-        self._pool_lon = float(pool_data["longitude"])
+        self._pool_lat = latitude
+        self._pool_lon = longitude
 
-        nickname = pool_data.get("nickname")
         if nickname:
             self._attr_name = nickname
-
-        image = pool_data.get("image")
-        if image:
-            self._attr_entity_picture = image
 
     @property
     def source(self) -> str:
@@ -96,9 +99,8 @@ class PoolCopGeoLocation(PoolCopEntity, GeolocationEvent):
         """Return True if the entity should show on the map."""
         map_mode = self.coordinator.config_entry.options.get(CONF_MAP_MODE, "always")
         if map_mode == MAP_MODE_ATTENTION:
-            alarms = self.coordinator.data.status_value("alarms") or {}
-            alarm_count = alarms.get("count", 0) if isinstance(alarms, dict) else 0
-            return alarm_count > 0
+            alarms = self.coordinator.data.device.state.alarms
+            return len(alarms) > 0
         return True
 
     @property
@@ -132,15 +134,13 @@ class PoolCopGeoLocation(PoolCopEntity, GeolocationEvent):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return extra state attributes."""
-        pool_data = self.coordinator.data.status_value("", prefix="Pool") or {}
-        if not isinstance(pool_data, dict):
-            return {}
+        pool = self.coordinator.data.pool
         attrs: dict[str, Any] = {}
-        if pool_data.get("timezone"):
-            attrs["timezone"] = pool_data["timezone"]
-        if pool_data.get("nickname"):
-            attrs["nickname"] = pool_data["nickname"]
-        alarms = self.coordinator.data.status_value("alarms") or {}
-        if isinstance(alarms, dict):
-            attrs["alarm_count"] = alarms.get("count", 0)
+        if pool is not None:
+            if pool.timezone:
+                attrs["timezone"] = pool.timezone
+            if pool.nickname:
+                attrs["nickname"] = pool.nickname
+        alarms = self.coordinator.data.device.state.alarms
+        attrs["alarm_count"] = len(alarms)
         return attrs

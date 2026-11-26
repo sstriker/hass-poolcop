@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+import re
 from typing import Final
 
 DOMAIN: Final = "poolcop"
@@ -18,9 +18,8 @@ UPDATE_INTERVAL = 15
 MIN_UPDATE_INTERVAL = 10  # Floor: never poll faster than every 10s
 MAX_UPDATE_INTERVAL = 120  # Ceiling: never wait longer than 2 minutes
 
-# Quota reserve: stop polling this many calls before exhaustion so the
-# token window can expire and refresh without hitting a rate limit.
-QUOTA_RESERVE = 3
+# User-configurable polling interval (options flow)
+CONF_POLL_INTERVAL = "poll_interval"
 
 # Storage constants
 STORAGE_KEY = "poolcop_learned_data"
@@ -30,8 +29,6 @@ STORAGE_VERSION = 1
 CONF_FLOW_RATE_1 = "flow_rate_1"  # Low speed
 CONF_FLOW_RATE_2 = "flow_rate_2"  # Medium speed
 CONF_FLOW_RATE_3 = "flow_rate_3"  # High speed
-
-SCAN_INTERVAL = timedelta(seconds=UPDATE_INTERVAL)
 
 # Map mode
 CONF_MAP_MODE = "map_mode"
@@ -44,6 +41,82 @@ SERVICE_TOGGLE_PUMP = "toggle_pump"
 SERVICE_TOGGLE_AUX = "toggle_aux"
 SERVICE_SET_VALVE_POSITION = "set_valve_position"
 SERVICE_CLEAR_ALARM = "clear_alarm"
+SERVICE_STOP_BACKWASH = "stop_backwash"
+SERVICE_SET_FILTRATION_MODE = "set_filtration_mode"
+SERVICE_SET_FILTRATION_TIMERS = "set_filtration_timers"
+ATTR_CONFIG_ENTRY_ID = "config_entry_id"
+
+# Client API rate limits (seconds). Requests on the same device must be
+# 10 s apart, except the pump state, valve position and auxiliary state
+# commands, which only need the 1 s per-key spacing the client applies.
+# The API measures the 10 s itself and refused a read sent exactly 10 s after
+# a command, so leave a margin.
+ENTITY_RATE_LIMIT = 12.0
+
+# A 429 whose Retry-After is at most this many seconds is waited out and the
+# request sent once more, instead of failing.
+RATE_LIMIT_RETRY_MAX = 5.0
+
+# The first request after a quiet period can take more than 15 s to answer.
+REQUEST_TIMEOUT = 45.0
+
+# Commands are accepted with HTTP 202 and take 30 s to 2 min to show up in
+# the device state. Entities show the requested state until then.
+PENDING_COMMAND_TIMEOUT = 150.0
+
+# Filtration modes accepted by the filtrationtimer command. Forced24H/48H/72H
+# are set through the forced filtration select instead.
+FILTRATION_MODES: Final = [
+    "Stop",
+    "Timer",
+    "EcoPlus",
+    "Volume",
+    "Continuous",
+    "Mode24H",
+]
+
+# Where users generate a Client API key
+API_KEY_URL: Final = "https://my.poolcop.com/profile/apikey"
+
+# Repair issue raised when a 2.x (PoolCopilot API) entry is migrated
+ISSUE_NEW_API_KEY = "new_api_key"
+
+# Entities from 2.x (PoolCopilot API) that the Client API no longer provides,
+# as (platform, key). Removed from the entity registry by the v2 -> v3 migration.
+REMOVED_ENTITY_KEYS: Final[frozenset[tuple[str, str]]] = frozenset(
+    {
+        ("binary_sensor", "autochlor_acid"),
+        ("binary_sensor", "autochlor_auto"),
+        ("binary_sensor", "autochlor_control"),
+        ("binary_sensor", "autochlor_installed"),
+        ("binary_sensor", "ioniser_control"),
+        ("binary_sensor", "ioniser_installed"),
+        ("binary_sensor", "ioniser_mode"),
+        ("binary_sensor", "orp_control_enabled"),
+        ("binary_sensor", "watervalve"),
+        ("sensor", "autochlor_duration"),
+        ("sensor", "autochlor_next_injection"),
+        ("sensor", "filter_mode"),
+        ("sensor", "forced_filtration_mode"),
+        ("sensor", "forced_filtration_remaining"),
+        ("sensor", "ioniser"),
+        ("sensor", "ioniser_current"),
+        ("sensor", "ioniser_duration"),
+        ("sensor", "ioniser_next_injection"),
+        ("sensor", "orp_hyper_day"),
+        ("sensor", "orp_hyper_set_point"),
+        ("sensor", "orp_next_injection"),
+        ("sensor", "ph_next_injection"),
+        ("sensor", "refill_status"),
+        ("sensor", "waterlevel_cable_status"),
+    }
+)
+
+# Entities whose 3.0 counterpart has a different key, as
+# (platform, old key) -> new key. They keep their entity ID and history.
+RENAMED_ENTITY_KEYS: Final[dict[tuple[str, str], str]] = {
+    ("sensor", "poolcop"): "running_status",
+}
 
 VALVE_POSITIONS = {
     "filter": 0,
@@ -278,194 +351,105 @@ POOL_TYPE_DESCRIPTIONS: Final[dict[int, str]] = {
     3: "Spa or hot tub. Typically smaller volume with higher turnover.",
 }
 
-# Aux label display names (maps numeric label IDs to human-readable names)
-# Without the X-PoolCopilot-Lang header, the API returns "label_aux_N" keys
-# where N is the numeric label ID.
-AUX_LABEL_NAMES: Final[dict[int, str]] = {
-    0: "Pool Light",
-    1: "Pool Cleaner",
-    2: "Pool Heating",
-    3: "Disinfection",
-    4: "Electrolysis",
-    5: "Remnant",
-    6: "Transfer Pump",
-    7: "UV",
-    8: "Spa",
-    9: "Fountain",
-    10: "Borehole",
-    11: "Pool House",
-    12: "Garden 1",
-    13: "Garden 2",
-    14: "Garden 3",
-    15: "Available",
-    16: "Waste Valve",
-    17: "Speed Control",
-    18: "ORP Control",
-    19: "Remnant",
-    20: "Pool Cover",
-    21: "Jet Stream",
-    22: "External Warnings",
-    23: "Cleaning Valve",
-    24: "Rinsing Valve",
-    25: "Dosing APF",
-    26: "Dosing ACO",
-    27: "Suction Valve",
+# Auxiliary output labels: the Client API's Auxiliary.label values and the
+# names shown for them. A friendly name set on the PoolCop takes precedence.
+AUX_LABEL_NAMES: Final[dict[str, str]] = {
+    "PoolLight": "Pool Light",
+    "PoolCleaner": "Pool Cleaner",
+    "Heating": "Pool Heating",
+    "Disinfection": "Disinfection",
+    "Electrolyser": "Electrolyser",
+    "Remnant": "Remnant",
+    "TransferPump": "Transfer Pump",
+    "UV": "UV",
+    "Spa": "Spa",
+    "Fountain": "Fountain",
+    "Borehole": "Borehole",
+    "PoolHouse": "Pool House",
+    "Garden": "Garden",
+    "Garden1": "Garden 1",
+    "Garden2": "Garden 2",
+    "Garden3": "Garden 3",
+    "Available": "Available",
+    "NotUsed": "Not Used",
+    "ReservedACO": "ACO Dosing",
+    "ReservedAuxAlarm": "External Warnings",
+    "ReservedCleaningValve": "Cleaning Valve",
+    "ReservedCover": "Pool Cover",
+    "ReservedFloculant": "Flocculant Dosing",
+    "ReservedJetStream": "Jet Stream",
+    "ReservedORP": "ORP Control",
+    "ReservedPumpControl": "Pump Control",
+    "ReservedPumpSpeedControl": "Pump Speed Control",
+    "ReservedRemnant": "Remnant",
+    "ReservedRince": "Rinsing Valve",
+    "ReservedSpeedControl": "Speed Control",
+    "ReservedSuction": "Suction Valve",
+    "ReservedValveCleaning": "Cleaning Valve",
+    "ReservedWasteValve": "Waste Valve",
+}
+
+# Outputs the firmware drives for a function that has its own entities
+# (pump speed, ORP dosing, waste valve).
+AUX_FIXED_FUNCTION_LABELS: Final[frozenset[str]] = frozenset(
+    {
+        "ReservedORP",
+        "ReservedPumpSpeedControl",
+        "ReservedSpeedControl",
+        "ReservedWasteValve",
+    }
+)
+
+# Valve outputs: OPENING device class (open/closed)
+AUX_VALVE_LABELS: Final[frozenset[str]] = frozenset(
+    {
+        "ReservedCleaningValve",
+        "ReservedRince",
+        "ReservedSuction",
+        "ReservedValveCleaning",
+        "ReservedWasteValve",
+    }
+)
+
+# Relay outputs with their own entities: POWER device class (on/off)
+AUX_RELAY_LABELS: Final[frozenset[str]] = frozenset(
+    {"ReservedORP", "ReservedPumpSpeedControl", "ReservedSpeedControl"}
+)
+
+# (on icon, off icon) per label
+AUX_LABEL_ICONS: Final[dict[str, tuple[str, str]]] = {
+    "PoolLight": ("mdi:lightbulb-on", "mdi:lightbulb-off"),
+    "PoolCleaner": ("mdi:robot-vacuum", "mdi:robot-vacuum-off"),
+    "Heating": ("mdi:heating-coil", "mdi:heating-coil"),
+    "Disinfection": ("mdi:bottle-tonic-skull", "mdi:bottle-tonic-skull-outline"),
+    "Electrolyser": ("mdi:flash", "mdi:flash-off"),
+    "TransferPump": ("mdi:pump", "mdi:pump-off"),
+    "UV": ("mdi:weather-sunny", "mdi:weather-sunny-off"),
+    "Spa": ("mdi:hot-tub", "mdi:hot-tub"),
+    "Fountain": ("mdi:fountain", "mdi:fountain"),
+    "Borehole": ("mdi:water-well", "mdi:water-well-outline"),
+    "PoolHouse": ("mdi:home", "mdi:home-outline"),
+    "Garden": ("mdi:sprinkler", "mdi:sprinkler-variant"),
+    "Garden1": ("mdi:sprinkler", "mdi:sprinkler-variant"),
+    "Garden2": ("mdi:sprinkler", "mdi:sprinkler-variant"),
+    "Garden3": ("mdi:sprinkler", "mdi:sprinkler-variant"),
+    "ReservedCover": ("mdi:window-shutter", "mdi:window-shutter-open"),
+    "ReservedJetStream": ("mdi:waves-arrow-right", "mdi:waves-arrow-right"),
+    "ReservedAuxAlarm": ("mdi:alert", "mdi:alert-outline"),
+    "ReservedACO": ("mdi:beaker", "mdi:beaker-outline"),
+    "ReservedFloculant": ("mdi:beaker", "mdi:beaker-outline"),
 }
 
 
-# Fixed-function label IDs (16+) that have first-class entity counterparts
-AUX_FIXED_FUNCTION_LABELS: Final[set[int]] = {16, 17, 18}
-
-# Valve-type aux label IDs — OPENING device class (Open/Closed)
-AUX_VALVE_LABELS: Final[set[int]] = {16, 23, 24, 27}
-
-# Relay-type aux label IDs with first-class counterparts — POWER device class (On/Off)
-AUX_RELAY_LABELS: Final[set[int]] = {17, 18}
-
-# Aux label icon mapping — (on_icon, off_icon) per label ID
-AUX_LABEL_ICONS: Final[dict[int, tuple[str, str]]] = {
-    0: ("mdi:lightbulb-on", "mdi:lightbulb-off"),  # Pool Light
-    1: ("mdi:robot-vacuum", "mdi:robot-vacuum-off"),  # Pool Cleaner
-    2: ("mdi:heating-coil", "mdi:heating-coil"),  # Pool Heating
-    3: ("mdi:bottle-tonic-skull", "mdi:bottle-tonic-skull-outline"),  # Disinfection
-    4: ("mdi:flash", "mdi:flash-off"),  # Electrolysis
-    6: ("mdi:pump", "mdi:pump-off"),  # Transfer Pump
-    7: ("mdi:weather-sunny", "mdi:weather-sunny-off"),  # UV
-    8: ("mdi:hot-tub", "mdi:hot-tub"),  # Spa
-    9: ("mdi:fountain", "mdi:fountain"),  # Fountain
-    10: ("mdi:water-well", "mdi:water-well-outline"),  # Borehole
-    11: ("mdi:home", "mdi:home-outline"),  # Pool House
-    20: ("mdi:window-shutter", "mdi:window-shutter-open"),  # Pool Cover
-    21: ("mdi:waves-arrow-right", "mdi:waves-arrow-right"),  # Jet Stream
-    22: ("mdi:alert", "mdi:alert-outline"),  # External Warnings
-    25: ("mdi:beaker", "mdi:beaker-outline"),  # Dosing APF
-    26: ("mdi:beaker", "mdi:beaker-outline"),  # Dosing ACO
-}
+def aux_display_name(label: str, friendly_name: str, channel: int) -> str:
+    """Return the name to show for an auxiliary output."""
+    return friendly_name or AUX_LABEL_NAMES.get(label) or label or f"Aux {channel}"
 
 
-# Alarm names (from cloud API enum PCFR.PoolCopilot.Xml.Alarm)
-# The legacy API returns "alert_title_N" where N is the 0-based index.
-ALARM_NAMES: Final[dict[int, str]] = {
-    0: "None",
-    1: "Freezing Risk",
-    2: "Consumables Level Low (Disinfection)",
-    3: "Pressure Low",
-    4: "Pressure Zero",
-    5: "pH Low",
-    6: "pH High",
-    7: "AutoChlor Acid Depleted",
-    8: "Ioniser Copper Electrodes",
-    9: "Cleaning Limit Reached",
-    10: "Electrolyser Production Limited",
-    11: "Ioniser Conductivity Error",
-    12: "Water Level Sensor Cable Failure",
-    13: "Valve Scan Error",
-    14: "pH Out of Bounds",
-    15: "Comm Bus Failure",
-    16: "Comm Bus Timeout",
-    17: "Pool Cover Open",
-    18: "Valve Disk Failure",
-    19: "Water Refill Timeout",
-    20: "Battery Low",
-    21: "Consumables Level Low (pH)",
-    22: "Cleaning Cycle Aborted",
-    23: "Valve Rotation Inhibited (High Pressure)",
-    24: "Salt System Needs Attention",
-    25: "Pressure Out of Bounds",
-    26: "Cleaning Required",
-    27: "Reduction Limit Reached",
-    28: "Consumables Level Low",
-    29: "Water Level Not Optimum",
-    30: "Valve Rotation Inhibited (Water Ingress)",
-    31: "Valve Position Not Reached",
-    32: "Water Temperature Faulty",
-    33: "ORP Out of Bounds",
-    34: "Disinfection Stopped (Low Temperature)",
-    35: "Disinfection Control Inefficient",
-    36: "pH Control Inefficient",
-    37: "Clock Not Running",
-    38: "Free Available Chlorine Low",
-    39: "Free Available Chlorine High",
-    40: "Free Available Chlorine Error",
-    41: "Manual Alarm",
-    42: "Water No Flow Detected",
-    43: "Free Available Chlorine Needs Maintenance",
-    44: "Flow Rate Low",
-    45: "Flow Rate High",
-    46: "FAC Negative",
-    47: "Free Available Chlorine Initial Calibration Required",
-    48: "Free Available Chlorine Periodic Calibration Required",
-    49: "Pressure Inhibited",
-    50: "Freezing Risk (External)",
-    51: "Consumables Level Low (Disinfection)",
-    52: "Consumables Level Low (pH)",
-    53: "Consumables Level Low",
-    54: "Pool Cover Open",
-    55: "Salt System Needs Attention",
-    56: "Pump Start Request",
-    57: "Pump Stop Request",
-    58: "Jet Stream Button Activated",
-    59: "Water Flow Switch Activated",
-    60: "Flooding",
-    61: "Flooding (Stop Filtration)",
-    62: "Free Chlorine Sensor Low Flow",
-    63: "Consumables Level Low (ACO)",
-    64: "Consumables Level Low (Flocculant)",
-    65: "Overflow Requested",
-    66: "Open Cover Button Activated",
-    67: "Close Cover Button Activated",
-    68: "Water Flow Switch for Electrolyser Activated",
-    69: "Aux Activated by Input",
-}
-
-# Alarm severity levels (from cloud API enum PCFR.PoolCopilot.Xml.AlarmSeverity)
-ALARM_SEVERITIES: Final[dict[str, str]] = {
-    "Remind": "Reminder",
-    "Warning": "Warning",
-    "Error": "Error",
-    "Failure": "Failure",
-}
-
-
-def alert_title_id(api_name: str) -> int | None:
-    """Extract the numeric alarm ID from an API alert string like 'alert_title_5'."""
-    if api_name and api_name.startswith("alert_title_"):
-        try:
-            return int(api_name.removeprefix("alert_title_"))
-        except ValueError:
-            pass
-    return None
-
-
-def alert_display_name(api_name: str) -> str:
-    """Resolve an API alert name to a human-readable name.
-
-    The API returns "alert_title_N" where N is the numeric alarm code.
-    Maps to a human-readable name via ALARM_NAMES.
-    """
-    alarm_id = alert_title_id(api_name)
-    if alarm_id is not None:
-        return ALARM_NAMES.get(alarm_id, f"Alarm {alarm_id}")
-    return api_name or "Unknown Alarm"
-
-
-def aux_label_id(api_label: str) -> int | None:
-    """Extract the numeric label ID from an API label string like 'label_aux_17'."""
-    if api_label and api_label.startswith("label_aux_"):
-        try:
-            return int(api_label.removeprefix("label_aux_"))
-        except ValueError:
-            pass
-    return None
-
-
-def aux_display_name(api_label: str, aux_id: int) -> str:
-    """Resolve an API aux label to a clean display name.
-
-    The API returns "label_aux_N" where N is the numeric label ID.
-    Maps to a human-readable name via AUX_LABEL_NAMES.
-    """
-    label_id = aux_label_id(api_label)
-    if label_id is not None:
-        return AUX_LABEL_NAMES.get(label_id, f"Aux {aux_id}")
-    return api_label or f"Aux {aux_id}"
+def alarm_display_name(code: str) -> str:
+    """Return a readable alarm name: PressureLowPump1 -> Pressure Low Pump 1."""
+    return re.sub(
+        r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[a-zA-Z])(?=[0-9])",
+        " ",
+        code,
+    )

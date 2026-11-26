@@ -4,6 +4,9 @@ token.dump.txt
 *.credentials
 *.secret
 
+# API analysis docs (not for distribution)
+docs/client-api-*.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

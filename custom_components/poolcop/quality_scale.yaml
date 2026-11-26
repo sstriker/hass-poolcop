@@ -1,0 +1,76 @@
+rules:
+  # Bronze
+  action-setup: done
+  appropriate-polling: done
+  brands: done
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency: done
+  docs-actions: done
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: exempt
+    comment: Entities don't subscribe to events; all data comes from the coordinator.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow: done
+  test-coverage: done
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery-update-info:
+    status: exempt
+    comment: Cloud-only device; it can't be discovered on the local network.
+  discovery:
+    status: exempt
+    comment: Cloud-only device; it can't be discovered on the local network.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: Each config entry is one PoolCop; more PoolCops are added as new entries.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default:
+    status: done
+    comment: Rarely needed settings and installed-equipment entities are disabled by default.
+  entity-translations:
+    status: done
+    comment: Auxiliary outputs are named after the label set on the PoolCop.
+  exception-translations: done
+  icon-translations:
+    status: done
+    comment: Auxiliary outputs pick their icon from the label set on the PoolCop, in code.
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: Each config entry is one PoolCop; removing the entry removes its device.
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+  strict-typing: done

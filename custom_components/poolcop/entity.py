@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import cast
 
-from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.helpers.entity import DeviceInfo, EntityDescription
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.entity import EntityDescription
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -35,28 +35,52 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
     def is_component_installed(
         coordinator: PoolCopDataUpdateCoordinator, key: str
     ) -> bool:
-        """Check if this entity's component is installed/enabled in PoolCop.
+        """Check if this entity's component is installed/enabled in PoolCop."""
+        data = coordinator.data
+        if data is None:
+            return True
 
-        Used by platform setup functions to skip entity creation entirely
-        for uninstalled components.
-        """
+        equip = data.device.equipments_info
+
         if key == "ph_control" or key.startswith("ph_") or key == "pH":
-            return bool(coordinator.data.status_value("conf.pH"))
+            return equip.has_ph_sensor
 
-        if key == "orp_control" or key.startswith("orp_"):
-            return bool(coordinator.data.status_value("conf.orp"))
+        if (
+            key == "orp_control"
+            or key.startswith("orp_")
+            or key.startswith("disinfection_")
+        ):
+            return equip.has_orp_sensor
 
         if key in {"ioniser", "ioniser_control"} or key.startswith("ioniser_"):
-            return bool(coordinator.data.status_value("conf.ioniser"))
+            return False  # Not exposed by client API
 
         if key == "autochlor_control" or key.startswith("autochlor_"):
-            return bool(coordinator.data.status_value("conf.autochlor"))
+            return False  # Not exposed by client API
 
         if key.startswith("waterlevel_") or key == "water_level":
-            return bool(coordinator.data.status_value("conf.waterlevel"))
+            return equip.has_water_level_sensor
 
         if key == "temperature_air":
-            return bool(coordinator.data.status_value("conf.air"))
+            return equip.has_air_temperature_sensor
+
+        if key.startswith("pool_cover"):
+            return equip.has_pool_cover
+
+        if key.startswith("jet_stream"):
+            return equip.has_jet_stream
+
+        if key == "free_available_chlorine":
+            return equip.has_fac_sensor
+
+        if key == "free_chlorine":
+            return equip.has_fc_sensor
+
+        if key == "total_chlorine":
+            return equip.has_tc_sensor
+
+        if key.startswith("flow_meter"):
+            return equip.has_flow_meter
 
         return True
 
@@ -64,21 +88,18 @@ class PoolCopEntity(CoordinatorEntity[PoolCopDataUpdateCoordinator]):
     def device_info(self) -> DeviceInfo:
         """Return device information about this PoolCop instance."""
         poolcop_id: str = cast(str, self.coordinator.config_entry.unique_id)
+        device = self.coordinator.data.device
 
         name = f"PoolCop {poolcop_id}"
+        sw_version = device.version_info.poolcop_version or None
+        model = device.version_info.model or None
 
-        info = DeviceInfo(
+        return DeviceInfo(
             entry_type=DeviceEntryType.SERVICE,
-            identifiers={
-                (
-                    DOMAIN,
-                    poolcop_id,
-                )
-            },
-            configuration_url=f"https://poolcopilot.com/mypoolcop/select/{poolcop_id}",
+            identifiers={(DOMAIN, poolcop_id)},
+            configuration_url="https://my.poolcop.com",
             manufacturer="PCFR",
             name=name,
-            sw_version=self.coordinator.data.status_value("network.version"),
+            sw_version=sw_version,
+            model=model,
         )
-
-        return info

@@ -1,0 +1,867 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Verbinden met PoolCop",
+        "description": "Voer je PoolCop Client API-sleutel in. Log in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren**. Eén sleutel geldt voor elke PoolCop in je account.",
+        "data": {
+          "api_key": "API-sleutel"
+        },
+        "data_description": {
+          "api_key": "De PoolCop Client API-sleutel van MyPoolCop. Sleutels voor de oude PoolCopilot API werken niet."
+        }
+      },
+      "device": {
+        "title": "Kies een PoolCop",
+        "description": "Je account heeft meer dan één PoolCop. Kies degene die je wilt toevoegen; de andere kun je daarna met dezelfde sleutel toevoegen.",
+        "data": {
+          "device_id": "PoolCop"
+        }
+      },
+      "flow_rates": {
+        "title": "Debiet van de pomp",
+        "description": "Je pomp heeft {pump_speeds} snelheid/snelheden. Voer het debiet bij elke snelheid in; dit wordt gebruikt om het gefilterde volume en de omlopen te berekenen.\n\nZwembadvolume: {vol} m³\nGeschat debiet gemeld door PoolCop: {flowrate} m³/u",
+        "data": {
+          "flow_rate_1": "Debiet bij snelheid 1",
+          "flow_rate_2": "Debiet bij snelheid 2",
+          "flow_rate_3": "Debiet bij snelheid 3"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nieuwe PoolCop API-sleutel nodig",
+        "description": "De API-sleutel voor {title} is geweigerd. Sinds versie 3.0 gebruikt deze integratie de PoolCop Client API, die een nieuwe sleutel nodig heeft: log in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren**.",
+        "data": {
+          "api_key": "API-sleutel"
+        },
+        "data_description": {
+          "api_key": "De PoolCop Client API-sleutel van MyPoolCop. Sleutels voor de oude PoolCopilot API werken niet."
+        }
+      },
+      "reconfigure": {
+        "title": "API-sleutel wijzigen",
+        "description": "Voer een nieuwe API-sleutel in voor {title}. Je krijgt er een in [MyPoolCop]({api_key_url}) onder **Profiel → Mijn sleutel beheren**.",
+        "data": {
+          "api_key": "API-sleutel"
+        },
+        "data_description": {
+          "api_key": "De PoolCop Client API-sleutel van MyPoolCop. Sleutels voor de oude PoolCopilot API werken niet."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Alle PoolCops in dit account zijn al geconfigureerd",
+      "cannot_connect": "Kan geen verbinding maken",
+      "reauth_successful": "Opnieuw authenticeren is gelukt",
+      "reconfigure_successful": "Opnieuw configureren is gelukt"
+    },
+    "error": {
+      "cannot_connect": "Kan geen verbinding maken",
+      "invalid_auth": "Ongeldige API-sleutel",
+      "no_devices": "Geen PoolCop-apparaten gevonden voor deze API-sleutel",
+      "device_not_found": "Deze API-sleutel heeft geen toegang tot deze PoolCop. Gebruik een sleutel van het account waartoe de PoolCop behoort.",
+      "unknown": "Onverwachte fout"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "PoolCop-opties",
+        "data": {
+          "map_mode": "Zwembad op de kaart",
+          "flow_rate_1": "Debiet bij snelheid 1",
+          "flow_rate_2": "Debiet bij snelheid 2",
+          "flow_rate_3": "Debiet bij snelheid 3"
+        },
+        "data_description": {
+          "map_mode": "Toon het zwembad altijd op de kaart, of alleen wanneer het aandacht nodig heeft (alarmen of een probleem)."
+        }
+      }
+    }
+  },
+  "selector": {
+    "map_mode": {
+      "options": {
+        "always": "Altijd",
+        "attention": "Alleen wanneer aandacht nodig is"
+      }
+    },
+    "valve_position": {
+      "options": {
+        "filter": "Filteren",
+        "waste": "Afvoer",
+        "closed": "Gesloten",
+        "backwash": "Terugspoelen",
+        "bypass": "Bypass",
+        "rinse": "Naspoelen"
+      }
+    },
+    "filtration_mode": {
+      "options": {
+        "stop": "Stop",
+        "timer": "Timer",
+        "eco_plus": "Eco+",
+        "volume": "Volume",
+        "continuous": "Continu",
+        "mode_24h": "24/24"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "active_alarm": {
+        "name": "Actief alarm"
+      },
+      "air_installed": {
+        "name": "Luchttemperatuursensor geïnstalleerd"
+      },
+      "disinfection_dosing": {
+        "name": "Desinfectiedosering"
+      },
+      "equip_energy_meter": {
+        "name": "Energiemeter geïnstalleerd"
+      },
+      "equip_fac_sensor": {
+        "name": "FAC-sensor geïnstalleerd"
+      },
+      "equip_flow_meter": {
+        "name": "Debietmeter geïnstalleerd"
+      },
+      "equip_jet_stream": {
+        "name": "Tegenstroominstallatie geïnstalleerd"
+      },
+      "equip_pool_cover": {
+        "name": "Zwembadafdekking geïnstalleerd"
+      },
+      "equip_salt_sensor": {
+        "name": "Zoutsensor geïnstalleerd"
+      },
+      "input_1": {
+        "name": "Ingang 1"
+      },
+      "input_2": {
+        "name": "Ingang 2"
+      },
+      "jet_stream_running": {
+        "name": "Tegenstroominstallatie"
+      },
+      "orp_control": {
+        "name": "Cl-pomp"
+      },
+      "orp_installed": {
+        "name": "ORP-regeling geïnstalleerd"
+      },
+      "ph_auto_adjust": {
+        "name": "Automatische pH-correctie"
+      },
+      "ph_control": {
+        "name": "pH-pomp"
+      },
+      "ph_dosing": {
+        "name": "pH-dosering"
+      },
+      "ph_installed": {
+        "name": "pH-regeling geïnstalleerd"
+      },
+      "pool_cover_open": {
+        "name": "Zwembadafdekking"
+      },
+      "pool_freeze_protection": {
+        "name": "Vorstbeveiliging"
+      },
+      "pool_service_mode": {
+        "name": "Servicemodus"
+      },
+      "pump": {
+        "name": "Pomp"
+      },
+      "pump_protect": {
+        "name": "Pompbeveiliging"
+      },
+      "waterlevel_auto_add": {
+        "name": "Automatisch water bijvullen"
+      },
+      "waterlevel_auto_reduce": {
+        "name": "Automatisch water verlagen"
+      },
+      "waterlevel_continuous": {
+        "name": "Continu waterpeil"
+      },
+      "waterlevel_installed": {
+        "name": "Waterpeilregeling geïnstalleerd"
+      },
+      "waterlevel_measuring": {
+        "name": "Waterpeil meten"
+      },
+      "waterlevel_on_error": {
+        "name": "Waterpeilfout"
+      },
+      "waterlevel_on_target": {
+        "name": "Waterpeil op streefwaarde"
+      },
+      "waterlevel_refilling": {
+        "name": "Waterpeil bijvullen"
+      }
+    },
+    "button": {
+      "clear_alarm": {
+        "name": "Alarm wissen"
+      },
+      "stop_backwash": {
+        "name": "Terugspoelen stoppen"
+      }
+    },
+    "select": {
+      "filtration_mode": {
+        "name": "Filtratiemodus",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continu",
+          "mode_24h": "24/24"
+        }
+      },
+      "forced_filtration": {
+        "name": "Geforceerde filtratie",
+        "state": {
+          "not_forced": "Niet geforceerd",
+          "forced_24h": "24 uur",
+          "forced_48h": "48 uur",
+          "forced_72h": "72 uur"
+        }
+      },
+      "pump_speed": {
+        "name": "Pompsnelheid",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "valve_position": {
+        "name": "Klepstand",
+        "state": {
+          "filter": "Filteren",
+          "waste": "Afvoer",
+          "closed": "Gesloten",
+          "backwash": "Terugspoelen",
+          "bypass": "Bypass",
+          "rinse": "Naspoelen"
+        }
+      }
+    },
+    "sensor": {
+      "api_cycle_elapsed_time": {
+        "name": "Verstreken cyclustijd (API)"
+      },
+      "api_cycle_remaining_time": {
+        "name": "Resterende cyclustijd (API)"
+      },
+      "cycle1_enabled": {
+        "name": "Cyclus 1 ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
+      },
+      "cycle1_start_time": {
+        "name": "Starttijd cyclus 1"
+      },
+      "cycle1_stop_time": {
+        "name": "Stoptijd cyclus 1"
+      },
+      "cycle2_enabled": {
+        "name": "Cyclus 2 ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
+      },
+      "cycle2_start_time": {
+        "name": "Starttijd cyclus 2"
+      },
+      "cycle2_stop_time": {
+        "name": "Stoptijd cyclus 2"
+      },
+      "cycle_elapsed_time": {
+        "name": "Verstreken cyclustijd"
+      },
+      "cycle_predicted_end": {
+        "name": "Verwacht einde cyclus"
+      },
+      "cycle_remaining_time": {
+        "name": "Resterende cyclustijd"
+      },
+      "daily_filtration_volume": {
+        "name": "Dagelijks filtratievolume"
+      },
+      "daily_turnovers": {
+        "name": "Dagelijkse omlopen"
+      },
+      "device_model": {
+        "name": "Apparaatmodel"
+      },
+      "disinfection_last_injection_duration": {
+        "name": "Duur laatste desinfectie-injectie"
+      },
+      "filter_backwash_duration": {
+        "name": "Duur terugspoelen"
+      },
+      "filter_backwash_mode": {
+        "name": "Terugspoelmodus",
+        "state": {
+          "inhibited": "Geblokkeerd",
+          "manual": "Handmatig",
+          "automatic": "Automatisch"
+        }
+      },
+      "filter_backwash_time": {
+        "name": "Tijdstip terugspoelen"
+      },
+      "filter_max_days": {
+        "name": "Maximaal aantal dagen tussen terugspoelen"
+      },
+      "filter_pressure": {
+        "name": "Drempel filterdruk"
+      },
+      "filter_rinse_duration": {
+        "name": "Duur naspoelen"
+      },
+      "filter_timer_mode": {
+        "name": "Filtertimermodus",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continu",
+          "forced_24h": "Geforceerd 24 u",
+          "forced_48h": "Geforceerd 48 u",
+          "forced_72h": "Geforceerd 72 u",
+          "mode_24h": "24/24",
+          "no_pump": "Geen pomp"
+        }
+      },
+      "filter_type": {
+        "name": "Filtertype",
+        "state": {
+          "no_filter": "Geen filter",
+          "pressure": "Drukfilter",
+          "suction": "Zuigfilter"
+        }
+      },
+      "filtration_mode": {
+        "name": "Filtratiemodus",
+        "state": {
+          "stop": "Stop",
+          "timer": "Timer",
+          "eco_plus": "Eco+",
+          "volume": "Volume",
+          "continuous": "Continu",
+          "forced_24h": "Geforceerd 24 u",
+          "forced_48h": "Geforceerd 48 u",
+          "forced_72h": "Geforceerd 72 u",
+          "mode_24h": "24/24",
+          "no_pump": "Geen pomp"
+        }
+      },
+      "firmware_version": {
+        "name": "Firmwareversie"
+      },
+      "flow_meter_rate": {
+        "name": "Debietmeterwaarde"
+      },
+      "forced_remaining": {
+        "name": "Resterende geforceerde filtratie"
+      },
+      "free_available_chlorine": {
+        "name": "Vrij beschikbaar chloor"
+      },
+      "free_chlorine": {
+        "name": "Vrij chloor"
+      },
+      "last_backwash": {
+        "name": "Laatste keer terugspoelen"
+      },
+      "last_ph_measure": {
+        "name": "Laatste pH-meting"
+      },
+      "last_refill": {
+        "name": "Laatste keer bijvullen"
+      },
+      "mains_voltage": {
+        "name": "Netspanning"
+      },
+      "orp": {
+        "name": "Redoxpotentiaal"
+      },
+      "orp_disinfectant": {
+        "name": "Type desinfectiemiddel",
+        "state": {
+          "read_only": "Alleen meten",
+          "chlorine": "Chloor",
+          "salt": "Zout",
+          "bromine": "Broom",
+          "poolcop_ocean": "PoolCop Ocean",
+          "da_space": "DA Space",
+          "da_gen": "DA Gen",
+          "aquark": "Aquark"
+        }
+      },
+      "orp_set_point": {
+        "name": "ORP-streefwaarde"
+      },
+      "orp_temperature_shutdown": {
+        "name": "ORP-uitschakeling bij temperatuur"
+      },
+      "os_version": {
+        "name": "Besturingssysteemversie"
+      },
+      "ph": {
+        "name": "pH"
+      },
+      "ph_dosing_time": {
+        "name": "Maximale pH-doseerduur"
+      },
+      "ph_high_threshold": {
+        "name": "Bovengrens pH"
+      },
+      "ph_last_injection_duration": {
+        "name": "Duur laatste pH-injectie"
+      },
+      "ph_low_threshold": {
+        "name": "Ondergrens pH"
+      },
+      "ph_set_point": {
+        "name": "pH-streefwaarde"
+      },
+      "ph_type": {
+        "name": "pH-doseermodus",
+        "state": {
+          "ph_minus": "pH-",
+          "ph_plus": "pH+",
+          "read_only": "Alleen meten"
+        }
+      },
+      "planned_remaining_turnovers": {
+        "name": "Geplande resterende omlopen"
+      },
+      "planned_remaining_volume": {
+        "name": "Gepland resterend filtervolume"
+      },
+      "pool_cover_reduction": {
+        "name": "Debietreductie afdekking"
+      },
+      "pool_nickname": {
+        "name": "Bijnaam zwembad"
+      },
+      "pool_turnover": {
+        "name": "Omloopsnelheid zwembad"
+      },
+      "pool_type": {
+        "name": "Zwembadtype",
+        "state": {
+          "classic_pool": "Klassiek zwembad",
+          "rimflow_type_a": "Overloopzwembad type A",
+          "rimflow_type_b": "Overloopzwembad type B",
+          "spa": "Spa"
+        }
+      },
+      "pool_volume": {
+        "name": "Zwembadvolume"
+      },
+      "pressure": {
+        "name": "Druk"
+      },
+      "pump_flow_rate": {
+        "name": "Pompdebiet"
+      },
+      "pump_flowrate": {
+        "name": "Basisdebiet pomp"
+      },
+      "pump_nb_speeds": {
+        "name": "Aantal pompsnelheden"
+      },
+      "pump_pressure_alarm": {
+        "name": "Alarmdrempel pompdruk"
+      },
+      "pump_pressure_low": {
+        "name": "Drempel lage pompdruk"
+      },
+      "pump_speed": {
+        "name": "Pompsnelheid",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_speed_24h": {
+        "name": "Pompsnelheid 24 u",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_speed_backwash": {
+        "name": "Pompsnelheid terugspoelen",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_speed_cover": {
+        "name": "Pompsnelheid afdekking",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_speed_cycle1": {
+        "name": "Pompsnelheid cyclus 1",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_speed_cycle2": {
+        "name": "Pompsnelheid cyclus 2",
+        "state": {
+          "none": "Uit",
+          "speed_1": "Snelheid 1",
+          "speed_2": "Snelheid 2",
+          "speed_3": "Snelheid 3",
+          "speed_4": "Snelheid 4",
+          "speed_5": "Snelheid 5",
+          "speed_6": "Snelheid 6",
+          "speed_7": "Snelheid 7",
+          "speed_8": "Snelheid 8"
+        }
+      },
+      "pump_type": {
+        "name": "Pomptype",
+        "state": {
+          "no_pump": "Geen pomp",
+          "mono_speed_pump": "Eentoerenpomp",
+          "pentair_intelliflo": "Pentair IntelliFlo",
+          "pentair_superflo": "Pentair SuperFlo",
+          "hayward_ecostar": "Hayward EcoStar",
+          "hayward_tristar": "Hayward TriStar",
+          "badu_ecotouch": "BADU EcoTouch",
+          "badu_ecomotion": "BADU EcoMotion",
+          "zodiac_flopro": "Zodiac FloPro",
+          "invertek_optidrive": "Invertek Optidrive",
+          "binary_combination": "Binaire combinatie",
+          "davey_promaster": "Davey ProMaster",
+          "acis_vipool_mkb": "ACIS VIPool MKB",
+          "dab_eswim": "DAB E.swim",
+          "aquagem_isaver_plus": "AquaGem iSAVER+",
+          "saci_epool_ejoy": "SACI e-pool e.joy",
+          "schneider_atv21": "Schneider ATV21"
+        }
+      },
+      "running_status": {
+        "name": "Bedrijfsstatus",
+        "state": {
+          "stopped": "Gestopt",
+          "freeze_protection": "Vorstbeveiliging",
+          "forced_mode": "Geforceerde filtratie",
+          "eco_plus_mode": "Eco+",
+          "timer_mode": "Timer",
+          "manual": "Handmatig",
+          "paused": "Gepauzeerd",
+          "external_request": "Extern",
+          "water_level_management": "Waterpeilbeheer",
+          "mode_24h": "24/24"
+        }
+      },
+      "salt": {
+        "name": "Zout"
+      },
+      "temperature_air": {
+        "name": "Luchttemperatuur"
+      },
+      "temperature_water": {
+        "name": "Watertemperatuur"
+      },
+      "total_chlorine": {
+        "name": "Totaal chloor"
+      },
+      "valve_position": {
+        "name": "Klepstand",
+        "state": {
+          "filter": "Filteren",
+          "waste": "Afvoer",
+          "closed": "Gesloten",
+          "backwash": "Terugspoelen",
+          "bypass": "Bypass",
+          "rinse": "Naspoelen"
+        }
+      },
+      "voltage": {
+        "name": "Batterijspanning"
+      },
+      "waterlevel": {
+        "name": "Waterpeil",
+        "state": {
+          "faulty": "Defect",
+          "low": "Laag",
+          "normal": "Normaal",
+          "high": "Hoog",
+          "very_high": "Zeer hoog"
+        }
+      },
+      "waterlevel_draining_duration": {
+        "name": "Afvoerduur waterpeil"
+      },
+      "waterlevel_max_duration": {
+        "name": "Maximale bijvulduur waterpeil"
+      },
+      "waterlevel_set_point": {
+        "name": "Streefwaarde waterpeil",
+        "state": {
+          "faulty": "Defect",
+          "low": "Laag",
+          "normal": "Normaal",
+          "high": "Hoog",
+          "very_high": "Zeer hoog"
+        }
+      },
+      "aux_timer_enabled": {
+        "name": "{aux} ingeschakeld",
+        "state": {
+          "disabled": "Uitgeschakeld",
+          "enabled": "Ingeschakeld"
+        }
+      },
+      "aux_timer_start_time": {
+        "name": "{aux} starttijd"
+      }
+    },
+    "switch": {
+      "jet_stream_switch": {
+        "name": "Tegenstroominstallatie"
+      },
+      "pump_switch": {
+        "name": "Pomp"
+      }
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "De PoolCop API-sleutel is geweigerd"
+    },
+    "access_expired": {
+      "message": "De PoolCop-cloudtoegang voor dit apparaat is verlopen"
+    },
+    "rate_limited": {
+      "message": "De limiet van de PoolCop API is overschreden; probeer het over een paar seconden opnieuw"
+    },
+    "update_failed": {
+      "message": "Fout bij de communicatie met de PoolCop API: {error}"
+    },
+    "command_failed": {
+      "message": "De PoolCop-opdracht is mislukt: {error}"
+    },
+    "entry_not_found": {
+      "message": "PoolCop-configuratie-item {entry_id} is niet gevonden"
+    },
+    "entry_not_loaded": {
+      "message": "{title} is niet geladen"
+    },
+    "entry_required": {
+      "message": "Er is meer dan één PoolCop geconfigureerd; kies er een met config_entry_id"
+    },
+    "no_loaded_entries": {
+      "message": "Er is geen PoolCop geladen"
+    },
+    "nothing_to_change": {
+      "message": "Geef een filtratiemodus of minstens één cyclusinstelling op"
+    }
+  },
+  "issues": {
+    "new_api_key": {
+      "title": "{title} heeft een nieuwe PoolCop API-sleutel nodig",
+      "description": "Versie 3.0 van de PoolCop-integratie gebruikt de nieuwe PoolCop Client API, omdat de PoolCopilot API wordt stopgezet. Je bestaande sleutel werkt hier niet mee.\n\nLog in op [MyPoolCop]({api_key_url}), open **Profiel**, klik in het blok **API-sleutel** op **Mijn sleutel beheren** en daarna op **Een sleutel genereren** en voer die in wanneer Home Assistant je vraagt om {title} opnieuw te authenticeren. Dit bericht verdwijnt zodra de nieuwe sleutel werkt."
+    },
+    "cloud_access_expired": {
+      "title": "PoolCop-cloudtoegang verlopen voor {title}",
+      "description": "PoolCop meldt dat de cloudtoegang voor {title} is verlopen, waardoor Home Assistant het apparaat niet kan uitlezen of bedienen. Verleng de cloudtoegang in MyPoolCop of neem contact op met je PoolCop-dealer. Dit bericht verdwijnt zodra het apparaat weer bereikbaar is."
+    }
+  },
+  "services": {
+    "set_pump_speed": {
+      "name": "Pompsnelheid instellen",
+      "description": "Stelt de pompsnelheid in.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "speed": {
+          "name": "Snelheid",
+          "description": "Pompsnelheid: 0 is uit, 1 tot 8 zijn de snelheden die je pomp ondersteunt."
+        }
+      }
+    },
+    "toggle_pump": {
+      "name": "Pomp omschakelen",
+      "description": "Zet de pomp aan als deze uit staat, of uit als deze aan staat.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        }
+      }
+    },
+    "toggle_aux": {
+      "name": "Hulpuitgang omschakelen",
+      "description": "Zet een hulpuitgang aan als deze uit staat, of uit als deze aan staat.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "aux_id": {
+          "name": "Hulpuitgang",
+          "description": "Het nummer van de hulpuitgang."
+        },
+        "module": {
+          "name": "Module",
+          "description": "De uitbreidingsmodule van de uitgang; Geen voor de PoolCop zelf."
+        }
+      }
+    },
+    "set_valve_position": {
+      "name": "Klepstand instellen",
+      "description": "Draait de meerwegklep naar een stand.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "position": {
+          "name": "Stand",
+          "description": "De klepstand."
+        }
+      }
+    },
+    "clear_alarm": {
+      "name": "Alarm wissen",
+      "description": "Wist één alarm, of alle actieve alarmen.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "alarm_code": {
+          "name": "Alarmcode",
+          "description": "Het alarm dat gewist moet worden, bijvoorbeeld PressureLowPump1. Laat leeg om alle alarmen te wissen."
+        }
+      }
+    },
+    "stop_backwash": {
+      "name": "Terugspoelen stoppen",
+      "description": "Stopt een lopende terugspoeling.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        }
+      }
+    },
+    "set_filtration_mode": {
+      "name": "Filtratiemodus instellen",
+      "description": "Stelt de filtratiemodus in en behoudt de huidige cyclustijden.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "mode": {
+          "name": "Modus",
+          "description": "De filtratiemodus."
+        }
+      }
+    },
+    "set_filtration_timers": {
+      "name": "Filtratietimers instellen",
+      "description": "Stelt de cyclustijden van de filtratie in en, optioneel, de filtratiemodus. Instellingen die je weglaat behouden hun huidige waarde.",
+      "fields": {
+        "config_entry_id": {
+          "name": "PoolCop",
+          "description": "De PoolCop die je wilt bedienen. Vereist wanneer er meer dan één is geconfigureerd."
+        },
+        "mode": {
+          "name": "Modus",
+          "description": "De filtratiemodus. Standaard de huidige modus."
+        },
+        "cycle_1_enabled": {
+          "name": "Cyclus 1 ingeschakeld",
+          "description": "Of filtratiecyclus 1 draait."
+        },
+        "cycle_1_start": {
+          "name": "Start cyclus 1",
+          "description": "Starttijd van filtratiecyclus 1."
+        },
+        "cycle_1_end": {
+          "name": "Einde cyclus 1",
+          "description": "Eindtijd van filtratiecyclus 1."
+        },
+        "cycle_2_enabled": {
+          "name": "Cyclus 2 ingeschakeld",
+          "description": "Of filtratiecyclus 2 draait."
+        },
+        "cycle_2_start": {
+          "name": "Start cyclus 2",
+          "description": "Starttijd van filtratiecyclus 2."
+        },
+        "cycle_2_end": {
+          "name": "Einde cyclus 2",
+          "description": "Eindtijd van filtratiecyclus 2."
+        }
+      }
+    }
+  }
+}
